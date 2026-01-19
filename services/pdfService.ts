@@ -67,15 +67,6 @@ export const generateReportPDF = (
           ${tableBodyHtml}
         </tbody>
       </table>
-
-      <!-- Footer -->
-      <div style="margin-top: 50px; display: flex; justify-content: flex-end;">
-        <div style="text-align: center; width: 200px;">
-          <p style="margin-bottom: 60px; font-size: 10px;">Dicetak oleh,</p>
-          <p style="margin: 0; font-size: 10px; font-weight: bold; border-bottom: 1px solid #000; display: inline-block; padding: 0 20px;">${settings.adminName}</p>
-          <p style="margin: 5px 0 0; font-size: 8px; color: #666; text-transform: uppercase;">Penanggung Jawab Gudang</p>
-        </div>
-      </div>
     </div>
   `;
 
