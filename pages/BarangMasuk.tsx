@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { useInventory } from '../App';
-import { Plus, Trash2, Download, Upload, Search, X, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Download, Upload, Search, X, Edit2, FileText } from 'lucide-react';
 import { InboundEntry, MONTHS, formatIndoDate } from '../types';
 import { exportToExcel, parseExcel } from '../services/excelService';
+import { generateReportPDF } from '../services/pdfService';
 
 const BarangMasuk: React.FC = () => {
   const { products, inbound, setInbound, settings } = useInventory();
@@ -45,7 +46,6 @@ const BarangMasuk: React.FC = () => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.productId) return alert('Pilih barang!');
-    
     if (editingEntry) {
       setInbound(inbound.map(i => i.id === editingEntry.id ? { ...i, ...formData } : i));
     } else {
@@ -54,7 +54,32 @@ const BarangMasuk: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleExport = () => {
+  const handleExportPDF = () => {
+    const columns = [
+      { header: 'No', dataKey: 'no', align: 'center' as const },
+      { header: 'Tanggal', dataKey: 'tglFormatted' },
+      { header: 'Barang', dataKey: 'nama' },
+      { header: 'Kode', dataKey: 'kode' },
+      { header: 'Jumlah', dataKey: 'jumlah', align: 'center' as const },
+      { header: 'Total Nilai', dataKey: 'total', align: 'right' as const, format: (v: any) => `Rp ${v.toLocaleString('id-ID')}` }
+    ];
+    
+    const data = filteredInbound.map((i, idx) => {
+      const p = products.find(prod => prod.id === i.productId);
+      return {
+        no: idx + 1,
+        tglFormatted: formatIndoDate(i.tanggal),
+        nama: p?.namaBarang || '-',
+        kode: p?.kodeBarang || '-',
+        jumlah: `${i.jumlah} ${p?.satuan || ''}`,
+        total: (p?.harga || 0) * i.jumlah
+      };
+    });
+    
+    generateReportPDF('LOG BARANG MASUK', columns, data, settings);
+  };
+
+  const handleExportExcel = () => {
     const data = filteredInbound.map(i => {
       const p = products.find(prod => prod.id === i.productId);
       return { 
@@ -77,21 +102,10 @@ const BarangMasuk: React.FC = () => {
     if (file) {
       try {
         const rawData = await parseExcel(file);
-        if (!rawData || rawData.length === 0) {
-          alert('File kosong atau format tidak sesuai.');
-          return;
-        }
-
+        if (!rawData || rawData.length === 0) return;
         const firstRow = rawData[0];
-        let kodeIdx = -1;
-        let jumlahIdx = -1;
-        let bulanIdx = -1;
-        let tahunIdx = -1;
-
-        const hasHeader = firstRow.some((cell: any) => 
-          /KODE|JUMLAH|QTY|NAMA|SATUAN|HARGA|BULAN|TAHUN/i.test(String(cell))
-        );
-        
+        let kodeIdx = -1, jumlahIdx = -1, bulanIdx = -1, tahunIdx = -1;
+        const hasHeader = firstRow.some((cell: any) => /KODE|JUMLAH|QTY|NAMA|SATUAN|HARGA|BULAN|TAHUN/i.test(String(cell)));
         if (hasHeader) {
           firstRow.forEach((cell: any, idx: number) => {
             const val = String(cell).toUpperCase();
@@ -101,63 +115,31 @@ const BarangMasuk: React.FC = () => {
             if (val.includes('TAHUN')) tahunIdx = idx;
           });
         }
-
-        if (kodeIdx === -1) kodeIdx = 0; 
-        if (jumlahIdx === -1) jumlahIdx = 4;
-        if (bulanIdx === -1) bulanIdx = 6;
-        if (tahunIdx === -1) tahunIdx = 7;
-
+        if (kodeIdx === -1) kodeIdx = 0; if (jumlahIdx === -1) jumlahIdx = 4;
+        if (bulanIdx === -1) bulanIdx = 6; if (tahunIdx === -1) tahunIdx = 7;
         const dataRows = hasHeader ? rawData.slice(1) : rawData;
-
         const imported: InboundEntry[] = dataRows.map((row: any) => {
           let cols = Array.isArray(row) ? row : [];
-          if (typeof row === 'string') {
-            cols = row.split(/[;,]/);
-          } else if (cols.length === 1 && typeof cols[0] === 'string' && cols[0].includes(';')) {
-            cols = cols[0].split(';');
-          }
-
           if (cols.length <= Math.max(kodeIdx, jumlahIdx)) return null;
-          
           const kode = String(cols[kodeIdx] || '').trim();
           const qty = parseInt(String(cols[jumlahIdx] || '0').replace(/\./g, '')) || 0;
-          
           const p = products.find(prod => prod.kodeBarang === kode);
           if (!p || qty <= 0) return null;
-
           const d = new Date();
-          const importedBulan = String(cols[bulanIdx] || '').trim();
-          const importedTahun = parseInt(String(cols[tahunIdx] || '')) || d.getFullYear();
-
-          return {
-            id: crypto.randomUUID(),
-            productId: p.id,
-            jumlah: qty,
-            tanggal: d.toISOString().split('T')[0],
-            bulan: MONTHS.includes(importedBulan) ? importedBulan : MONTHS[d.getMonth()],
-            tahun: importedTahun
-          };
+          return { id: crypto.randomUUID(), productId: p.id, jumlah: qty, tanggal: d.toISOString().split('T')[0], bulan: MONTHS[d.getMonth()], tahun: d.getFullYear() };
         }).filter(Boolean) as InboundEntry[];
-
         if (imported.length > 0) {
           setInbound(prev => [...prev, ...imported]);
-          alert(`Berhasil mengimpor ${imported.length} data barang masuk.`);
-        } else {
-          alert('Tidak ada data valid yang bisa diimpor.');
+          alert(`Berhasil impor ${imported.length} data.`);
         }
-      } catch (err) { 
-        alert('Gagal mengimpor file. Pastikan format file sesuai.'); 
-      }
+      } catch (err) { alert('Gagal impor.'); }
     }
     e.target.value = '';
   };
 
   const filteredInbound = inbound.filter(i => {
     const p = products.find(prod => prod.id === i.productId);
-    return (
-      p?.namaBarang.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p?.kodeBarang.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return p?.namaBarang.toLowerCase().includes(searchQuery.toLowerCase()) || p?.kodeBarang.toLowerCase().includes(searchQuery.toLowerCase());
   }).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
 
   return (
@@ -171,11 +153,14 @@ const BarangMasuk: React.FC = () => {
           <button onClick={() => handleOpenModal()} className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg text-xs uppercase tracking-widest transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
             <Plus size={18} /> Tambah Data
           </button>
-          <button onClick={handleExport} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50">
-            <Download size={18} className="text-emerald-500" /> Export Excel
+          <button onClick={handleExportPDF} className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:bg-red-100">
+            <FileText size={18} /> Export PDF
+          </button>
+          <button onClick={handleExportExcel} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50">
+            <Download size={18} className="text-emerald-500" /> Excel
           </button>
           <label className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm cursor-pointer hover:bg-slate-50">
-            <Upload size={18} className="text-blue-500" /> Import Excel
+            <Upload size={18} className="text-blue-500" /> Import
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
           </label>
         </div>

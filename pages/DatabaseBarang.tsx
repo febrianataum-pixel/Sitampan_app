@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { useInventory } from '../App';
-import { Plus, Edit2, Trash2, Download, Upload, Search, X, CheckSquare, Square } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Upload, Search, X, CheckSquare, Square, FileText } from 'lucide-react';
 import { Product } from '../types';
 import { exportToExcel, parseExcel } from '../services/excelService';
+import { generateReportPDF } from '../services/pdfService';
 
 const DatabaseBarang: React.FC = () => {
   const { products, setProducts, settings } = useInventory();
@@ -67,7 +68,7 @@ const DatabaseBarang: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const data = products.map(p => ({
       'KODE BARANG': p.kodeBarang,
       'NAMA BARANG': p.namaBarang,
@@ -77,18 +78,27 @@ const DatabaseBarang: React.FC = () => {
     exportToExcel(data, 'Database_Barang');
   };
 
+  const handleExportPDF = () => {
+    const columns = [
+      { header: 'No', dataKey: 'no', align: 'center' as const, format: (v: any) => String(v) },
+      { header: 'Kode', dataKey: 'kodeBarang' },
+      { header: 'Nama Barang', dataKey: 'namaBarang' },
+      { header: 'Satuan', dataKey: 'satuan', align: 'center' as const },
+      { header: 'Harga Satuan', dataKey: 'harga', align: 'right' as const, format: (v: any) => `Rp ${v.toLocaleString('id-ID')}` }
+    ];
+    const dataWithIndex = filteredProducts.map((p, idx) => ({ ...p, no: idx + 1 }));
+    generateReportPDF('DATABASE BARANG', columns, dataWithIndex, settings);
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       try {
         const rawData = await parseExcel(file);
         if (!rawData || rawData.length === 0) return;
-        
-        // Skip baris pertama jika itu adalah header (mengandung kata 'KODE' atau 'NAMA')
         const firstRow = rawData[0];
         const hasHeader = firstRow.some((cell: any) => /KODE|NAMA|SATUAN|HARGA/i.test(String(cell)));
         const dataRows = hasHeader ? rawData.slice(1) : rawData;
-
         const imported = dataRows.map((row: any[]) => {
           if (!row || row.length < 2) return null;
           const kode = String(row[0] || '').trim();
@@ -96,18 +106,9 @@ const DatabaseBarang: React.FC = () => {
           const satuan = String(row[2] || '').trim();
           const hargaRaw = row[3] || '0';
           const harga = Number(String(hargaRaw).replace(/[^0-9.-]+/g, '')) || 0;
-          
           if (!kode || !nama) return null;
-
-          return { 
-            id: crypto.randomUUID(), 
-            kodeBarang: kode, 
-            namaBarang: nama, 
-            satuan: satuan || 'Unit', 
-            harga 
-          };
+          return { id: crypto.randomUUID(), kodeBarang: kode, namaBarang: nama, satuan: satuan || 'Unit', harga };
         }).filter(Boolean) as Product[];
-
         if (imported.length > 0) {
           const existingCodes = new Set(products.map(p => p.kodeBarang));
           const newItems = imported.filter(p => !existingCodes.has(p.kodeBarang));
@@ -142,11 +143,14 @@ const DatabaseBarang: React.FC = () => {
           <button onClick={() => handleOpenModal()} className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-black shadow-xl transition-all active:scale-95 text-xs uppercase tracking-widest" style={{ backgroundColor: settings.themeColor }}>
             <Plus size={18} /> Tambah Barang
           </button>
-          <button onClick={handleExport} className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-black shadow-sm text-xs uppercase tracking-widest transition-colors">
-            <Download size={18} className="text-emerald-500" /> Export Excel
+          <button onClick={handleExportPDF} className="flex items-center gap-2 bg-red-50 border border-red-100 hover:bg-red-100 text-red-700 px-4 py-2.5 rounded-xl font-black shadow-sm text-xs uppercase tracking-widest transition-colors">
+            <FileText size={18} /> Export PDF
+          </button>
+          <button onClick={handleExportExcel} className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-black shadow-sm text-xs uppercase tracking-widest transition-colors">
+            <Download size={18} className="text-emerald-500" /> Excel
           </button>
           <label className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-black cursor-pointer shadow-sm text-xs uppercase tracking-widest transition-colors">
-            <Upload size={18} className="text-blue-500" /> Import Excel
+            <Upload size={18} className="text-blue-500" /> Import
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
           </label>
         </div>

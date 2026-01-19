@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { useInventory } from '../App';
-import { Download, Search, AlertTriangle } from 'lucide-react';
+import { Download, Search, AlertTriangle, FileText } from 'lucide-react';
 import { exportToCSV } from '../services/csvService';
+import { generateReportPDF } from '../services/pdfService';
 
 const StokBarang: React.FC = () => {
   const { products, calculateStock, settings } = useInventory();
@@ -19,7 +20,7 @@ const StokBarang: React.FC = () => {
     s.kodeBarang.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleExport = () => {
+  const handleExportCSV = () => {
     const data = filteredStock.map(s => ({
       'KODE BARANG': s.kodeBarang,
       'NAMA BARANG': s.namaBarang,
@@ -31,6 +32,20 @@ const StokBarang: React.FC = () => {
     exportToCSV(data, 'Laporan_Stok_Barang');
   };
 
+  const handleExportPDF = () => {
+    const columns = [
+      { header: 'No', dataKey: 'no', align: 'center' as const },
+      { header: 'Kode', dataKey: 'kodeBarang' },
+      { header: 'Nama Barang', dataKey: 'namaBarang' },
+      { header: 'Stok Sisa', dataKey: 'stokSaatIni', align: 'center' as const, format: (v: any) => String(v) },
+      { header: 'Satuan', dataKey: 'satuan', align: 'center' as const },
+      { header: 'Harga Satuan', dataKey: 'harga', align: 'right' as const, format: (v: any) => `Rp ${v.toLocaleString('id-ID')}` },
+      { header: 'Total Nilai', dataKey: 'nilaiStok', align: 'right' as const, format: (v: any) => `Rp ${v.toLocaleString('id-ID')}` }
+    ];
+    const dataWithIndex = filteredStock.map((s, idx) => ({ ...s, no: idx + 1 }));
+    generateReportPDF('REKAPITULASI STOK BARANG', columns, dataWithIndex, settings);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -38,9 +53,14 @@ const StokBarang: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Stok Barang</h2>
           <p className="text-slate-500 text-sm font-medium">Monitoring ketersediaan stok secara real-time.</p>
         </div>
-        <button onClick={handleExport} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-black shadow-xl hover:bg-black transition-all active:scale-95 text-xs uppercase tracking-widest">
-          <Download size={18}/> Export CSV
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportPDF} className="bg-red-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-black shadow-xl hover:bg-red-700 transition-all active:scale-95 text-xs uppercase tracking-widest">
+            <FileText size={18}/> Export PDF
+          </button>
+          <button onClick={handleExportCSV} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-black shadow-xl hover:bg-black transition-all active:scale-95 text-xs uppercase tracking-widest">
+            <Download size={18}/> Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
