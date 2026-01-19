@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
-import { HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { 
   Database, 
   ArrowDownCircle, 
@@ -13,11 +13,10 @@ import {
   LayoutDashboard,
   CalendarDays,
   UserCircle,
-  Wifi,
   WifiOff
 } from 'lucide-react';
 import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import Dashboard from './pages/Dashboard';
 import DatabaseBarang from './pages/DatabaseBarang';
 import BarangMasuk from './pages/BarangMasuk';
@@ -36,7 +35,7 @@ interface InventoryContextType {
   outbound: OutboundTransaction[];
   setOutbound: (data: OutboundTransaction[] | ((prev: OutboundTransaction[]) => OutboundTransaction[])) => void;
   settings: AppSettings;
-  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
+  setSettings: (newSettings: AppSettings) => void;
   calculateStock: (productId: string) => number;
   isCloudConnected: boolean;
 }
@@ -50,9 +49,15 @@ export const useInventory = () => {
 };
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { settings, isCloudConnected } = useInventory();
+  const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
+
+  // Tutup sidebar di mobile saat ganti halaman
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
@@ -67,50 +72,107 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} fixed md:relative z-40 h-full bg-slate-900 text-white transition-all duration-300 flex flex-col no-print shadow-2xl`}>
-        <div className="p-6 flex items-center gap-3 h-20 overflow-hidden">
-          <div className="shrink-0">{settings.logo ? <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" /> : <Package className="text-blue-400" size={28} />}</div>
-          {isSidebarOpen && <div className="flex flex-col truncate"><span className="font-bold text-lg uppercase leading-tight">{settings.appName}</span></div>}
+      {/* Backdrop Mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar / Drawer */}
+      <aside className={`
+        fixed md:relative z-50 h-full bg-slate-900 text-white transition-all duration-300 flex flex-col no-print shadow-2xl
+        ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20'}
+      `}>
+        <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
+          <div className="shrink-0">
+            {settings.logo ? (
+              <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+            ) : (
+              <Package className="text-blue-400" size={28} />
+            )}
+          </div>
+          <div className={`flex flex-col truncate transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'md:opacity-0 md:hidden'}`}>
+            <span className="font-bold text-lg uppercase leading-tight truncate">{settings.appName}</span>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden ml-auto p-2 hover:bg-white/10 rounded-lg">
+            <X size={20} />
+          </button>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-hide">
           {menuItems.map((item) => (
-            <NavLink key={item.path} to={item.path} className={({ isActive }) => `flex items-center gap-3 p-3 rounded-xl transition-all ${isActive ? 'text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`} style={({ isActive }) => isActive ? { backgroundColor: settings.themeColor } : {}}>
+            <NavLink 
+              key={item.path} 
+              to={item.path} 
+              className={({ isActive }) => `
+                flex items-center gap-3 p-3 rounded-xl transition-all
+                ${isActive ? 'text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}
+              `} 
+              style={({ isActive }) => isActive ? { backgroundColor: settings.themeColor } : {}}
+            >
               <div className="shrink-0">{item.icon}</div>
-              {isSidebarOpen && <span className="font-semibold text-sm">{item.name}</span>}
+              <span className={`font-semibold text-sm transition-all duration-300 ${isSidebarOpen ? 'opacity-100 block' : 'md:opacity-0 md:hidden'}`}>
+                {item.name}
+              </span>
             </NavLink>
           ))}
         </nav>
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-4 hover:bg-white/5 flex justify-center text-slate-400 border-t border-white/5">{isSidebarOpen ? <X size={20} /> : <Menu size={20} />}</button>
+
+        <button 
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+          className="hidden md:flex p-4 hover:bg-white/5 justify-center text-slate-400 border-t border-white/5"
+        >
+          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
       </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center px-6 no-print justify-between z-30">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 bg-slate-100 rounded-lg text-slate-600"><Menu size={20}/></button>
-            <div className="flex items-center gap-3">
-              <h1 className="text-sm font-bold text-slate-800 uppercase tracking-widest hidden sm:block">{settings.appName}</h1>
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 md:px-6 no-print justify-between z-30 shrink-0 sticky top-0">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <button 
+              onClick={() => setIsSidebarOpen(true)} 
+              className="p-2 bg-slate-100 rounded-xl text-slate-600 active:scale-95 md:hidden"
+            >
+              <Menu size={20}/>
+            </button>
+            
+            <div className="flex items-center gap-2 overflow-hidden">
+              <h1 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-widest truncate">
+                {settings.appName}
+              </h1>
               {isCloudConnected ? (
-                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[9px] font-bold border border-emerald-100">
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full sync-pulse"></div> REALTIME SYNC
+                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full text-[8px] md:text-[9px] font-bold border border-emerald-100 whitespace-nowrap">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full sync-pulse shrink-0"></div> 
+                  <span>SYNC LIVE</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[9px] font-bold border border-slate-200">
-                  <WifiOff size={10} /> OFFLINE MODE
+                <div className="flex items-center gap-1.5 bg-slate-100 text-slate-400 px-2 py-1 rounded-full text-[8px] md:text-[9px] font-bold border border-slate-200 whitespace-nowrap">
+                  <WifiOff size={10} className="shrink-0" /> 
+                  <span>LOCAL</span>
                 </div>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2 shrink-0">
             <div className="text-right hidden sm:block">
-               <p className="text-sm font-bold text-slate-700 leading-none mb-1">{settings.adminName}</p>
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{todayFormatted}</p>
+               <p className="text-xs font-bold text-slate-700 leading-none">{settings.adminName}</p>
+               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{todayFormatted}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden">
+            <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden">
                {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" /> : settings.adminName.charAt(0)}
             </div>
           </div>
         </header>
-        <div className="flex-1 overflow-auto p-4 md:p-8">{children}</div>
+
+        <main className="flex-1 overflow-auto p-4 md:p-8">
+          <div className="max-w-[1600px] mx-auto pb-10">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );
@@ -121,7 +183,7 @@ const App: React.FC = () => {
   const [inbound, setInboundState] = useState<InboundEntry[]>([]);
   const [outbound, setOutboundState] = useState<OutboundTransaction[]>([]);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>(() => {
+  const [settings, setSettingsState] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('inv_settings');
     return saved ? JSON.parse(saved) : {
       appName: 'SITAMPAN',
@@ -139,7 +201,7 @@ const App: React.FC = () => {
   const dbRef = useRef<any>(null);
   const isRemoteChange = useRef(false);
 
-  // Inisialisasi Firebase
+  // Sync Logic with Firebase
   useEffect(() => {
     if (settings.fbApiKey && settings.fbProjectId && settings.syncEnabled) {
       try {
@@ -152,7 +214,7 @@ const App: React.FC = () => {
         dbRef.current = getFirestore(app);
         setIsCloudConnected(true);
 
-        // Listen Realtime
+        // Listeners
         const unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
           isRemoteChange.current = true;
           setProductsState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
@@ -171,40 +233,57 @@ const App: React.FC = () => {
           setTimeout(() => isRemoteChange.current = false, 500);
         });
 
+        // Listen Settings Sync (Kecuali Key Firebase)
+        const unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
+          if (snap.exists()) {
+            const remoteSettings = snap.data();
+            setSettingsState(prev => ({
+              ...prev,
+              appName: remoteSettings.appName || prev.appName,
+              appSubtitle: remoteSettings.appSubtitle || prev.appSubtitle,
+              adminName: remoteSettings.adminName || prev.adminName,
+              warehouseName: remoteSettings.warehouseName || prev.warehouseName,
+              themeColor: remoteSettings.themeColor || prev.themeColor,
+              logo: remoteSettings.logo || prev.logo
+            }));
+          }
+        });
+
         return () => {
-          unsubProducts();
-          unsubInbound();
-          unsubOutbound();
+          unsubProducts(); unsubInbound(); unsubOutbound(); unsubSettings();
         };
       } catch (e) {
-        console.error("Firebase Error:", e);
         setIsCloudConnected(false);
       }
     } else {
       setIsCloudConnected(false);
-      // Load from LocalStorage if no sync
-      const p = localStorage.getItem('inv_products');
-      const i = localStorage.getItem('inv_inbound');
-      const o = localStorage.getItem('inv_outbound');
-      if (p) setProductsState(JSON.parse(p));
-      if (i) setInboundState(JSON.parse(i));
-      if (o) setOutboundState(JSON.parse(o));
+      // Load from Local if Cloud off
+      ['products', 'inbound', 'outbound'].forEach(key => {
+        const saved = localStorage.getItem(`inv_${key}`);
+        if (saved) {
+          if (key === 'products') setProductsState(JSON.parse(saved));
+          if (key === 'inbound') setInboundState(JSON.parse(saved));
+          if (key === 'outbound') setOutboundState(JSON.parse(saved));
+        }
+      });
     }
   }, [settings.fbApiKey, settings.fbProjectId, settings.syncEnabled]);
 
-  // Simpan Settings
-  useEffect(() => {
-    localStorage.setItem('inv_settings', JSON.stringify(settings));
-  }, [settings]);
+  const setSettings = async (newSettings: AppSettings) => {
+    setSettingsState(newSettings);
+    localStorage.setItem('inv_settings', JSON.stringify(newSettings));
+    if (isCloudConnected && dbRef.current) {
+      // Hanya sinkronkan data profil ke cloud, bukan API KEY-nya demi keamanan
+      const { fbApiKey, fbProjectId, fbAppId, ...syncable } = newSettings;
+      await setDoc(doc(dbRef.current, 'config', 'app_settings'), syncable);
+    }
+  };
 
-  // Sync Logics (Writers)
   const setProducts = async (newData: Product[] | ((prev: Product[]) => Product[])) => {
     const value = typeof newData === 'function' ? newData(products) : newData;
     setProductsState(value);
     localStorage.setItem('inv_products', JSON.stringify(value));
     if (isCloudConnected && !isRemoteChange.current) {
-      // Sync logic here: Untuk efisiensi biasanya kita push item per item di Page, 
-      // tapi untuk kesederhanaan kita push per koleksi (Batch).
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'products', item.id), item);
       }

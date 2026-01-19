@@ -7,6 +7,11 @@ const Profile: React.FC = () => {
   const { settings, setSettings, isCloudConnected } = useInventory();
   const [isTesting, setIsTesting] = useState(false);
 
+  // Fungsi untuk membersihkan input dari tanda kutip dan spasi tambahan
+  const sanitizeInput = (val: string) => {
+    return val.replace(/['"]+/g, '').trim();
+  };
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -19,7 +24,8 @@ const Profile: React.FC = () => {
   const testConnection = async () => {
     if (!settings.fbApiKey || !settings.fbProjectId) return alert('Lengkapi data API Key dan Project ID Firebase!');
     setIsTesting(true);
-    // Kita anggap berhasil jika user klik ini untuk mengaktifkan
+    
+    // Simulasi penyimpanan dan aktivasi
     setTimeout(() => {
       setSettings({ ...settings, syncEnabled: true });
       setIsTesting(false);
@@ -52,33 +58,33 @@ const Profile: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div className="space-y-2">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Firebase API Key</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Firebase API Key (Tanpa Tanda Kutip)</label>
                   <input 
                     type="password" 
-                    placeholder="AIzaSyA..."
+                    placeholder="Contoh: AIzaSyA..."
                     className="w-full bg-white/10 border border-white/5 rounded-2xl px-6 py-4 font-bold text-white focus:bg-white/20 outline-none transition-all placeholder:text-white/20"
                     value={settings.fbApiKey || ''}
-                    onChange={(e) => setSettings({ ...settings, fbApiKey: e.target.value })}
+                    onChange={(e) => setSettings({ ...settings, fbApiKey: sanitizeInput(e.target.value) })}
                   />
                </div>
                <div className="space-y-2">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Firebase Project ID</label>
                   <input 
                     type="text" 
-                    placeholder="my-project-123"
+                    placeholder="Contoh: my-project-123"
                     className="w-full bg-white/10 border border-white/5 rounded-2xl px-6 py-4 font-bold text-white focus:bg-white/20 outline-none transition-all placeholder:text-white/20"
                     value={settings.fbProjectId || ''}
-                    onChange={(e) => setSettings({ ...settings, fbProjectId: e.target.value })}
+                    onChange={(e) => setSettings({ ...settings, fbProjectId: sanitizeInput(e.target.value) })}
                   />
                </div>
                <div className="md:col-span-2 space-y-2">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">App ID (Opsional)</label>
                   <input 
                     type="text" 
-                    placeholder="1:123456789:web:abcdef..."
+                    placeholder="Contoh: 1:123456789:web:abcdef..."
                     className="w-full bg-white/10 border border-white/5 rounded-2xl px-6 py-4 font-bold text-white focus:bg-white/20 outline-none transition-all placeholder:text-white/20"
                     value={settings.fbAppId || ''}
-                    onChange={(e) => setSettings({ ...settings, fbAppId: e.target.value })}
+                    onChange={(e) => setSettings({ ...settings, fbAppId: sanitizeInput(e.target.value) })}
                   />
                </div>
             </div>
@@ -118,7 +124,7 @@ const Profile: React.FC = () => {
               </div>
             </div>
             
-            <p className="text-[9px] text-white/40 font-bold uppercase tracking-[0.2em] text-center">Data Anda aman. Sinkronisasi menggunakan Firestore Database dengan aturan security standar.</p>
+            <p className="text-[9px] text-white/40 font-bold uppercase tracking-[0.2em] text-center">Sistem akan otomatis menghapus tanda kutip jika Anda tidak sengaja menyalinnya.</p>
          </div>
       </div>
 
