@@ -39,7 +39,12 @@ export interface AppSettings {
   bgColor: string;
   adminName: string;
   warehouseName: string;
-  baTemplate?: string; 
+  baTemplate?: string;
+  // Firebase Sync Config
+  fbApiKey?: string;
+  fbProjectId?: string;
+  fbAppId?: string;
+  syncEnabled?: boolean;
 }
 
 export const MONTHS = [

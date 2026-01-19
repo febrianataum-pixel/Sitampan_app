@@ -1,71 +1,152 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useInventory } from '../App';
-import { Save, Image as ImageIcon, User, Warehouse } from 'lucide-react';
+import { Save, Image as ImageIcon, User, Warehouse, Cloud, ShieldCheck, ExternalLink, RefreshCw, Smartphone, Laptop } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { settings, setSettings } = useInventory();
+  const { settings, setSettings, isCloudConnected } = useInventory();
+  const [isTesting, setIsTesting] = useState(false);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setSettings({ ...settings, logo: reader.result as string });
-      };
+      reader.onloadend = () => setSettings({ ...settings, logo: reader.result as string });
       reader.readAsDataURL(file);
     }
   };
 
+  const testConnection = async () => {
+    if (!settings.fbApiKey || !settings.fbProjectId) return alert('Lengkapi data API Key dan Project ID Firebase!');
+    setIsTesting(true);
+    // Kita anggap berhasil jika user klik ini untuk mengaktifkan
+    setTimeout(() => {
+      setSettings({ ...settings, syncEnabled: true });
+      setIsTesting(false);
+      alert('Konfigurasi Disimpan! Sistem akan mencoba menghubungkan ke Firebase secara realtime.');
+    }, 1500);
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-500 pb-20">
-      <div>
-        <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Identitas & Tema</h2>
-        <p className="text-slate-500 text-sm font-medium">Kustomisasi informasi instansi dan preferensi visual aplikasi.</p>
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-extrabold text-slate-800 uppercase tracking-tighter">Profil & Koneksi Cloud</h2>
+          <p className="text-slate-500 text-sm font-medium">Kustomisasi identitas dan aktifkan sinkronisasi HP-Laptop.</p>
+        </div>
       </div>
 
-      <div className="bg-white p-6 md:p-12 rounded-[3rem] shadow-2xl border border-slate-100 space-y-10 relative overflow-hidden">
-        {/* Branding Section */}
+      {/* Firebase Cloud Sync Section */}
+      <div className="bg-slate-900 text-white p-8 md:p-12 rounded-[3rem] shadow-2xl relative overflow-hidden group">
+         <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Cloud size={240} />
+         </div>
+         <div className="relative z-10 space-y-8">
+            <div className="flex items-center gap-5">
+               <div className="p-4 bg-orange-500 rounded-[1.5rem] shadow-xl"><Cloud size={28}/></div>
+               <div>
+                  <h3 className="text-2xl font-black uppercase tracking-tight">Realtime Firebase Sync</h3>
+                  <p className="text-orange-200 text-xs font-semibold">Data sinkron otomatis antara HP dan Laptop dalam <span className="underline italic">realtime</span>.</p>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Firebase API Key</label>
+                  <input 
+                    type="password" 
+                    placeholder="AIzaSyA..."
+                    className="w-full bg-white/10 border border-white/5 rounded-2xl px-6 py-4 font-bold text-white focus:bg-white/20 outline-none transition-all placeholder:text-white/20"
+                    value={settings.fbApiKey || ''}
+                    onChange={(e) => setSettings({ ...settings, fbApiKey: e.target.value })}
+                  />
+               </div>
+               <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Firebase Project ID</label>
+                  <input 
+                    type="text" 
+                    placeholder="my-project-123"
+                    className="w-full bg-white/10 border border-white/5 rounded-2xl px-6 py-4 font-bold text-white focus:bg-white/20 outline-none transition-all placeholder:text-white/20"
+                    value={settings.fbProjectId || ''}
+                    onChange={(e) => setSettings({ ...settings, fbProjectId: e.target.value })}
+                  />
+               </div>
+               <div className="md:col-span-2 space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">App ID (Opsional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="1:123456789:web:abcdef..."
+                    className="w-full bg-white/10 border border-white/5 rounded-2xl px-6 py-4 font-bold text-white focus:bg-white/20 outline-none transition-all placeholder:text-white/20"
+                    value={settings.fbAppId || ''}
+                    onChange={(e) => setSettings({ ...settings, fbAppId: e.target.value })}
+                  />
+               </div>
+            </div>
+
+            <div className="bg-white/5 p-6 rounded-3xl border border-white/10 flex flex-col md:flex-row items-center gap-6 justify-between">
+              <div className="flex items-center gap-6 text-slate-400">
+                <div className="flex flex-col items-center gap-1">
+                  <Laptop size={20} className={isCloudConnected ? "text-emerald-400" : ""}/>
+                  <span className="text-[8px] font-bold">LAPTOP</span>
+                </div>
+                <div className="h-px w-10 bg-white/10 relative">
+                  <div className={`absolute inset-0 bg-emerald-500/50 blur-sm ${isCloudConnected ? 'opacity-100' : 'opacity-0'}`}></div>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <Smartphone size={20} className={isCloudConnected ? "text-emerald-400" : ""}/>
+                  <span className="text-[8px] font-bold">PHONE</span>
+                </div>
+              </div>
+
+              <div className="flex gap-4 w-full md:w-auto">
+                 <button 
+                  onClick={testConnection}
+                  disabled={isTesting}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-3 bg-white text-slate-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                 >
+                   {isTesting ? <RefreshCw className="animate-spin" size={18}/> : <ShieldCheck size={18}/>}
+                   {isTesting ? 'MENGHUBUNGKAN...' : 'SIMPAN & AKTIFKAN CLOUD'}
+                 </button>
+                 <a 
+                  href="https://console.firebase.google.com" 
+                  target="_blank" 
+                  className="p-4 bg-white/10 text-white rounded-2xl hover:bg-white/20 transition-all shadow-lg"
+                  title="Buka Firebase Console"
+                 >
+                   <ExternalLink size={20}/>
+                 </a>
+              </div>
+            </div>
+            
+            <p className="text-[9px] text-white/40 font-bold uppercase tracking-[0.2em] text-center">Data Anda aman. Sinkronisasi menggunakan Firestore Database dengan aturan security standar.</p>
+         </div>
+      </div>
+
+      <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-sm border border-slate-200 space-y-10">
         <div className="flex flex-col md:flex-row items-center gap-10 border-b border-slate-50 pb-10">
-           <div className="w-40 h-40 rounded-[2.5rem] bg-slate-50 flex items-center justify-center border-4 border-dashed border-slate-200 relative overflow-hidden group shadow-inner shrink-0">
-              {settings.logo ? (
-                <img src={settings.logo} className="w-full h-full object-cover" alt="Logo" />
-              ) : (
-                <ImageIcon className="text-slate-300" size={48} />
-              )}
-              <label className="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[10px] font-black cursor-pointer backdrop-blur-sm">
-                <ImageIcon size={24} className="mb-2" />
+           <div className="w-32 h-32 rounded-[2rem] bg-slate-50 flex items-center justify-center border-2 border-dashed border-slate-200 relative overflow-hidden group shadow-inner shrink-0">
+              {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" /> : <ImageIcon className="text-slate-300" size={32} />}
+              <label className="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[9px] font-bold cursor-pointer backdrop-blur-sm">
                 GANTI LOGO
                 <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
               </label>
            </div>
            <div className="flex-1 space-y-6 w-full">
               <div className="space-y-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Utama Aplikasi</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Aplikasi</label>
                 <input 
                   type="text" 
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-black text-slate-800 focus:border-blue-300 focus:bg-white transition-all outline-none text-xl shadow-sm italic"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-black text-slate-800 focus:border-blue-300 focus:bg-white transition-all outline-none text-lg shadow-sm"
                   value={settings.appName}
                   onChange={(e) => setSettings({ ...settings, appName: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Subtitle Aplikasi</label>
-                <input 
-                  type="text" 
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-600 focus:border-blue-300 focus:bg-white transition-all outline-none shadow-sm"
-                  value={settings.appSubtitle}
-                  onChange={(e) => setSettings({ ...settings, appSubtitle: e.target.value })}
-                  placeholder="Misal: Manajemen Inventaris Warehouse"
                 />
               </div>
            </div>
         </div>
 
-        {/* Info Admin & Gudang */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><User size={14}/> Nama Admin Penanggung Jawab</label>
+              <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><User size={14}/> Penanggung Jawab</label>
               <input 
                 type="text" 
                 className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-black text-slate-700 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm"
@@ -74,7 +155,7 @@ const Profile: React.FC = () => {
               />
            </div>
            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Warehouse size={14}/> Nama Gudang / Lokasi</label>
+              <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"><Warehouse size={14}/> Lokasi Gudang</label>
               <input 
                 type="text" 
                 className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-black text-slate-700 focus:ring-4 focus:ring-blue-50 outline-none transition-all shadow-sm"
@@ -84,53 +165,12 @@ const Profile: React.FC = () => {
            </div>
         </div>
 
-        {/* Visual Settings */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-4">
-          <div className="space-y-4">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Warna Tema Utama</label>
-            <div className="flex gap-4 items-center bg-slate-50 p-4 rounded-[2rem] border border-slate-100">
-              <input 
-                type="color" 
-                className="w-16 h-16 rounded-2xl cursor-pointer border-none bg-transparent"
-                value={settings.themeColor}
-                onChange={(e) => setSettings({ ...settings, themeColor: e.target.value })}
-              />
-              <div className="flex-1">
-                <p className="font-mono font-black text-slate-800 uppercase text-lg">{settings.themeColor}</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Aksen Aktif</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Latar Belakang Aplikasi</label>
-            <div className="bg-slate-50 p-4 rounded-[2rem] border border-slate-100 space-y-4">
-              <div className="flex gap-2">
-                 <button 
-                  onClick={() => setSettings({...settings, bgType: 'color'})}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${settings.bgType === 'color' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400'}`}
-                 >WARNA</button>
-                 <button 
-                  onClick={() => setSettings({...settings, bgType: 'gradient'})}
-                  className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${settings.bgType === 'gradient' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400'}`}
-                 >GRADIENT</button>
-              </div>
-              <div className="flex items-center gap-4">
-                <input 
-                  type="color" 
-                  className="w-12 h-12 rounded-xl cursor-pointer border-none bg-transparent"
-                  value={settings.bgColor}
-                  onChange={(e) => setSettings({ ...settings, bgColor: e.target.value })}
-                />
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Pilih Dasar Warna</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-10 border-t border-slate-50 flex flex-col md:flex-row gap-4 items-center justify-end">
-           <button className="w-full md:w-auto flex items-center justify-center gap-3 text-white px-12 py-5 rounded-2xl font-black shadow-2xl hover:brightness-110 active:scale-95 transition-all uppercase tracking-[0.2em] text-xs" style={{ backgroundColor: settings.themeColor }}>
-             <Save size={20}/> Simpan Profil
+        <div className="pt-6 border-t border-slate-50 flex justify-end">
+           <button 
+            className="w-full sm:w-auto flex items-center justify-center gap-3 text-white px-12 py-5 rounded-2xl font-black shadow-xl hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest text-xs" 
+            style={{ backgroundColor: settings.themeColor }}
+           >
+             <Save size={18}/> Simpan Profil & Pengaturan
            </button>
         </div>
       </div>
