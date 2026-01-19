@@ -26,7 +26,8 @@ const BarangKeluar: React.FC = () => {
   const handleOpenModal = (tx?: OutboundTransaction, duplicate = false) => {
     if (tx) {
       if (!duplicate) setEditingTx(tx);
-      else setEditingTx(null);
+      else setEditingTx(null); // Mode duplikat dianggap sebagai transaksi baru
+
       setGeneralData({ 
         penerima: tx.penerima, 
         tanggal: duplicate ? new Date().toISOString().split('T')[0] : tx.tanggal, 
@@ -65,7 +66,7 @@ const BarangKeluar: React.FC = () => {
       const originalQty = editingTx ? editingTx.items.find(i => i.productId === item.productId)?.jumlah || 0 : 0;
       const effectiveStock = stock + originalQty;
       if (item.jumlah > effectiveStock) {
-        alert(`Gagal: Stok tidak mencukupi.`);
+        alert(`Gagal: Stok tidak mencukupi untuk ${products.find(p => p.id === item.productId)?.namaBarang}.`);
         return;
       }
     }
@@ -84,9 +85,22 @@ const BarangKeluar: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Urutan Alfabetis A-Z
-  const availableProducts = [...products]
-    .sort((a, b) => a.namaBarang.localeCompare(b.namaBarang));
+  const sortedOutbound = [...outbound].sort((a, b) => 
+    new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
+  );
+
+  const getFilteredAvailableProducts = (currentRowId: string) => {
+    const currentItem = items.find(it => it.id === currentRowId);
+    
+    return [...products]
+      .filter(p => {
+        const stock = calculateStock(p.id);
+        const isAlreadyInThisTx = editingTx?.items.some(i => i.productId === p.id);
+        const isCurrentSelected = currentItem?.productId === p.id;
+        return stock > 0 || isAlreadyInThisTx || isCurrentSelected;
+      })
+      .sort((a, b) => a.namaBarang.localeCompare(b.namaBarang));
+  };
 
   return (
     <div className="space-y-6">
@@ -101,9 +115,8 @@ const BarangKeluar: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-        {/* Kontainer Scroll untuk Tabel Utama */}
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left min-w-[700px]">
+          <table className="w-full text-left min-w-[750px]">
             <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
               <tr>
                 <th className="px-6 py-4">Tanggal Transaksi</th>
@@ -113,21 +126,27 @@ const BarangKeluar: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {outbound.map(o => (
+              {sortedOutbound.map(o => (
                 <tr key={o.id} className="hover:bg-blue-50/30 transition-colors group">
-                  <td className="px-6 py-4 text-slate-400 text-xs font-semibold whitespace-nowrap">{formatIndoDate(o.tanggal)}</td>
+                  <td className="px-6 py-4 text-slate-400 text-xs font-semibold whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      {formatIndoDate(o.tanggal)}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 font-bold text-slate-700 text-sm italic">{o.penerima}</td>
                   <td className="px-6 py-4 text-slate-500 text-xs truncate max-w-[200px]">{o.alamat || '-'}</td>
                   <td className="px-6 py-4">
                     <div className="flex justify-center gap-1">
                       <button onClick={() => setViewingTx(o)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Lihat"><Eye size={16}/></button>
+                      <button onClick={() => handleOpenModal(o, true)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all" title="Duplikat"><Copy size={16}/></button>
                       <button onClick={() => handleOpenModal(o)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Edit"><Edit2 size={16}/></button>
                       <button onClick={() => handleDeleteTx(o.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Hapus"><Trash2 size={16}/></button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {outbound.length === 0 && (
+              {sortedOutbound.length === 0 && (
                 <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400 italic">Belum ada catatan transaksi.</td></tr>
               )}
             </tbody>
@@ -135,10 +154,10 @@ const BarangKeluar: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Lihat Rincian */}
+      {/* Modal Lihat Rincian dengan Harga & Total */}
       {viewingTx && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+          <div className="bg-white rounded-[2rem] w-full max-w-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
             <div className="p-6 border-b border-slate-50 flex items-center justify-between">
               <h3 className="text-lg font-bold uppercase tracking-tight">Rincian Transaksi</h3>
               <button onClick={() => setViewingTx(null)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
@@ -158,28 +177,53 @@ const BarangKeluar: React.FC = () => {
                   <p className="font-bold flex items-center gap-2 text-xs text-slate-700"><MapPin size={12}/> {viewingTx.alamat || '-'}</p>
                 </div>
               </div>
+              
               <div className="border border-slate-100 rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs min-w-[400px]">
+                  <table className="w-full text-left text-xs min-w-[600px]">
                     <thead className="bg-slate-50 font-bold text-slate-400 uppercase tracking-widest">
                       <tr>
                         <th className="px-5 py-3">Nama Barang</th>
                         <th className="px-5 py-3 text-center">Jumlah</th>
-                        <th className="px-5 py-3 text-right">Satuan</th>
+                        <th className="px-5 py-3 text-right">Harga Satuan</th>
+                        <th className="px-5 py-3 text-right">Total Harga</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {viewingTx.items.map(item => {
                         const p = products.find(prod => prod.id === item.productId);
+                        const subtotal = item.jumlah * (p?.harga || 0);
                         return (
-                          <tr key={item.id}>
-                            <td className="px-5 py-3 font-bold text-slate-700">{p?.namaBarang}</td>
-                            <td className="px-5 py-3 text-center font-bold text-blue-600">{item.jumlah}</td>
-                            <td className="px-5 py-3 text-right text-slate-400 uppercase font-bold">{p?.satuan}</td>
+                          <tr key={item.id} className="hover:bg-slate-50/50">
+                            <td className="px-5 py-3">
+                              <p className="font-bold text-slate-700">{p?.namaBarang}</p>
+                              <p className="text-[9px] text-slate-400 uppercase">{p?.kodeBarang}</p>
+                            </td>
+                            <td className="px-5 py-3 text-center">
+                              <span className="font-bold text-blue-600">{item.jumlah}</span>
+                              <span className="ml-1 text-slate-400 text-[10px] uppercase">{p?.satuan}</span>
+                            </td>
+                            <td className="px-5 py-3 text-right text-slate-500 font-semibold">
+                              Rp {(p?.harga || 0).toLocaleString('id-ID')}
+                            </td>
+                            <td className="px-5 py-3 text-right font-black text-slate-900">
+                              Rp {subtotal.toLocaleString('id-ID')}
+                            </td>
                           </tr>
                         );
                       })}
                     </tbody>
+                    <tfoot className="bg-slate-50/50 border-t">
+                      <tr>
+                        <td colSpan={3} className="px-5 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Grand Total</td>
+                        <td className="px-5 py-4 text-right font-black text-emerald-600 text-sm">
+                          Rp {viewingTx.items.reduce((acc, curr) => {
+                            const p = products.find(prod => prod.id === curr.productId);
+                            return acc + (curr.jumlah * (p?.harga || 0));
+                          }, 0).toLocaleString('id-ID')}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
@@ -196,7 +240,9 @@ const BarangKeluar: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[95vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in duration-300">
             <div className="flex items-center justify-between p-6 border-b border-slate-50 shrink-0">
-              <h3 className="text-lg font-bold uppercase tracking-tight">{editingTx ? 'Edit Transaksi' : 'Form Transaksi Baru'}</h3>
+              <h3 className="text-lg font-bold uppercase tracking-tight">
+                {editingTx ? 'Edit Transaksi' : 'Form Transaksi Baru'}
+              </h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={24}/></button>
             </div>
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto scrollbar-hide p-6 space-y-6">
@@ -234,7 +280,7 @@ const BarangKeluar: React.FC = () => {
                     const query = searchQueries[item.id] || '';
                     const isSearchActive = activeSearchId === item.id;
 
-                    const results = availableProducts.filter(p => {
+                    const results = getFilteredAvailableProducts(item.id).filter(p => {
                       const match = p.namaBarang.toLowerCase().includes(query.toLowerCase()) || p.kodeBarang.toLowerCase().includes(query.toLowerCase());
                       return match && !selectedIds.includes(p.id);
                     });
@@ -242,12 +288,12 @@ const BarangKeluar: React.FC = () => {
                     return (
                       <div key={item.id} className="grid grid-cols-12 gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 relative">
                         <div className="col-span-12 md:col-span-7 relative">
-                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Cari Nama/Kode Barang</label>
+                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Cari Barang (Hanya yang Ada Stok)</label>
                           <div className="relative">
                             <input 
                               type="text"
                               className="w-full text-xs bg-white border border-slate-100 rounded-xl pl-10 pr-4 py-2.5 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50"
-                              placeholder="Ketik sesuatu..."
+                              placeholder="Ketik nama atau kode..."
                               value={isSearchActive ? query : (selectedProduct?.namaBarang || '')}
                               onFocus={() => {
                                 setActiveSearchId(item.id);
@@ -262,24 +308,34 @@ const BarangKeluar: React.FC = () => {
                             <>
                               <div className="fixed inset-0 z-[110]" onClick={() => setActiveSearchId(null)}></div>
                               <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 z-[120] max-h-48 overflow-y-auto scrollbar-hide py-1">
-                                {results.length > 0 ? results.map(p => (
-                                  <button key={p.id} type="button" className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-50 last:border-0"
-                                    onClick={() => {
-                                      handleItemChange(item.id, 'productId', p.id);
-                                      setSearchQueries({...searchQueries, [item.id]: p.namaBarang});
-                                      setActiveSearchId(null);
-                                    }}>
-                                    <p className="text-xs font-bold text-slate-700">{p.namaBarang}</p>
-                                    <p className="text-[9px] font-bold text-blue-500">{p.kodeBarang} • Sisa: {calculateStock(p.id)}</p>
-                                  </button>
-                                )) : <div className="p-4 text-center text-xs text-slate-400 italic">Tidak ada barang.</div>}
+                                {results.length > 0 ? results.map(p => {
+                                  const sisa = calculateStock(p.id);
+                                  return (
+                                    <button key={p.id} type="button" className="w-full text-left px-4 py-2.5 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                                      onClick={() => {
+                                        handleItemChange(item.id, 'productId', p.id);
+                                        setSearchQueries({...searchQueries, [item.id]: p.namaBarang});
+                                        setActiveSearchId(null);
+                                      }}>
+                                      <p className="text-xs font-bold text-slate-700">{p.namaBarang}</p>
+                                      <div className="flex justify-between items-center mt-1">
+                                        <p className="text-[9px] font-bold text-blue-500 uppercase">{p.kodeBarang}</p>
+                                        <span className="text-[8px] px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-black">STOK: {sisa}</span>
+                                      </div>
+                                    </button>
+                                  );
+                                }) : (
+                                  <div className="p-4 text-center text-xs text-slate-400 italic">
+                                    {query ? 'Barang tidak ditemukan atau stok kosong.' : 'Ketik untuk mencari...'}
+                                  </div>
+                                )}
                               </div>
                             </>
                           )}
                         </div>
 
                         <div className="col-span-8 md:col-span-3">
-                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Jumlah</label>
+                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Jumlah Keluar</label>
                           <input type="number" min="1" required className={`w-full text-xs bg-white border rounded-xl px-4 py-2.5 font-bold outline-none ${isOverStock ? 'border-red-500 ring-2 ring-red-100' : 'border-slate-100'}`}
                             value={item.jumlah} onChange={(e) => handleItemChange(item.id, 'jumlah', parseInt(e.target.value) || 0)} />
                         </div>
