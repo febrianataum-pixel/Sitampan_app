@@ -18,7 +18,8 @@ import {
   Upload, 
   CheckCircle2, 
   Clock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { OutboundTransaction, OutboundItem, formatIndoDate, Product } from '../types';
 
@@ -26,6 +27,7 @@ const BarangKeluar: React.FC = () => {
   const { products, outbound, setOutbound, calculateStock, settings } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [editingTx, setEditingTx] = useState<OutboundTransaction | null>(null);
   const [viewingTx, setViewingTx] = useState<OutboundTransaction | null>(null);
   const [uploadingTxId, setUploadingTxId] = useState<string | null>(null);
@@ -42,6 +44,40 @@ const BarangKeluar: React.FC = () => {
   const [items, setItems] = useState<OutboundItem[]>([
     { id: crypto.randomUUID(), productId: '', jumlah: 1 }
   ]);
+
+  // Fungsi Helper untuk Kompresi Gambar
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800; // Ukuran standar untuk dokumentasi
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Kompres kualitas ke 0.6 (60%) agar file sangat ringan (<100KB)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          resolve(dataUrl);
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
 
   const handleOpenModal = (tx?: OutboundTransaction, duplicate = false) => {
     if (tx) {
@@ -63,27 +99,35 @@ const BarangKeluar: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && uploadingTxId) {
-      const readers = Array.from(files).map((file: File) => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-      });
+      setIsProcessing(true);
+      try {
+        const compressedImages: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          const compressed = await compressImage(files[i]);
+          compressedImages.push(compressed);
+        }
 
-      Promise.all(readers).then((base64Images: string[]) => {
-        setOutbound((prev: OutboundTransaction[]) => prev.map(tx => 
-          tx.id === uploadingTxId 
-            ? { ...tx, images: [...(tx.images || []), ...base64Images] } 
-            : tx
-        ));
+        await setOutbound((prev: OutboundTransaction[]) => {
+          const updated = prev.map(tx => 
+            tx.id === uploadingTxId 
+              ? { ...tx, images: [...(tx.images || []), ...compressedImages] } 
+              : tx
+          );
+          return updated;
+        });
+
         setIsUploadModalOpen(false);
         setUploadingTxId(null);
-        alert('Dokumentasi berhasil diunggah!');
-      });
+        alert('Dokumentasi berhasil diunggah dan disinkronkan!');
+      } catch (error) {
+        console.error("Upload error:", error);
+        alert('Gagal mengunggah foto. Pastikan format file benar.');
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -229,20 +273,33 @@ const BarangKeluar: React.FC = () => {
           <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
             <div className="p-6 border-b flex justify-between items-center">
               <h3 className="font-bold uppercase text-slate-800">Tindak Lanjut Dokumentasi</h3>
-              <button onClick={() => setIsUploadModalOpen(false)}><X size={20}/></button>
+              <button onClick={() => setIsUploadModalOpen(false)} disabled={isProcessing}><X size={20}/></button>
             </div>
             <div className="p-8 text-center space-y-6">
-              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-                <Camera size={40}/>
+              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner relative">
+                {isProcessing ? <Loader2 size={40} className="animate-spin" /> : <Camera size={40}/>}
               </div>
               <div>
-                <p className="font-bold text-slate-700">Upload Bukti Foto</p>
-                <p className="text-xs text-slate-400 mt-1">Unggah foto penyerahan barang sebagai bukti validitas transaksi.</p>
+                <p className="font-bold text-slate-700">{isProcessing ? 'Sedang Memproses...' : 'Upload Bukti Foto'}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {isProcessing 
+                    ? 'Foto sedang dikompres agar hemat memori & sinkron lancar.' 
+                    : 'Unggah foto penyerahan barang sebagai bukti validitas transaksi.'}
+                </p>
               </div>
-              <label className="block w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xl">
-                PILIH FOTO DARI GALERI / KAMERA
-                <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
-              </label>
+              
+              {!isProcessing && (
+                <label className="block w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xl">
+                  PILIH FOTO DARI GALERI / KAMERA
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
+                </label>
+              )}
+              
+              {isProcessing && (
+                <div className="w-full bg-slate-100 text-slate-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest">
+                  TUNGGU SEBENTAR...
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -283,7 +340,7 @@ const BarangKeluar: React.FC = () => {
                       <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm relative group">
                         <img src={img} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <a href={img} download={`Dokumentasi_${viewingTx.penerima}_${idx}.png`} className="p-2 bg-white rounded-full text-slate-900"><Upload size={14}/></a>
+                          <a href={img} download={`Dokumentasi_${viewingTx.penerima}_${idx}.jpg`} className="p-2 bg-white rounded-full text-slate-900"><Upload size={14}/></a>
                         </div>
                       </div>
                     ))}
