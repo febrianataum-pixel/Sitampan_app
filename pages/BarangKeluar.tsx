@@ -63,7 +63,6 @@ const BarangKeluar: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // Fix: Explicitly type File objects and Promise results to resolve the 'unknown' to 'Blob' error.
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && uploadingTxId) {
@@ -161,12 +160,13 @@ const BarangKeluar: React.FC = () => {
 
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left min-w-[900px]">
+          <table className="w-full text-left min-w-[1000px]">
             <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
               <tr>
                 <th className="px-6 py-4 w-12 text-center">No.</th>
                 <th className="px-6 py-4">Tanggal Transaksi</th>
                 <th className="px-6 py-4">Nama Penerima</th>
+                <th className="px-6 py-4">Alamat / Tujuan</th>
                 <th className="px-6 py-4">Status / Dokumentasi</th>
                 <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
@@ -184,6 +184,12 @@ const BarangKeluar: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-slate-700 text-sm italic">{o.penerima}</td>
+                    <td className="px-6 py-4 text-slate-500 text-xs font-medium max-w-[250px] truncate" title={o.alamat}>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin size={12} className="text-slate-300 shrink-0"/>
+                        <span className="truncate">{o.alamat || '-'}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       {isTuntas ? (
                         <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg w-fit border border-emerald-100">
@@ -210,7 +216,7 @@ const BarangKeluar: React.FC = () => {
                 );
               })}
               {sortedOutbound.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-400 italic">Belum ada catatan transaksi.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">Belum ada catatan transaksi.</td></tr>
               )}
             </tbody>
           </table>
