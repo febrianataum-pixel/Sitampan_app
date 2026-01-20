@@ -28,6 +28,7 @@ export interface OutboundTransaction {
   tanggal: string;
   alamat: string;
   items: OutboundItem[];
+  images?: string[]; // Properti baru untuk dokumentasi foto (Base64)
 }
 
 export interface AppSettings {

@@ -33,7 +33,6 @@ const CetakBeritaAcara: React.FC = () => {
   const editorRef = useRef<HTMLDivElement>(null);
   const printAreaRef = useRef<HTMLDivElement>(null);
 
-  // Template Default yang sudah disesuaikan agar Kop lebih presisi ke kiri
   const defaultBA = `
     <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px; width:100%;">
       <div style="width:15%; text-align:left;">[logo_app]</div>
@@ -153,14 +152,12 @@ const CetakBeritaAcara: React.FC = () => {
                .replace(/\[tanggal_panjang\]/g, datePanjang)
                .replace(/\[tabel_barang\]/g, tableHtml);
                
-    // Placeholder default jika belum diisi user
     if (!settings.baTemplate) {
       html = html.replace(/\[nama_pihak_kesatu\]/g, "NURKHOLIS, S.Kep, MM.")
                  .replace(/\[jabatan_pihak_kesatu\]/g, "Plt. Kepala Bidang Sosial Dinsos PPPA Kab. Blora")
                  .replace(/\[nip_pihak_kesatu\]/g, "19680328 198803 1 004");
     }
 
-    // Wrap untuk PDF agar konten berada di tengah halaman (Horizontal & Vertikal)
     if (forPdf) {
       return `
         <div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; background: white; margin: 0; padding: 0;">
@@ -177,12 +174,9 @@ const CetakBeritaAcara: React.FC = () => {
   const handleDownloadPDF = () => {
     if (!printAreaRef.current || !selectedTx) return;
     setIsGenerating(true);
-    
-    // Create hidden element for clean export
     const container = document.createElement('div');
     container.innerHTML = renderBA(selectedTx, true);
     document.body.appendChild(container);
-
     const opt = {
       margin: 0,
       filename: `BAST_${selectedTx.penerima.replace(/\s+/g, '_')}.pdf`,
@@ -190,7 +184,6 @@ const CetakBeritaAcara: React.FC = () => {
       html2canvas: { scale: 3, useCORS: true, letterRendering: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-
     html2pdf().set(opt).from(container).save().then(() => {
       document.body.removeChild(container);
       setIsGenerating(false);
@@ -226,7 +219,7 @@ const CetakBeritaAcara: React.FC = () => {
 
         <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-blue-700 text-xs flex items-center gap-3 no-print">
            <div className="p-2 bg-blue-600 text-white rounded-lg"><Eye size={14}/></div>
-           <p>Pratinjau Berita Acara (Layout A4). Konten akan otomatis berada di tengah halaman saat diunduh.</p>
+           <p>Pratinjau Berita Acara (Layout A4). Konten otomatis berada di tengah halaman.</p>
         </div>
 
         <div className="flex justify-start sm:justify-center overflow-x-auto p-4 scrollbar-hide bg-slate-200/50 rounded-2xl border border-slate-300">
@@ -257,6 +250,7 @@ const CetakBeritaAcara: React.FC = () => {
           <table className="w-full text-left text-sm min-w-[700px]">
             <thead className="bg-slate-50/50 text-slate-400 font-bold text-[10px] border-b uppercase tracking-widest">
               <tr>
+                <th className="px-6 py-4 w-12 text-center">No.</th>
                 <th className="px-6 py-4">Tanggal Transaksi</th>
                 <th className="px-6 py-4">Nama Penerima</th>
                 <th className="px-6 py-4">Tujuan / Alamat</th>
@@ -264,8 +258,9 @@ const CetakBeritaAcara: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {outbound.map((o) => (
+              {outbound.map((o, idx) => (
                 <tr key={o.id} className="hover:bg-blue-50/30 transition-colors group">
+                  <td className="px-6 py-4 text-center text-xs font-bold text-slate-300">{idx + 1}</td>
                   <td className="px-6 py-4 text-xs font-semibold text-slate-400">{formatIndoDate(o.tanggal)}</td>
                   <td className="px-6 py-4 font-bold text-slate-700 italic">{o.penerima}</td>
                   <td className="px-6 py-4 text-slate-500 truncate max-w-[200px]">{o.alamat || '-'}</td>
@@ -277,7 +272,7 @@ const CetakBeritaAcara: React.FC = () => {
                 </tr>
               ))}
               {outbound.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400 italic">Belum ada data transaksi keluar.</td></tr>
+                <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-400 italic">Belum ada data transaksi keluar.</td></tr>
               )}
             </tbody>
           </table>
@@ -307,7 +302,6 @@ const CetakBeritaAcara: React.FC = () => {
                         <button key={tag} onClick={() => insertPlaceholder(tag)} className="text-left px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg text-[9px] font-bold hover:border-blue-500 transition-all uppercase text-blue-700">[{tag}]</button>
                       ))}
                     </div>
-                    <p className="mt-2 text-[8px] text-slate-400 leading-tight italic">Gunakan tag di atas, lalu ketik manual detailnya di area pratinjau.</p>
                   </div>
                </div>
                <div className="flex-1 bg-slate-100 overflow-auto p-4 sm:p-8 scrollbar-hide flex justify-center">

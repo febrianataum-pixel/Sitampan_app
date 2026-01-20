@@ -1,14 +1,34 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useInventory } from '../App';
-import { Plus, Trash2, X, AlertCircle, Edit2, Copy, Eye, MapPin, Calendar, User, Search, ChevronDown } from 'lucide-react';
+import { 
+  Plus, 
+  Trash2, 
+  X, 
+  AlertCircle, 
+  Edit2, 
+  Copy, 
+  Eye, 
+  MapPin, 
+  Calendar, 
+  User, 
+  Search, 
+  ChevronDown, 
+  Camera, 
+  Upload, 
+  CheckCircle2, 
+  Clock,
+  Image as ImageIcon
+} from 'lucide-react';
 import { OutboundTransaction, OutboundItem, formatIndoDate, Product } from '../types';
 
 const BarangKeluar: React.FC = () => {
   const { products, outbound, setOutbound, calculateStock, settings } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<OutboundTransaction | null>(null);
   const [viewingTx, setViewingTx] = useState<OutboundTransaction | null>(null);
+  const [uploadingTxId, setUploadingTxId] = useState<string | null>(null);
   
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
@@ -26,7 +46,7 @@ const BarangKeluar: React.FC = () => {
   const handleOpenModal = (tx?: OutboundTransaction, duplicate = false) => {
     if (tx) {
       if (!duplicate) setEditingTx(tx);
-      else setEditingTx(null); // Mode duplikat dianggap sebagai transaksi baru
+      else setEditingTx(null);
 
       setGeneralData({ 
         penerima: tx.penerima, 
@@ -41,6 +61,31 @@ const BarangKeluar: React.FC = () => {
     }
     setSearchQueries({});
     setIsModalOpen(true);
+  };
+
+  // Fix: Explicitly type File objects and Promise results to resolve the 'unknown' to 'Blob' error.
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && uploadingTxId) {
+      const readers = Array.from(files).map((file: File) => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(readers).then((base64Images: string[]) => {
+        setOutbound((prev: OutboundTransaction[]) => prev.map(tx => 
+          tx.id === uploadingTxId 
+            ? { ...tx, images: [...(tx.images || []), ...base64Images] } 
+            : tx
+        ));
+        setIsUploadModalOpen(false);
+        setUploadingTxId(null);
+        alert('Dokumentasi berhasil diunggah!');
+      });
+    }
   };
 
   const handleDeleteTx = (id: string) => {
@@ -74,7 +119,8 @@ const BarangKeluar: React.FC = () => {
     const newTransaction: OutboundTransaction = {
       id: editingTx ? editingTx.id : crypto.randomUUID(),
       ...generalData,
-      items: items
+      items: items,
+      images: editingTx?.images || []
     };
 
     if (editingTx) {
@@ -91,7 +137,6 @@ const BarangKeluar: React.FC = () => {
 
   const getFilteredAvailableProducts = (currentRowId: string) => {
     const currentItem = items.find(it => it.id === currentRowId);
-    
     return [...products]
       .filter(p => {
         const stock = calculateStock(p.id);
@@ -107,7 +152,7 @@ const BarangKeluar: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Barang Keluar</h2>
-          <p className="text-slate-500 text-sm font-medium">Manajemen distribusi barang keluar gudang.</p>
+          <p className="text-slate-500 text-sm font-medium">Manajemen distribusi dan dokumentasi serah terima.</p>
         </div>
         <button onClick={() => handleOpenModal()} className="w-full sm:w-auto flex items-center justify-center gap-2 text-white px-5 py-3 rounded-xl font-bold shadow-lg uppercase text-xs tracking-widest transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
           <Plus size={18} /> Transaksi Baru
@@ -116,53 +161,96 @@ const BarangKeluar: React.FC = () => {
 
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left min-w-[750px]">
+          <table className="w-full text-left min-w-[900px]">
             <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
               <tr>
+                <th className="px-6 py-4 w-12 text-center">No.</th>
                 <th className="px-6 py-4">Tanggal Transaksi</th>
                 <th className="px-6 py-4">Nama Penerima</th>
-                <th className="px-6 py-4">Alamat / Tujuan</th>
+                <th className="px-6 py-4">Status / Dokumentasi</th>
                 <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedOutbound.map(o => (
-                <tr key={o.id} className="hover:bg-blue-50/30 transition-colors group">
-                  <td className="px-6 py-4 text-slate-400 text-xs font-semibold whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                      {formatIndoDate(o.tanggal)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-slate-700 text-sm italic">{o.penerima}</td>
-                  <td className="px-6 py-4 text-slate-500 text-xs truncate max-w-[200px]">{o.alamat || '-'}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center gap-1">
-                      <button onClick={() => setViewingTx(o)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Lihat"><Eye size={16}/></button>
-                      <button onClick={() => handleOpenModal(o, true)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all" title="Duplikat"><Copy size={16}/></button>
-                      <button onClick={() => handleOpenModal(o)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Edit"><Edit2 size={16}/></button>
-                      <button onClick={() => handleDeleteTx(o.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Hapus"><Trash2 size={16}/></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {sortedOutbound.map((o, index) => {
+                const isTuntas = o.images && o.images.length > 0;
+                return (
+                  <tr key={o.id} className="hover:bg-blue-50/30 transition-colors group">
+                    <td className="px-6 py-4 text-center text-xs font-bold text-slate-300">{index + 1}</td>
+                    <td className="px-6 py-4 text-slate-400 text-xs font-semibold whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${isTuntas ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
+                        {formatIndoDate(o.tanggal)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-slate-700 text-sm italic">{o.penerima}</td>
+                    <td className="px-6 py-4">
+                      {isTuntas ? (
+                        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg w-fit border border-emerald-100">
+                          <CheckCircle2 size={12}/>
+                          <span className="text-[10px] font-black uppercase tracking-tight">Tuntas ({o.images?.length})</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 bg-slate-50 text-slate-400 px-3 py-1 rounded-lg w-fit border border-slate-100">
+                          <Clock size={12}/>
+                          <span className="text-[10px] font-black uppercase tracking-tight">Proses</span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center gap-1">
+                        <button onClick={() => { setUploadingTxId(o.id); setIsUploadModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Tindak Lanjut / Dokumentasi"><Camera size={16}/></button>
+                        <button onClick={() => setViewingTx(o)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Lihat"><Eye size={16}/></button>
+                        <button onClick={() => handleOpenModal(o, true)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all" title="Duplikat"><Copy size={16}/></button>
+                        <button onClick={() => handleOpenModal(o)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Edit"><Edit2 size={16}/></button>
+                        <button onClick={() => handleDeleteTx(o.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Hapus"><Trash2 size={16}/></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {sortedOutbound.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400 italic">Belum ada catatan transaksi.</td></tr>
+                <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-400 italic">Belum ada catatan transaksi.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Lihat Rincian dengan Harga & Total */}
+      {/* Modal Upload Dokumentasi */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
+            <div className="p-6 border-b flex justify-between items-center">
+              <h3 className="font-bold uppercase text-slate-800">Tindak Lanjut Dokumentasi</h3>
+              <button onClick={() => setIsUploadModalOpen(false)}><X size={20}/></button>
+            </div>
+            <div className="p-8 text-center space-y-6">
+              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                <Camera size={40}/>
+              </div>
+              <div>
+                <p className="font-bold text-slate-700">Upload Bukti Foto</p>
+                <p className="text-xs text-slate-400 mt-1">Unggah foto penyerahan barang sebagai bukti validitas transaksi.</p>
+              </div>
+              <label className="block w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-xl">
+                PILIH FOTO DARI GALERI / KAMERA
+                <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Lihat Rincian & Dokumentasi */}
       {viewingTx && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="text-lg font-bold uppercase tracking-tight">Rincian Transaksi</h3>
+          <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
+            <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0">
+              <h3 className="text-lg font-bold uppercase tracking-tight">Rincian & Dokumentasi</h3>
               <button onClick={() => setViewingTx(null)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
             </div>
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+            <div className="p-6 space-y-6 overflow-y-auto scrollbar-hide flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tanggal</p>
@@ -176,6 +264,29 @@ const BarangKeluar: React.FC = () => {
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Alamat</p>
                   <p className="font-bold flex items-center gap-2 text-xs text-slate-700"><MapPin size={12}/> {viewingTx.alamat || '-'}</p>
                 </div>
+              </div>
+
+              {/* Galeri Foto Tindak Lanjut */}
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <ImageIcon size={14}/> Dokumentasi Foto
+                </h4>
+                {viewingTx.images && viewingTx.images.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {viewingTx.images.map((img, idx) => (
+                      <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-slate-100 shadow-sm relative group">
+                        <img src={img} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <a href={img} download={`Dokumentasi_${viewingTx.penerima}_${idx}.png`} className="p-2 bg-white rounded-full text-slate-900"><Upload size={14}/></a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-10 border-2 border-dashed border-slate-100 rounded-[2rem] flex flex-col items-center text-slate-300 italic text-xs">
+                    <Camera size={32} className="mb-2 opacity-20"/> Belum ada dokumentasi foto.
+                  </div>
+                )}
               </div>
               
               <div className="border border-slate-100 rounded-2xl overflow-hidden">
@@ -228,14 +339,14 @@ const BarangKeluar: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="p-6 bg-slate-50 flex justify-end">
+            <div className="p-6 bg-slate-50 flex justify-end shrink-0">
               <button onClick={() => setViewingTx(null)} className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl uppercase tracking-widest text-[10px] shadow-lg">Tutup</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Input Form */}
+      {/* Modal Input Form (Tetap) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[95vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in duration-300">
@@ -288,7 +399,7 @@ const BarangKeluar: React.FC = () => {
                     return (
                       <div key={item.id} className="grid grid-cols-12 gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 relative">
                         <div className="col-span-12 md:col-span-7 relative">
-                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Cari Barang (Hanya yang Ada Stok)</label>
+                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Cari Barang</label>
                           <div className="relative">
                             <input 
                               type="text"
@@ -326,7 +437,7 @@ const BarangKeluar: React.FC = () => {
                                   );
                                 }) : (
                                   <div className="p-4 text-center text-xs text-slate-400 italic">
-                                    {query ? 'Barang tidak ditemukan atau stok kosong.' : 'Ketik untuk mencari...'}
+                                    {query ? 'Tidak ditemukan.' : 'Ketik untuk mencari...'}
                                   </div>
                                 )}
                               </div>
@@ -335,7 +446,7 @@ const BarangKeluar: React.FC = () => {
                         </div>
 
                         <div className="col-span-8 md:col-span-3">
-                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Jumlah Keluar</label>
+                          <label className="block text-[8px] font-bold text-slate-300 uppercase mb-1">Jumlah</label>
                           <input type="number" min="1" required className={`w-full text-xs bg-white border rounded-xl px-4 py-2.5 font-bold outline-none ${isOverStock ? 'border-red-500 ring-2 ring-red-100' : 'border-slate-100'}`}
                             value={item.jumlah} onChange={(e) => handleItemChange(item.id, 'jumlah', parseInt(e.target.value) || 0)} />
                         </div>
