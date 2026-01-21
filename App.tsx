@@ -16,7 +16,7 @@ import {
   WifiOff
 } from 'lucide-react';
 import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import Dashboard from './pages/Dashboard';
 import DatabaseBarang from './pages/DatabaseBarang';
 import BarangMasuk from './pages/BarangMasuk';
@@ -54,25 +54,23 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
 
-  // Tutup sidebar di mobile saat ganti halaman
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-    { name: 'Database', path: '/database', icon: <Database size={20} /> },
-    { name: 'Masuk', path: '/masuk', icon: <ArrowDownCircle size={20} /> },
-    { name: 'Keluar', path: '/keluar', icon: <ArrowUpCircle size={20} /> },
-    { name: 'Berita Acara', path: '/berita-acara', icon: <FileText size={20} /> },
-    { name: 'Stok', path: '/stok', icon: <BarChart3 size={20} /> },
-    { name: 'Rekap', path: '/rekap', icon: <CalendarDays size={20} /> },
-    { name: 'Profil', path: '/profile', icon: <UserCircle size={20} /> },
+    { name: 'Database', path: '/dashboard/database', icon: <Database size={20} /> },
+    { name: 'Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={20} /> },
+    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={20} /> },
+    { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={20} /> },
+    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={20} /> },
+    { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={20} /> },
+    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
   ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      {/* Backdrop Mobile */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
@@ -80,7 +78,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         />
       )}
 
-      {/* Sidebar / Drawer */}
       <aside className={`
         fixed md:relative z-50 h-full bg-slate-900 text-white transition-all duration-300 flex flex-col no-print shadow-2xl
         ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20'}
@@ -128,7 +125,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </button>
       </aside>
 
-      {/* Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 md:px-6 no-print justify-between z-30 shrink-0 sticky top-0">
           <div className="flex items-center gap-3 overflow-hidden">
@@ -201,7 +197,6 @@ const App: React.FC = () => {
   const dbRef = useRef<any>(null);
   const isRemoteChange = useRef(false);
 
-  // Sync Logic with Firebase
   useEffect(() => {
     if (settings.fbApiKey && settings.fbProjectId && settings.syncEnabled) {
       try {
@@ -214,7 +209,6 @@ const App: React.FC = () => {
         dbRef.current = getFirestore(app);
         setIsCloudConnected(true);
 
-        // Listeners
         const unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
           isRemoteChange.current = true;
           setProductsState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
@@ -233,7 +227,6 @@ const App: React.FC = () => {
           setTimeout(() => isRemoteChange.current = false, 500);
         });
 
-        // Listen Settings Sync (Kecuali Key Firebase)
         const unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
           if (snap.exists()) {
             const remoteSettings = snap.data();
@@ -257,7 +250,6 @@ const App: React.FC = () => {
       }
     } else {
       setIsCloudConnected(false);
-      // Load from Local if Cloud off
       ['products', 'inbound', 'outbound'].forEach(key => {
         const saved = localStorage.getItem(`inv_${key}`);
         if (saved) {
@@ -273,7 +265,6 @@ const App: React.FC = () => {
     setSettingsState(newSettings);
     localStorage.setItem('inv_settings', JSON.stringify(newSettings));
     if (isCloudConnected && dbRef.current) {
-      // Hanya sinkronkan data profil ke cloud, bukan API KEY-nya demi keamanan
       const { fbApiKey, fbProjectId, fbAppId, ...syncable } = newSettings;
       await setDoc(doc(dbRef.current, 'config', 'app_settings'), syncable);
     }
@@ -281,9 +272,19 @@ const App: React.FC = () => {
 
   const setProducts = async (newData: Product[] | ((prev: Product[]) => Product[])) => {
     const value = typeof newData === 'function' ? newData(products) : newData;
+    
+    // Cari data yang dihapus
+    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
+      const deletedItems = products.filter(p => !value.some(v => v.id === p.id));
+      for (const item of deletedItems) {
+        await deleteDoc(doc(dbRef.current, 'products', item.id));
+      }
+    }
+
     setProductsState(value);
     localStorage.setItem('inv_products', JSON.stringify(value));
-    if (isCloudConnected && !isRemoteChange.current) {
+    
+    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'products', item.id), item);
       }
@@ -292,9 +293,18 @@ const App: React.FC = () => {
 
   const setInbound = async (newData: InboundEntry[] | ((prev: InboundEntry[]) => InboundEntry[])) => {
     const value = typeof newData === 'function' ? newData(inbound) : newData;
+
+    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
+      const deletedItems = inbound.filter(i => !value.some(v => v.id === i.id));
+      for (const item of deletedItems) {
+        await deleteDoc(doc(dbRef.current, 'inbound', item.id));
+      }
+    }
+
     setInboundState(value);
     localStorage.setItem('inv_inbound', JSON.stringify(value));
-    if (isCloudConnected && !isRemoteChange.current) {
+
+    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'inbound', item.id), item);
       }
@@ -303,9 +313,18 @@ const App: React.FC = () => {
 
   const setOutbound = async (newData: OutboundTransaction[] | ((prev: OutboundTransaction[]) => OutboundTransaction[])) => {
     const value = typeof newData === 'function' ? newData(outbound) : newData;
+
+    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
+      const deletedItems = outbound.filter(o => !value.some(v => v.id === o.id));
+      for (const item of deletedItems) {
+        await deleteDoc(doc(dbRef.current, 'outbound', item.id));
+      }
+    }
+
     setOutboundState(value);
     localStorage.setItem('inv_outbound', JSON.stringify(value));
-    if (isCloudConnected && !isRemoteChange.current) {
+
+    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'outbound', item.id), item);
       }
@@ -324,13 +343,13 @@ const App: React.FC = () => {
         <Layout>
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/database" element={<DatabaseBarang />} />
-            <Route path="/masuk" element={<BarangMasuk />} />
-            <Route path="/keluar" element={<BarangKeluar />} />
-            <Route path="/berita-acara" element={<CetakBeritaAcara />} />
-            <Route path="/stok" element={<StokBarang />} />
-            <Route path="/rekap" element={<RekapBulanan />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/dashboard/database" element={<DatabaseBarang />} />
+            <Route path="/dashboard/masuk" element={<BarangMasuk />} />
+            <Route path="/dashboard/keluar" element={<BarangKeluar />} />
+            <Route path="/dashboard/berita-acara" element={<CetakBeritaAcara />} />
+            <Route path="/dashboard/stok" element={<StokBarang />} />
+            <Route path="/dashboard/rekap" element={<RekapBulanan />} />
+            <Route path="/dashboard/profile" element={<Profile />} />
             <Route path="/" element={<Navigate to="/dashboard" />} />
           </Routes>
         </Layout>
