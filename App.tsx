@@ -85,13 +85,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-true-black theme-transition">
       {/* Sidebar Desktop */}
       <aside className={`
-        fixed md:relative z-50 h-full bg-slate-900 dark:bg-black text-white transition-all duration-300 hidden md:flex flex-col no-print shadow-2xl border-r dark:border-white/5
+        fixed md:relative z-40 h-full bg-slate-900 dark:bg-black text-white transition-all duration-300 hidden md:flex flex-col no-print shadow-2xl border-r dark:border-white/5
         ${isSidebarOpen ? 'w-64' : 'w-20'}
       `}>
         <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
           <div className="shrink-0">
             {settings.logo ? (
-              <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+              <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" alt="Logo" />
             ) : (
               <Package className="text-blue-400" size={28} />
             )}
@@ -136,7 +136,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <div className="flex items-center gap-2 overflow-hidden">
                 <div className="md:hidden">
                   {settings.logo ? (
-                    <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+                    <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" alt="Logo" />
                   ) : (
                     <Package className="text-blue-600" size={24} />
                   )}
@@ -159,7 +159,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              {/* Theme Toggle Button */}
               <button 
                 onClick={toggleTheme}
                 className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 active-touch theme-transition border dark:border-white/10"
@@ -173,7 +172,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{todayFormatted}</p>
               </div>
               <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold overflow-hidden shadow-sm">
-                 {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" /> : settings.adminName.charAt(0)}
+                 {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" alt="Admin" /> : settings.adminName.charAt(0)}
               </div>
             </div>
           </div>
@@ -185,7 +184,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-surface-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 px-4 z-50 shadow-[0_-5px_25px_rgba(0,0,0,0.08)] safe-bottom theme-transition">
           <div className="h-20 flex items-center justify-around pb-2">
             {mobileMenus.map((item) => {
@@ -237,6 +235,20 @@ const App: React.FC = () => {
   const dbRef = useRef<any>(null);
   const isRemoteChange = useRef(false);
 
+  // Splash Screen Logic
+  useEffect(() => {
+    const splash = document.getElementById('splash-screen');
+    if (splash) {
+      const timer = setTimeout(() => {
+        splash.classList.add('fade-out');
+        setTimeout(() => {
+          splash.style.display = 'none';
+        }, 800);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Theme effect
   useEffect(() => {
     const root = window.document.documentElement;
@@ -245,6 +257,10 @@ const App: React.FC = () => {
     } else {
       root.classList.remove('dark');
     }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', settings.theme === 'dark' ? '#000000' : '#ffffff');
+    }
   }, [settings.theme]);
 
   const toggleTheme = () => {
@@ -252,7 +268,13 @@ const App: React.FC = () => {
     setSettings({ ...settings, theme: nextTheme });
   };
 
+  // Firebase Sync Logic
   useEffect(() => {
+    let unsubProducts = () => {};
+    let unsubInbound = () => {};
+    let unsubOutbound = () => {};
+    let unsubSettings = () => {};
+
     if (settings.fbApiKey && settings.fbProjectId && settings.syncEnabled) {
       try {
         const firebaseConfig = {
@@ -264,43 +286,41 @@ const App: React.FC = () => {
         dbRef.current = getFirestore(app);
         setIsCloudConnected(true);
 
-        const unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
+        unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
           isRemoteChange.current = true;
-          setProductsState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
-          setTimeout(() => isRemoteChange.current = false, 500);
+          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+          setProductsState(remoteData);
+          localStorage.setItem('inv_products', JSON.stringify(remoteData));
+          setTimeout(() => { isRemoteChange.current = false; }, 500);
         });
 
-        const unsubInbound = onSnapshot(collection(dbRef.current, 'inbound'), (snap) => {
+        unsubInbound = onSnapshot(collection(dbRef.current, 'inbound'), (snap) => {
           isRemoteChange.current = true;
-          setInboundState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InboundEntry)));
-          setTimeout(() => isRemoteChange.current = false, 500);
+          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InboundEntry));
+          setInboundState(remoteData);
+          localStorage.setItem('inv_inbound', JSON.stringify(remoteData));
+          setTimeout(() => { isRemoteChange.current = false; }, 500);
         });
 
-        const unsubOutbound = onSnapshot(collection(dbRef.current, 'outbound'), (snap) => {
+        unsubOutbound = onSnapshot(collection(dbRef.current, 'outbound'), (snap) => {
           isRemoteChange.current = true;
-          setOutboundState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OutboundTransaction)));
-          setTimeout(() => isRemoteChange.current = false, 500);
+          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OutboundTransaction));
+          setOutboundState(remoteData);
+          localStorage.setItem('inv_outbound', JSON.stringify(remoteData));
+          setTimeout(() => { isRemoteChange.current = false; }, 500);
         });
 
-        const unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
+        unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
           if (snap.exists()) {
             const remoteSettings = snap.data();
-            setSettingsState(prev => ({
-              ...prev,
-              appName: remoteSettings.appName || prev.appName,
-              appSubtitle: remoteSettings.appSubtitle || prev.appSubtitle,
-              adminName: remoteSettings.adminName || prev.adminName,
-              warehouseName: remoteSettings.warehouseName || prev.warehouseName,
-              themeColor: remoteSettings.themeColor || prev.themeColor,
-              logo: remoteSettings.logo || prev.logo,
-              theme: remoteSettings.theme || prev.theme
-            }));
+            setSettingsState(prev => {
+              const merged = { ...prev, ...remoteSettings };
+              localStorage.setItem('inv_settings', JSON.stringify(merged));
+              return merged;
+            });
           }
         });
 
-        return () => {
-          unsubProducts(); unsubInbound(); unsubOutbound(); unsubSettings();
-        };
       } catch (e) {
         setIsCloudConnected(false);
       }
@@ -315,6 +335,10 @@ const App: React.FC = () => {
         }
       });
     }
+
+    return () => {
+      unsubProducts(); unsubInbound(); unsubOutbound(); unsubSettings();
+    };
   }, [settings.fbApiKey, settings.fbProjectId, settings.syncEnabled]);
 
   const setSettings = async (newSettings: AppSettings) => {
@@ -328,15 +352,13 @@ const App: React.FC = () => {
 
   const setProducts = async (newData: Product[] | ((prev: Product[]) => Product[])) => {
     const value = typeof newData === 'function' ? newData(products) : newData;
+    setProductsState(value);
+    localStorage.setItem('inv_products', JSON.stringify(value));
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       const deletedItems = products.filter(p => !value.some(v => v.id === p.id));
       for (const item of deletedItems) {
         await deleteDoc(doc(dbRef.current, 'products', item.id));
       }
-    }
-    setProductsState(value);
-    localStorage.setItem('inv_products', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'products', item.id), item);
       }
@@ -345,15 +367,13 @@ const App: React.FC = () => {
 
   const setInbound = async (newData: InboundEntry[] | ((prev: InboundEntry[]) => InboundEntry[])) => {
     const value = typeof newData === 'function' ? newData(inbound) : newData;
+    setInboundState(value);
+    localStorage.setItem('inv_inbound', JSON.stringify(value));
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       const deletedItems = inbound.filter(i => !value.some(v => v.id === i.id));
       for (const item of deletedItems) {
         await deleteDoc(doc(dbRef.current, 'inbound', item.id));
       }
-    }
-    setInboundState(value);
-    localStorage.setItem('inv_inbound', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'inbound', item.id), item);
       }
@@ -362,15 +382,13 @@ const App: React.FC = () => {
 
   const setOutbound = async (newData: OutboundTransaction[] | ((prev: OutboundTransaction[]) => OutboundTransaction[])) => {
     const value = typeof newData === 'function' ? newData(outbound) : newData;
+    setOutboundState(value);
+    localStorage.setItem('inv_outbound', JSON.stringify(value));
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       const deletedItems = outbound.filter(o => !value.some(v => v.id === o.id));
       for (const item of deletedItems) {
         await deleteDoc(doc(dbRef.current, 'outbound', item.id));
       }
-    }
-    setOutboundState(value);
-    localStorage.setItem('inv_outbound', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'outbound', item.id), item);
       }
@@ -384,7 +402,15 @@ const App: React.FC = () => {
   };
 
   return (
-    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, settings, setSettings, calculateStock, isCloudConnected, toggleTheme }}>
+    <InventoryContext.Provider value={{ 
+      products, setProducts, 
+      inbound, setInbound, 
+      outbound, setOutbound, 
+      settings, setSettings, 
+      calculateStock, 
+      isCloudConnected, 
+      toggleTheme 
+    }}>
       <HashRouter>
         <Layout>
           <Routes>

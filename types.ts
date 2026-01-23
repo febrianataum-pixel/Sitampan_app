@@ -35,6 +35,7 @@ export interface AppSettings {
   appName: string;
   appSubtitle: string;
   logo: string;
+  appLogo?: string; // Logo khusus Splash Screen & Icon PWA
   themeColor: string;
   bgType: 'color' | 'gradient' | 'image';
   bgColor: string;
