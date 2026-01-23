@@ -1,11 +1,29 @@
 
 import React, { useEffect, useState } from 'react';
 import { useInventory } from '../App';
-import { Package, ArrowDownCircle, ArrowUpCircle, XCircle, BarChart2, MapPin } from 'lucide-react';
+import { 
+  Package, 
+  ArrowDownCircle, 
+  ArrowUpCircle, 
+  XCircle, 
+  BarChart2, 
+  MapPin, 
+  X, 
+  Eye, 
+  Calendar, 
+  User, 
+  CheckCircle2, 
+  Clock 
+} from 'lucide-react';
+import { formatIndoDate, OutboundTransaction } from '../types';
 
 const Dashboard: React.FC = () => {
   const { products, inbound, outbound, calculateStock, settings } = useInventory();
   const [animate, setAnimate] = useState(false);
+  
+  // State untuk Modal Detail Kecamatan
+  const [selectedKecName, setSelectedKecName] = useState<string | null>(null);
+  const [kecTransactions, setKecTransactions] = useState<OutboundTransaction[]>([]);
 
   useEffect(() => {
     // Memicu animasi setelah komponen dimuat
@@ -25,12 +43,15 @@ const Dashboard: React.FC = () => {
   const maxStock = Math.max(...stockLevels.map(s => s.stock), 1);
 
   // Logika Ekstraksi Kecamatan
+  const getKecamatanName = (alamat: string) => {
+    const match = alamat.match(/(?:Kec\.|Kecamatan)\s+([a-zA-Z\s]+?)(?:,|$|\d)/i);
+    return match ? `KEC. ${match[1].trim().toUpperCase()}` : 'WILAYAH LAIN';
+  };
+
   const getKecamatanStats = () => {
     const counts: Record<string, number> = {};
     outbound.forEach(tx => {
-      // Mencari pola "Kec. [Nama]" atau "Kecamatan [Nama]"
-      const match = tx.alamat.match(/(?:Kec\.|Kecamatan)\s+([a-zA-Z\s]+?)(?:,|$|\d)/i);
-      const kecName = match ? `Kec. ${match[1].trim().toUpperCase()}` : 'WILAYAH LAIN';
+      const kecName = getKecamatanName(tx.alamat);
       counts[kecName] = (counts[kecName] || 0) + 1;
     });
     return Object.entries(counts)
@@ -40,6 +61,13 @@ const Dashboard: React.FC = () => {
 
   const districtStats = getKecamatanStats();
   const maxDistrictCount = Math.max(...districtStats.map(d => d.count), 1);
+
+  const handleKecClick = (name: string) => {
+    const filtered = outbound.filter(tx => getKecamatanName(tx.alamat) === name)
+      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+    setKecTransactions(filtered);
+    setSelectedKecName(name);
+  };
 
   return (
     <div className="space-y-8 pb-10 animate-in fade-in duration-700">
@@ -105,30 +133,36 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Chart Distribusi Kecamatan */}
+        {/* Chart Distribusi Kecamatan (Interaktif) */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-sm tracking-tight">
                 <MapPin size={18} className="text-orange-500" /> Distribusi Bantuan
               </h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Persebaran per Kecamatan</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Klik grafik untuk rincian per kecamatan</p>
             </div>
           </div>
           <div className="space-y-6">
             {districtStats.length > 0 ? districtStats.slice(0, 10).map((d, idx) => (
-              <div key={idx} className="space-y-1.5">
+              <div 
+                key={idx} 
+                className="space-y-1.5 cursor-pointer group/bar" 
+                onClick={() => handleKecClick(d.name)}
+              >
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="font-bold text-slate-600 tracking-tight">{d.name}</span>
+                  <span className="font-bold text-slate-600 tracking-tight group-hover/bar:text-orange-600 transition-colors">{d.name}</span>
                   <span className="font-black text-orange-600">{d.count} <span className="text-[9px] text-slate-300">BAST</span></span>
                 </div>
-                <div className="w-full bg-slate-50 h-2.5 rounded-full overflow-hidden border border-slate-100">
+                <div className="w-full bg-slate-50 h-3 rounded-full overflow-hidden border border-slate-100 group-hover/bar:border-orange-200 transition-all">
                   <div 
-                    className="h-full transition-all duration-[1200ms] ease-out rounded-full bg-gradient-to-r from-orange-400 to-orange-600 shadow-sm"
+                    className="h-full transition-all duration-[1200ms] ease-out rounded-full bg-gradient-to-r from-orange-400 to-orange-600 shadow-sm relative group-hover/bar:brightness-110"
                     style={{ 
                       width: animate ? `${(d.count / maxDistrictCount) * 100}%` : '0%',
                     }}
-                  ></div>
+                  >
+                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/bar:opacity-100 transition-opacity"></div>
+                  </div>
                 </div>
               </div>
             )) : (
@@ -164,6 +198,102 @@ const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal Detail Kecamatan */}
+      {selectedKecName && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-5xl max-h-[85vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-300">
+            <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
+                  <MapPin size={24}/>
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Detail Distribusi: {selectedKecName}</h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Total {kecTransactions.length} Transaksi Terdeteksi</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedKecName(null)} 
+                className="p-3 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+              >
+                <X size={24}/>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-hide">
+              <div className="bg-slate-50 border border-slate-100 rounded-3xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-100/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                      <tr>
+                        <th className="px-6 py-4 w-12 text-center">No.</th>
+                        <th className="px-6 py-4">Tanggal</th>
+                        <th className="px-6 py-4">Penerima</th>
+                        <th className="px-6 py-4">Alamat Lengkap</th>
+                        <th className="px-6 py-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {kecTransactions.map((tx, idx) => {
+                        const isTuntas = tx.images && tx.images.length > 0;
+                        return (
+                          <tr key={tx.id} className="hover:bg-orange-50/30 transition-colors">
+                            <td className="px-6 py-4 text-center text-xs font-bold text-slate-300">{idx + 1}</td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-400 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <Calendar size={12}/>
+                                {formatIndoDate(tx.tanggal)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-700 text-sm">
+                              <div className="flex items-center gap-2">
+                                <User size={12} className="text-slate-300"/>
+                                {tx.penerima}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-slate-500 text-xs font-medium max-w-[300px]">
+                              <div className="flex items-start gap-1.5">
+                                <MapPin size={12} className="text-slate-300 shrink-0 mt-0.5"/>
+                                <span className="line-clamp-2 leading-relaxed">{tx.alamat}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              {isTuntas ? (
+                                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg w-fit border border-emerald-100">
+                                  <CheckCircle2 size={12}/>
+                                  <span className="text-[9px] font-black uppercase tracking-tight">Tuntas</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 bg-slate-50 text-slate-400 px-3 py-1 rounded-lg w-fit border border-slate-100">
+                                  <Clock size={12}/>
+                                  <span className="text-[9px] font-black uppercase tracking-tight">Proses</span>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {kecTransactions.length === 0 && (
+                        <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400 italic">Tidak ada rincian data.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8 bg-slate-50 border-t border-slate-100 flex justify-end shrink-0">
+              <button 
+                onClick={() => setSelectedKecName(null)} 
+                className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+              >
+                Tutup Rincian
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
