@@ -1,0 +1,24 @@
+
+{
+  "name": "SITAMPAN",
+  "short_name": "SITAMPAN",
+  "description": "Sistem Tanggap Pemantauan Logistik Kebencanaan",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

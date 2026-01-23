@@ -6,16 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>SITAMPAN - Sistem Inventaris Realtime</title>
     
-    <!-- PWA Fullscreen Meta Tags -->
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SITAMPAN">
     <meta name="theme-color" content="#000000">
     
-    <!-- Favicon & PWA Icons (Menggunakan Logo SITAMPAN) -->
-    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png">
-    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png">
+    <!-- Favicon & PWA Icons -->
+    <link id="dynamic-favicon" rel="icon" type="image/png" href="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png">
+    <link id="dynamic-apple-icon" rel="apple-touch-icon" href="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -39,16 +40,9 @@
         }
         body { 
             font-family: var(--font-main);
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            overscroll-behavior-y: contain;
-            transition: background-color 0.3s ease, color 0.3s ease;
+            background: #000;
         }
         
-        .safe-top { padding-top: env(safe-area-inset-top, 0px); }
-        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
-
-        /* Splash Screen Styles */
         #splash-screen {
             position: fixed;
             inset: 0;
@@ -58,43 +52,43 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: opacity 0.6s ease, transform 0.6s ease;
         }
 
         #splash-logo {
-            width: 180px;
+            width: 160px;
+            max-width: 60vw;
             height: auto;
-            animation: splash-entry 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, 
-                       splash-pulse 2s ease-in-out infinite 1.2s;
-            filter: drop-shadow(0 0 20px rgba(37, 99, 235, 0.3));
+            opacity: 0;
+            transform: scale(0.8);
+            filter: drop-shadow(0 0 30px rgba(59, 130, 246, 0.4));
+        }
+
+        .logo-animate {
+            animation: splash-entry 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, 
+                       splash-pulse 2.5s ease-in-out infinite 1s;
         }
 
         @keyframes splash-entry {
-            0% { opacity: 0; transform: scale(0.5); }
-            100% { opacity: 1; transform: scale(1); }
+            0% { opacity: 0; transform: scale(0.5) translateY(20px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
         }
 
         @keyframes splash-pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.85; }
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3)); }
+            50% { transform: scale(1.03); filter: drop-shadow(0 0 40px rgba(59, 130, 246, 0.5)); }
         }
 
         #splash-screen.fade-out {
             opacity: 0;
-            transform: translateY(-20px);
+            transform: scale(1.1);
             pointer-events: none;
         }
 
-        @media print {
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-        }
-
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        .theme-transition {
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        @keyframes loading-bar {
+            0% { transform: scaleX(0); }
+            50% { transform: scaleX(1); }
+            100% { transform: scaleX(0); transform-origin: right; }
         }
     </style>
 <script type="importmap">
@@ -118,21 +112,41 @@
     <!-- Splash Screen Overlay -->
     <div id="splash-screen">
         <img id="splash-logo" src="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png" alt="SITAMPAN">
-        <div class="mt-8 flex flex-col items-center gap-2">
-            <div class="w-12 h-0.5 bg-slate-800 rounded-full overflow-hidden">
+        <div id="splash-loader" class="mt-12 flex flex-col items-center gap-3">
+            <div class="w-16 h-1 bg-slate-900 rounded-full overflow-hidden border border-white/10">
                 <div class="w-full h-full bg-blue-500 origin-left animate-[loading-bar_2s_ease-in-out_infinite]"></div>
             </div>
-            <span class="text-[8px] font-black text-slate-500 uppercase tracking-[0.4em] animate-pulse">Memuat Sistem</span>
+            <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.5em] animate-pulse">SITAMPAN SYSTEM</span>
         </div>
     </div>
 
-    <style>
-        @keyframes loading-bar {
-            0% { transform: scaleX(0); }
-            50% { transform: scaleX(1); }
-            100% { transform: scaleX(0); transform-origin: right; }
+    <script>
+      (function() {
+        const splashImg = document.getElementById('splash-logo');
+        try {
+          const saved = localStorage.getItem('inv_settings');
+          if (saved) {
+            const settings = JSON.parse(saved);
+            if (settings.appLogo) {
+              splashImg.src = settings.appLogo;
+              const fav = document.getElementById('dynamic-favicon');
+              const apple = document.getElementById('dynamic-apple-icon');
+              if (fav) fav.href = settings.appLogo;
+              if (apple) apple.href = settings.appLogo;
+            }
+          }
+        } catch (e) {}
+        
+        // Pastikan gambar selesai dimuat sebelum animasi dimulai
+        if (splashImg.complete) {
+          splashImg.classList.add('logo-animate');
+        } else {
+          splashImg.onload = function() {
+            splashImg.classList.add('logo-animate');
+          };
         }
-    </style>
+      })();
+    </script>
 
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
