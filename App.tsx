@@ -13,7 +13,10 @@ import {
   LayoutDashboard,
   CalendarDays,
   UserCircle,
-  WifiOff
+  WifiOff,
+  Home,
+  LogOut,
+  ChevronRight
 } from 'lucide-react';
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -69,18 +72,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
   ];
 
+  // Menu Khusus Mobile (Bottom Nav)
+  const mobileMenus = [
+    { name: 'Home', path: '/dashboard', icon: <Home size={22} /> },
+    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={22} /> },
+    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={22} /> },
+    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={22} /> },
+  ];
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
+      {/* Sidebar Desktop (Hidden on Mobile) */}
       <aside className={`
-        fixed md:relative z-50 h-full bg-slate-900 text-white transition-all duration-300 flex flex-col no-print shadow-2xl
-        ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20'}
+        fixed md:relative z-50 h-full bg-slate-900 text-white transition-all duration-300 hidden md:flex flex-col no-print shadow-2xl
+        ${isSidebarOpen ? 'w-64' : 'w-20'}
       `}>
         <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
           <div className="shrink-0">
@@ -90,12 +95,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Package className="text-blue-400" size={28} />
             )}
           </div>
-          <div className={`flex flex-col truncate transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'md:opacity-0 md:hidden'}`}>
+          <div className={`flex flex-col truncate transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
             <span className="font-bold text-lg uppercase leading-tight truncate">{settings.appName}</span>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden ml-auto p-2 hover:bg-white/10 rounded-lg">
-            <X size={20} />
-          </button>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-hide">
@@ -110,7 +112,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               style={({ isActive }) => isActive ? { backgroundColor: settings.themeColor } : {}}
             >
               <div className="shrink-0">{item.icon}</div>
-              <span className={`font-semibold text-sm transition-all duration-300 ${isSidebarOpen ? 'opacity-100 block' : 'md:opacity-0 md:hidden'}`}>
+              <span className={`font-semibold text-sm transition-all duration-300 ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
                 {item.name}
               </span>
             </NavLink>
@@ -125,50 +127,74 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </button>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 md:px-6 no-print justify-between z-30 shrink-0 sticky top-0">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        {/* Top Header (Responsive) */}
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 md:px-6 no-print justify-between z-30 shrink-0 sticky top-0 shadow-sm">
           <div className="flex items-center gap-3 overflow-hidden">
-            <button 
-              onClick={() => setIsSidebarOpen(true)} 
-              className="p-2 bg-slate-100 rounded-xl text-slate-600 active:scale-95 md:hidden"
-            >
-              <Menu size={20}/>
-            </button>
-            
             <div className="flex items-center gap-2 overflow-hidden">
+              <div className="md:hidden">
+                {settings.logo ? (
+                  <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+                ) : (
+                  <Package className="text-blue-600" size={24} />
+                )}
+              </div>
               <h1 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-widest truncate">
                 {settings.appName}
               </h1>
               {isCloudConnected ? (
-                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full text-[8px] md:text-[9px] font-bold border border-emerald-100 whitespace-nowrap">
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full sync-pulse shrink-0"></div> 
-                  <span>SYNC LIVE</span>
+                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full text-[8px] font-bold border border-emerald-100 whitespace-nowrap">
+                  <div className="w-1 h-1 bg-emerald-500 rounded-full sync-pulse shrink-0"></div> 
+                  <span>SYNC</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 bg-slate-100 text-slate-400 px-2 py-1 rounded-full text-[8px] md:text-[9px] font-bold border border-slate-200 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 bg-slate-100 text-slate-400 px-2 py-1 rounded-full text-[8px] font-bold border border-slate-200 whitespace-nowrap">
                   <WifiOff size={10} className="shrink-0" /> 
-                  <span>LOCAL</span>
+                  <span>OFFLINE</span>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <div className="text-right hidden sm:block">
                <p className="text-xs font-bold text-slate-700 leading-none">{settings.adminName}</p>
                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{todayFormatted}</p>
             </div>
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden shadow-sm">
                {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" /> : settings.adminName.charAt(0)}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 md:p-8">
-          <div className="max-w-[1600px] mx-auto pb-10">
+        {/* Content Body */}
+        <main className="flex-1 overflow-auto p-4 md:p-8 pb-24 md:pb-10">
+          <div className="max-w-[1600px] mx-auto">
             {children}
           </div>
         </main>
+
+        {/* Mobile Bottom Navigation (Only visible on small screens) */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-t border-slate-200 flex items-center justify-around px-4 pb-4 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+          {mobileMenus.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <NavLink 
+                key={item.path} 
+                to={item.path} 
+                className={`flex flex-col items-center gap-1.5 p-2 transition-all active-touch ${isActive ? 'text-blue-600 scale-110' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-blue-50' : 'bg-transparent'}`}>
+                  {React.cloneElement(item.icon as React.ReactElement, { size: 22, strokeWidth: isActive ? 3 : 2 })}
+                </div>
+                <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                  {item.name}
+                </span>
+              </NavLink>
+            );
+          })}
+        </nav>
       </div>
     </div>
   );
@@ -273,7 +299,6 @@ const App: React.FC = () => {
   const setProducts = async (newData: Product[] | ((prev: Product[]) => Product[])) => {
     const value = typeof newData === 'function' ? newData(products) : newData;
     
-    // Cari data yang dihapus
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       const deletedItems = products.filter(p => !value.some(v => v.id === p.id));
       for (const item of deletedItems) {
