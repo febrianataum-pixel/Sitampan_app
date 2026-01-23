@@ -1,5 +1,8 @@
+
 {
   "name": "SITAMPAN",
-  "description": "Aplikasi manajemen inventaris barang lengkap dengan fitur barang masuk, keluar, stok real-time, dan pembuatan berita acara.",
-  "requestFramePermissions": []
+  "description": "Sistem Tanggap Pemantauan Logistik Kebencanaan",
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

@@ -123,6 +123,17 @@
     </div>
 
     <script>
+      // Service Worker Registration for PWA Standalone
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('SW Registered', reg);
+          }).catch(err => {
+            console.warn('SW Registration failed', err);
+          });
+        });
+      }
+
       (function() {
         const splashImg = document.getElementById('splash-logo');
         const defaultLogo = 'https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png';
@@ -131,6 +142,14 @@
           const saved = localStorage.getItem('inv_settings');
           if (saved) {
             const settings = JSON.parse(saved);
+            
+            // Sync Theme on load to prevent flash
+            if (settings.theme === 'dark') {
+              document.documentElement.classList.add('dark');
+            } else {
+              document.documentElement.classList.remove('dark');
+            }
+
             if (settings.appLogo) {
               splashImg.src = settings.appLogo;
               const fav = document.getElementById('dynamic-favicon');
@@ -140,7 +159,7 @@
             }
           }
         } catch (e) {
-          console.warn("Failed to load custom splash logo from localStorage.");
+          console.warn("Failed to load custom splash logo/theme from localStorage.");
         }
         
         const startAnimation = () => {

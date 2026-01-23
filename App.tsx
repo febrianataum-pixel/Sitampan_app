@@ -91,7 +91,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
           <div className="shrink-0">
             {settings.logo ? (
-              <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+              <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" alt="Logo" />
             ) : (
               <Package className="text-blue-400" size={28} />
             )}
@@ -136,7 +136,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <div className="flex items-center gap-2 overflow-hidden">
                 <div className="md:hidden">
                   {settings.logo ? (
-                    <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+                    <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" alt="Logo" />
                   ) : (
                     <Package className="text-blue-600" size={24} />
                   )}
@@ -159,7 +159,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              {/* Theme Toggle Button */}
               <button 
                 onClick={toggleTheme}
                 className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 active-touch theme-transition border dark:border-white/10"
@@ -173,7 +172,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{todayFormatted}</p>
               </div>
               <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold overflow-hidden shadow-sm">
-                 {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" /> : settings.adminName.charAt(0)}
+                 {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" alt="Admin" /> : settings.adminName.charAt(0)}
               </div>
             </div>
           </div>
@@ -185,7 +184,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-surface-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 px-4 z-50 shadow-[0_-5px_25px_rgba(0,0,0,0.08)] safe-bottom theme-transition">
           <div className="h-20 flex items-center justify-around pb-2">
             {mobileMenus.map((item) => {
@@ -259,6 +257,10 @@ const App: React.FC = () => {
     } else {
       root.classList.remove('dark');
     }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', settings.theme === 'dark' ? '#000000' : '#ffffff');
+    }
   }, [settings.theme]);
 
   const toggleTheme = () => {
@@ -266,7 +268,13 @@ const App: React.FC = () => {
     setSettings({ ...settings, theme: nextTheme });
   };
 
+  // Firebase Sync Logic
   useEffect(() => {
+    let unsubProducts = () => {};
+    let unsubInbound = () => {};
+    let unsubOutbound = () => {};
+    let unsubSettings = () => {};
+
     if (settings.fbApiKey && settings.fbProjectId && settings.syncEnabled) {
       try {
         const firebaseConfig = {
@@ -278,52 +286,41 @@ const App: React.FC = () => {
         dbRef.current = getFirestore(app);
         setIsCloudConnected(true);
 
-        const unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
+        unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
           isRemoteChange.current = true;
           const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
           setProductsState(remoteData);
           localStorage.setItem('inv_products', JSON.stringify(remoteData));
-          setTimeout(() => isRemoteChange.current = false, 500);
+          setTimeout(() => { isRemoteChange.current = false; }, 500);
         });
 
-        const unsubInbound = onSnapshot(collection(dbRef.current, 'inbound'), (snap) => {
+        unsubInbound = onSnapshot(collection(dbRef.current, 'inbound'), (snap) => {
           isRemoteChange.current = true;
           const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InboundEntry));
           setInboundState(remoteData);
           localStorage.setItem('inv_inbound', JSON.stringify(remoteData));
-          setTimeout(() => isRemoteChange.current = false, 500);
+          setTimeout(() => { isRemoteChange.current = false; }, 500);
         });
 
-        const unsubOutbound = onSnapshot(collection(dbRef.current, 'outbound'), (snap) => {
+        unsubOutbound = onSnapshot(collection(dbRef.current, 'outbound'), (snap) => {
           isRemoteChange.current = true;
           const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OutboundTransaction));
           setOutboundState(remoteData);
           localStorage.setItem('inv_outbound', JSON.stringify(remoteData));
-          setTimeout(() => isRemoteChange.current = false, 500);
+          setTimeout(() => { isRemoteChange.current = false; }, 500);
         });
 
-        const unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
+        unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
           if (snap.exists()) {
             const remoteSettings = snap.data();
-            const merged = {
-              ...settings,
-              appName: remoteSettings.appName || settings.appName,
-              appSubtitle: remoteSettings.appSubtitle || settings.appSubtitle,
-              adminName: remoteSettings.adminName || settings.adminName,
-              warehouseName: remoteSettings.warehouseName || settings.warehouseName,
-              themeColor: remoteSettings.themeColor || settings.themeColor,
-              logo: remoteSettings.logo || settings.logo,
-              appLogo: remoteSettings.appLogo || settings.appLogo,
-              theme: remoteSettings.theme || settings.theme
-            };
-            setSettingsState(merged);
-            localStorage.setItem('inv_settings', JSON.stringify(merged));
+            setSettingsState(prev => {
+              const merged = { ...prev, ...remoteSettings };
+              localStorage.setItem('inv_settings', JSON.stringify(merged));
+              return merged;
+            });
           }
         });
 
-        return () => {
-          unsubProducts(); unsubInbound(); unsubOutbound(); unsubSettings();
-        };
       } catch (e) {
         setIsCloudConnected(false);
       }
@@ -338,6 +335,10 @@ const App: React.FC = () => {
         }
       });
     }
+
+    return () => {
+      unsubProducts(); unsubInbound(); unsubOutbound(); unsubSettings();
+    };
   }, [settings.fbApiKey, settings.fbProjectId, settings.syncEnabled]);
 
   const setSettings = async (newSettings: AppSettings) => {
@@ -401,7 +402,15 @@ const App: React.FC = () => {
   };
 
   return (
-    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, settings, setSettings, calculateStock, isCloudConnected, toggleTheme }}>
+    <InventoryContext.Provider value={{ 
+      products, setProducts, 
+      inbound, setInbound, 
+      outbound, setOutbound, 
+      settings, setSettings, 
+      calculateStock, 
+      isCloudConnected, 
+      toggleTheme 
+    }}>
       <HashRouter>
         <Layout>
           <Routes>
