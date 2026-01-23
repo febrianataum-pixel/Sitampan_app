@@ -85,7 +85,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-true-black theme-transition">
       {/* Sidebar Desktop */}
       <aside className={`
-        fixed md:relative z-50 h-full bg-slate-900 dark:bg-black text-white transition-all duration-300 hidden md:flex flex-col no-print shadow-2xl border-r dark:border-white/5
+        fixed md:relative z-40 h-full bg-slate-900 dark:bg-black text-white transition-all duration-300 hidden md:flex flex-col no-print shadow-2xl border-r dark:border-white/5
         ${isSidebarOpen ? 'w-64' : 'w-20'}
       `}>
         <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
@@ -236,6 +236,20 @@ const App: React.FC = () => {
 
   const dbRef = useRef<any>(null);
   const isRemoteChange = useRef(false);
+
+  // Splash Screen Logic
+  useEffect(() => {
+    const splash = document.getElementById('splash-screen');
+    if (splash) {
+      const timer = setTimeout(() => {
+        splash.classList.add('fade-out');
+        setTimeout(() => {
+          splash.style.display = 'none';
+        }, 800);
+      }, 2500); // 2.5 Detik tampilan logo
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Theme effect
   useEffect(() => {
