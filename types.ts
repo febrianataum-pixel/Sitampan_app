@@ -28,7 +28,7 @@ export interface OutboundTransaction {
   tanggal: string;
   alamat: string;
   items: OutboundItem[];
-  images?: string[]; // Properti baru untuk dokumentasi foto (Base64)
+  images?: string[];
 }
 
 export interface AppSettings {
@@ -41,6 +41,7 @@ export interface AppSettings {
   adminName: string;
   warehouseName: string;
   baTemplate?: string;
+  theme?: 'light' | 'dark';
   // Firebase Sync Config
   fbApiKey?: string;
   fbProjectId?: string;

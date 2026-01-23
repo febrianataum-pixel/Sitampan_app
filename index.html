@@ -13,10 +13,23 @@
     <meta name="apple-mobile-web-app-title" content="SITAMPAN">
     <meta name="theme-color" content="#0f172a">
     
-    <!-- Splash Screen Icons (Optional but recommended) -->
+    <!-- Splash Screen Icons -->
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2897/2897782.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'true-black': '#000000',
+              'surface-dark': '#0a0a0a',
+            }
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -27,24 +40,18 @@
             font-family: var(--font-main);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            overscroll-behavior-y: contain; /* Mencegah pull-to-refresh browser */
-            background-color: #f8fafc;
+            overscroll-behavior-y: contain;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         
-        /* Menangani Safe Area untuk HP ber-poni (Notch) */
-        .safe-top {
-            padding-top: env(safe-area-inset-top, 0px);
-        }
-        .safe-bottom {
-            padding-bottom: env(safe-area-inset-bottom, 0px);
-        }
+        .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
         }
 
-        /* UI Native Feeling */
         button, a {
             -webkit-tap-highlight-color: transparent;
             user-select: none;
@@ -55,13 +62,12 @@
             transition: transform 0.1s;
         }
 
-        /* Sembunyikan Scrollbar tapi tetap bisa scroll */
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Smooth transitions for theme switching */
+        .theme-transition {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
     </style>
 <script type="importmap">
@@ -81,7 +87,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-slate-50 text-slate-900 overflow-x-hidden">
+<body class="bg-slate-50 dark:bg-true-black text-slate-900 dark:text-slate-100 overflow-x-hidden">
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
 </body>
