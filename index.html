@@ -41,6 +41,8 @@
         body { 
             font-family: var(--font-main);
             background: #000;
+            margin: 0;
+            padding: 0;
         }
         
         #splash-screen {
@@ -123,6 +125,8 @@
     <script>
       (function() {
         const splashImg = document.getElementById('splash-logo');
+        const defaultLogo = 'https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png';
+        
         try {
           const saved = localStorage.getItem('inv_settings');
           if (saved) {
@@ -135,16 +139,32 @@
               if (apple) apple.href = settings.appLogo;
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Failed to load custom splash logo from localStorage.");
+        }
         
-        // Pastikan gambar selesai dimuat sebelum animasi dimulai
-        if (splashImg.complete) {
+        const startAnimation = () => {
           splashImg.classList.add('logo-animate');
+        };
+
+        if (splashImg.complete) {
+          startAnimation();
         } else {
-          splashImg.onload = function() {
-            splashImg.classList.add('logo-animate');
+          splashImg.onload = startAnimation;
+          splashImg.onerror = () => {
+            splashImg.src = defaultLogo;
+            startAnimation();
           };
         }
+        
+        // Safety timeout to hide splash if something hangs
+        setTimeout(() => {
+          const splash = document.getElementById('splash-screen');
+          if (splash && !splash.classList.contains('fade-out')) {
+             console.warn("Splash screen timeout fallback triggered.");
+             splash.classList.add('fade-out');
+          }
+        }, 5000);
       })();
     </script>
 

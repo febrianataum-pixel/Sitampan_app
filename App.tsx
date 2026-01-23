@@ -246,7 +246,7 @@ const App: React.FC = () => {
         setTimeout(() => {
           splash.style.display = 'none';
         }, 800);
-      }, 2500); // 2.5 Detik tampilan logo
+      }, 2500);
       return () => clearTimeout(timer);
     }
   }, []);
@@ -280,35 +280,44 @@ const App: React.FC = () => {
 
         const unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
           isRemoteChange.current = true;
-          setProductsState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+          setProductsState(remoteData);
+          localStorage.setItem('inv_products', JSON.stringify(remoteData));
           setTimeout(() => isRemoteChange.current = false, 500);
         });
 
         const unsubInbound = onSnapshot(collection(dbRef.current, 'inbound'), (snap) => {
           isRemoteChange.current = true;
-          setInboundState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InboundEntry)));
+          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InboundEntry));
+          setInboundState(remoteData);
+          localStorage.setItem('inv_inbound', JSON.stringify(remoteData));
           setTimeout(() => isRemoteChange.current = false, 500);
         });
 
         const unsubOutbound = onSnapshot(collection(dbRef.current, 'outbound'), (snap) => {
           isRemoteChange.current = true;
-          setOutboundState(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OutboundTransaction)));
+          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OutboundTransaction));
+          setOutboundState(remoteData);
+          localStorage.setItem('inv_outbound', JSON.stringify(remoteData));
           setTimeout(() => isRemoteChange.current = false, 500);
         });
 
         const unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
           if (snap.exists()) {
             const remoteSettings = snap.data();
-            setSettingsState(prev => ({
-              ...prev,
-              appName: remoteSettings.appName || prev.appName,
-              appSubtitle: remoteSettings.appSubtitle || prev.appSubtitle,
-              adminName: remoteSettings.adminName || prev.adminName,
-              warehouseName: remoteSettings.warehouseName || prev.warehouseName,
-              themeColor: remoteSettings.themeColor || prev.themeColor,
-              logo: remoteSettings.logo || prev.logo,
-              theme: remoteSettings.theme || prev.theme
-            }));
+            const merged = {
+              ...settings,
+              appName: remoteSettings.appName || settings.appName,
+              appSubtitle: remoteSettings.appSubtitle || settings.appSubtitle,
+              adminName: remoteSettings.adminName || settings.adminName,
+              warehouseName: remoteSettings.warehouseName || settings.warehouseName,
+              themeColor: remoteSettings.themeColor || settings.themeColor,
+              logo: remoteSettings.logo || settings.logo,
+              appLogo: remoteSettings.appLogo || settings.appLogo,
+              theme: remoteSettings.theme || settings.theme
+            };
+            setSettingsState(merged);
+            localStorage.setItem('inv_settings', JSON.stringify(merged));
           }
         });
 
@@ -342,15 +351,13 @@ const App: React.FC = () => {
 
   const setProducts = async (newData: Product[] | ((prev: Product[]) => Product[])) => {
     const value = typeof newData === 'function' ? newData(products) : newData;
+    setProductsState(value);
+    localStorage.setItem('inv_products', JSON.stringify(value));
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       const deletedItems = products.filter(p => !value.some(v => v.id === p.id));
       for (const item of deletedItems) {
         await deleteDoc(doc(dbRef.current, 'products', item.id));
       }
-    }
-    setProductsState(value);
-    localStorage.setItem('inv_products', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'products', item.id), item);
       }
@@ -359,15 +366,13 @@ const App: React.FC = () => {
 
   const setInbound = async (newData: InboundEntry[] | ((prev: InboundEntry[]) => InboundEntry[])) => {
     const value = typeof newData === 'function' ? newData(inbound) : newData;
+    setInboundState(value);
+    localStorage.setItem('inv_inbound', JSON.stringify(value));
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       const deletedItems = inbound.filter(i => !value.some(v => v.id === i.id));
       for (const item of deletedItems) {
         await deleteDoc(doc(dbRef.current, 'inbound', item.id));
       }
-    }
-    setInboundState(value);
-    localStorage.setItem('inv_inbound', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'inbound', item.id), item);
       }
@@ -376,15 +381,13 @@ const App: React.FC = () => {
 
   const setOutbound = async (newData: OutboundTransaction[] | ((prev: OutboundTransaction[]) => OutboundTransaction[])) => {
     const value = typeof newData === 'function' ? newData(outbound) : newData;
+    setOutboundState(value);
+    localStorage.setItem('inv_outbound', JSON.stringify(value));
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       const deletedItems = outbound.filter(o => !value.some(v => v.id === o.id));
       for (const item of deletedItems) {
         await deleteDoc(doc(dbRef.current, 'outbound', item.id));
       }
-    }
-    setOutboundState(value);
-    localStorage.setItem('inv_outbound', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
       for (const item of value) {
         await setDoc(doc(dbRef.current, 'outbound', item.id), item);
       }
