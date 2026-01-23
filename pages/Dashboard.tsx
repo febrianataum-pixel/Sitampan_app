@@ -18,8 +18,7 @@ import {
   Image as ImageIcon,
   ChevronRight,
   Download,
-  Upload,
-  FileText
+  Upload
 } from 'lucide-react';
 import { formatIndoDate, OutboundTransaction } from '../types';
 
@@ -29,6 +28,7 @@ const Dashboard: React.FC = () => {
   
   const [selectedKecName, setSelectedKecName] = useState<string | null>(null);
   const [kecTransactions, setKecTransactions] = useState<OutboundTransaction[]>([]);
+  const [viewingDocTx, setViewingDocTx] = useState<OutboundTransaction | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setAnimate(true), 150);
@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
             {districtStats.length > 0 ? districtStats.slice(0, 10).map((d, idx) => (
               <div 
                 key={idx} 
-                className="cursor-pointer group/bar active-touch" 
+                className="cursor-pointer group/bar" 
                 onClick={() => handleKecClick(d.name)}
               >
                 <div className="flex justify-between items-center text-[11px] mb-1.5">
@@ -207,68 +207,6 @@ const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* District Modal Details */}
-      {selectedKecName && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-surface-dark w-full max-w-4xl max-h-[85vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border dark:border-white/10">
-            <div className="p-8 border-b dark:border-white/5 flex items-center justify-between shrink-0">
-               <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-2xl flex items-center justify-center shadow-inner">
-                    <MapPin size={24}/>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">{selectedKecName}</h3>
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Daftar Transaksi BAST Terkirim</p>
-                  </div>
-               </div>
-               <button onClick={() => setSelectedKecName(null)} className="p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl transition-all text-slate-400 active-touch">
-                  <X size={24}/>
-               </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-8 space-y-4 scrollbar-hide">
-               {kecTransactions.length > 0 ? (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   {kecTransactions.map((tx) => (
-                     <div key={tx.id} className="bg-slate-50 dark:bg-white/5 p-6 rounded-[2rem] border border-slate-100 dark:border-white/5 group hover:border-orange-200 dark:hover:border-orange-900/30 transition-all shadow-sm">
-                        <div className="flex justify-between items-start mb-4">
-                           <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                              <Calendar size={12}/> {formatIndoDate(tx.tanggal)}
-                           </div>
-                           <div className={`text-[8px] font-black px-2 py-0.5 rounded-full border ${tx.images && tx.images.length > 0 ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 border-blue-100'} uppercase`}>
-                             {tx.images && tx.images.length > 0 ? 'DOKUMENTASI LENGKAP' : 'PROSES'}
-                           </div>
-                        </div>
-                        <h4 className="font-black text-slate-800 dark:text-slate-100 mb-1 italic">{tx.penerima}</h4>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-4 truncate">{tx.alamat}</p>
-                        <div className="space-y-1 pt-4 border-t dark:border-white/5">
-                           {tx.items.map((item, i) => {
-                             const p = products.find(prod => prod.id === item.productId);
-                             return (
-                               <div key={i} className="flex justify-between text-[10px]">
-                                 <span className="font-bold text-slate-500 dark:text-slate-400 uppercase">{p?.namaBarang}</span>
-                                 <span className="font-black text-slate-800 dark:text-slate-200">{item.jumlah} {p?.satuan}</span>
-                               </div>
-                             );
-                           })}
-                        </div>
-                     </div>
-                   ))}
-                 </div>
-               ) : (
-                 <div className="py-20 text-center italic text-slate-400">Tidak ada data transaksi ditemukan.</div>
-               )}
-            </div>
-
-            <div className="p-8 bg-slate-50 dark:bg-white/5 border-t dark:border-white/5 shrink-0 flex justify-end">
-               <button onClick={() => setSelectedKecName(null)} className="px-10 py-4 bg-slate-900 dark:bg-blue-600 text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all">
-                  Tutup Rincian
-               </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

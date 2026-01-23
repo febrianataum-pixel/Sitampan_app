@@ -8,11 +8,13 @@ import {
   Warehouse, 
   Cloud, 
   ShieldCheck, 
+  ExternalLink, 
   RefreshCw, 
+  Smartphone, 
+  Laptop,
   Trash2,
   Camera,
-  Smartphone,
-  Info
+  Paintbrush
 } from 'lucide-react';
 
 const Profile: React.FC = () => {
@@ -21,22 +23,18 @@ const Profile: React.FC = () => {
 
   const sanitizeInput = (val: string) => val.replace(/['"]+/g, '').trim();
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'appLogo') => {
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) return alert("Ukuran file terlalu besar! Maksimal 2MB.");
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setSettings({ ...settings, [field]: reader.result as string });
-      };
+      reader.onloadend = () => setSettings({ ...settings, logo: reader.result as string });
       reader.readAsDataURL(file);
     }
   };
 
-  const removeLogo = (field: 'logo' | 'appLogo') => {
-    if (confirm("Hapus logo ini?")) {
-      setSettings({ ...settings, [field]: '' });
-    }
+  const removeLogo = () => {
+    if (confirm("Hapus logo?")) setSettings({ ...settings, logo: '' });
   };
 
   const testConnection = async () => {
@@ -59,51 +57,25 @@ const Profile: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-surface-dark p-8 md:p-12 rounded-[3rem] shadow-sm border border-slate-200 dark:border-white/5 space-y-10 theme-transition">
-        
-        {/* Logo Branding (Sidebar/Header) */}
         <div className="flex flex-col md:flex-row items-center gap-10 border-b dark:border-white/5 pb-10">
-           <div className="relative group text-center space-y-2">
-              <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Logo Instansi (Internal)</label>
-              <div className="w-32 h-32 rounded-[2rem] bg-slate-50 dark:bg-white/5 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 relative overflow-hidden shadow-inner transition-all group-hover:border-blue-400 mx-auto">
+           <div className="relative group">
+              <div className="w-40 h-40 rounded-[2.5rem] bg-slate-50 dark:bg-white/5 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 relative overflow-hidden shadow-inner transition-all group-hover:border-blue-400">
                 {settings.logo ? (
                   <img src={settings.logo} className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex flex-col items-center text-slate-300 dark:text-slate-700">
-                    <ImageIcon size={32} />
-                    <span className="text-[7px] font-black uppercase mt-1">Logo</span>
+                    <ImageIcon size={48} />
+                    <span className="text-[8px] font-black uppercase mt-2">No Logo</span>
                   </div>
                 )}
-                <label className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[9px] font-black cursor-pointer backdrop-blur-sm">
-                  <Camera size={20} className="mb-1" />
-                  UPLOAD
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'logo')} />
+                <label className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[10px] font-black cursor-pointer backdrop-blur-sm">
+                  <Camera size={24} className="mb-2" />
+                  GANTI LOGO
+                  <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
                 </label>
               </div>
               {settings.logo && (
-                <button onClick={() => removeLogo('logo')} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 active:scale-90"><Trash2 size={12} /></button>
-              )}
-           </div>
-
-           {/* LOGO APLIKASI / SPLASH SCREEN */}
-           <div className="relative group text-center space-y-2">
-              <label className="block text-[9px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1 justify-center"><Smartphone size={10}/> Logo Aplikasi (Splash Screen)</label>
-              <div className="w-32 h-32 rounded-[2rem] bg-blue-50 dark:bg-blue-900/10 flex flex-col items-center justify-center border-2 border-dashed border-blue-200 dark:border-blue-900/30 relative overflow-hidden shadow-inner transition-all group-hover:border-blue-500 mx-auto">
-                {settings.appLogo ? (
-                  <img src={settings.appLogo} className="w-full h-full object-contain p-2" />
-                ) : (
-                  <div className="flex flex-col items-center text-blue-300 dark:text-blue-800">
-                    <Smartphone size={32} />
-                    <span className="text-[7px] font-black uppercase mt-1">Splash Logo</span>
-                  </div>
-                )}
-                <label className="absolute inset-0 bg-blue-900/60 dark:bg-blue-600/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[9px] font-black cursor-pointer backdrop-blur-sm">
-                  <Camera size={20} className="mb-1" />
-                  UPLOAD LOGO
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'appLogo')} />
-                </label>
-              </div>
-              {settings.appLogo && (
-                <button onClick={() => removeLogo('appLogo')} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 active:scale-90"><Trash2 size={12} /></button>
+                <button onClick={removeLogo} className="absolute -top-2 -right-2 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 active:scale-90"><Trash2 size={14} /></button>
               )}
            </div>
 
@@ -119,11 +91,6 @@ const Profile: React.FC = () => {
            </div>
         </div>
 
-        <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 flex gap-3">
-          <Info className="text-blue-500 shrink-0" size={20}/>
-          <p className="text-[10px] text-blue-700 dark:text-blue-300 font-medium"><b>Logo Aplikasi (Splash Screen)</b> digunakan pada animasi pembuka saat aplikasi pertama kali dimuat di perangkat dan juga akan muncul sebagai ikon pada tab browser (favicon). Gunakan gambar transparan format PNG untuk hasil terbaik.</p>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <div className="space-y-2">
               <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1"><User size={14}/> Nama Admin</label>
@@ -136,7 +103,7 @@ const Profile: React.FC = () => {
         </div>
 
         <div className="pt-6 border-t dark:border-white/5 flex justify-end">
-           <button onClick={() => { localStorage.setItem('inv_settings', JSON.stringify(settings)); alert('Profil & Branding disimpan!'); window.location.reload(); }} className="w-full sm:w-auto flex items-center justify-center gap-3 text-white px-12 py-5 rounded-2xl font-black shadow-xl uppercase tracking-widest text-xs" style={{ backgroundColor: settings.themeColor }}>
+           <button className="w-full sm:w-auto flex items-center justify-center gap-3 text-white px-12 py-5 rounded-2xl font-black shadow-xl uppercase tracking-widest text-xs" style={{ backgroundColor: settings.themeColor }}>
              <Save size={18}/> Simpan Profil & Branding
            </button>
         </div>
