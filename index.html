@@ -104,7 +104,10 @@
     "xlsx": "https://esm.sh/xlsx@^0.18.5",
     "firebase/app": "https://esm.sh/firebase@11.1.0/app",
     "firebase/firestore": "https://esm.sh/firebase@11.1.0/firestore",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
+    "firebase/": "https://esm.sh/firebase@^12.8.0/",
+    "path": "https://esm.sh/path@^0.12.7",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
@@ -123,67 +126,30 @@
     </div>
 
     <script>
-      // Service Worker Registration for PWA Standalone
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js').then(reg => {
-            console.log('SW Registered', reg);
-          }).catch(err => {
-            console.warn('SW Registration failed', err);
-          });
+          navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW failed', err));
         });
       }
 
       (function() {
         const splashImg = document.getElementById('splash-logo');
-        const defaultLogo = 'https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png';
-        
         try {
           const saved = localStorage.getItem('inv_settings');
           if (saved) {
             const settings = JSON.parse(saved);
-            
-            // Sync Theme on load to prevent flash
-            if (settings.theme === 'dark') {
-              document.documentElement.classList.add('dark');
-            } else {
-              document.documentElement.classList.remove('dark');
-            }
-
-            if (settings.appLogo) {
-              splashImg.src = settings.appLogo;
-              const fav = document.getElementById('dynamic-favicon');
-              const apple = document.getElementById('dynamic-apple-icon');
-              if (fav) fav.href = settings.appLogo;
-              if (apple) apple.href = settings.appLogo;
-            }
+            if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+            if (settings.appLogo) splashImg.src = settings.appLogo;
           }
-        } catch (e) {
-          console.warn("Failed to load custom splash logo/theme from localStorage.");
-        }
+        } catch (e) {}
         
-        const startAnimation = () => {
-          splashImg.classList.add('logo-animate');
-        };
-
-        if (splashImg.complete) {
-          startAnimation();
-        } else {
-          splashImg.onload = startAnimation;
-          splashImg.onerror = () => {
-            splashImg.src = defaultLogo;
-            startAnimation();
-          };
-        }
+        const startAnimation = () => { splashImg.classList.add('logo-animate'); };
+        if (splashImg.complete) startAnimation(); else splashImg.onload = startAnimation;
         
-        // Safety timeout to hide splash if something hangs
         setTimeout(() => {
           const splash = document.getElementById('splash-screen');
-          if (splash && !splash.classList.contains('fade-out')) {
-             console.warn("Splash screen timeout fallback triggered.");
-             splash.classList.add('fade-out');
-          }
-        }, 5000);
+          if (splash) splash.classList.add('fade-out');
+        }, 3000);
       })();
     </script>
 

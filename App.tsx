@@ -1,6 +1,9 @@
 
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
-import { HashRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
+// Fix: Import from react-router-dom as a module to avoid missing named export errors in specific environments
+import * as ReactRouterDom from 'react-router-dom';
+const { HashRouter, Routes, Route, NavLink, Navigate, useLocation } = ReactRouterDom as any;
+
 import { 
   Database, 
   ArrowDownCircle, 
@@ -19,7 +22,10 @@ import {
   Moon,
   ChevronRight
 } from 'lucide-react';
-import { initializeApp, getApp, getApps } from 'firebase/app';
+// Fix: Import from firebase/app as a module to avoid missing named export errors in specific environments
+import * as FirebaseApp from 'firebase/app';
+const { initializeApp, getApp, getApps } = FirebaseApp as any;
+
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import Dashboard from './pages/Dashboard';
 import DatabaseBarang from './pages/DatabaseBarang';
@@ -106,11 +112,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <NavLink 
               key={item.path} 
               to={item.path} 
-              className={({ isActive }) => `
+              className={({ isActive }: any) => `
                 flex items-center gap-3 p-3 rounded-xl transition-all
                 ${isActive ? 'text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}
               `} 
-              style={({ isActive }) => isActive ? { backgroundColor: settings.themeColor } : {}}
+              style={({ isActive }: any) => isActive ? { backgroundColor: settings.themeColor } : {}}
             >
               <div className="shrink-0">{item.icon}</div>
               <span className={`font-semibold text-sm transition-all duration-300 ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
@@ -195,7 +201,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   className={`flex flex-col items-center gap-1.5 p-2 transition-all active-touch ${isActive ? 'text-blue-600 dark:text-blue-400 scale-110' : 'text-slate-400 dark:text-slate-500'}`}
                 >
                   <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-transparent'}`}>
-                    {React.cloneElement(item.icon as React.ReactElement, { size: 22, strokeWidth: isActive ? 3 : 2 })}
+                    {/* Fix: cast element to any and props to any to bypass property existence errors on cloneElement */}
+                    {React.cloneElement(item.icon as React.ReactElement<any>, { size: 22, strokeWidth: isActive ? 3 : 2 } as any)}
                   </div>
                   <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${isActive ? 'opacity-100' : 'opacity-60'}`}>
                     {item.name}
