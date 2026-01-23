@@ -72,7 +72,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
   ];
 
-  // Menu Khusus Mobile (Bottom Nav)
   const mobileMenus = [
     { name: 'Home', path: '/dashboard', icon: <Home size={22} /> },
     { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={22} /> },
@@ -82,7 +81,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      {/* Sidebar Desktop (Hidden on Mobile) */}
+      {/* Sidebar Desktop */}
       <aside className={`
         fixed md:relative z-50 h-full bg-slate-900 text-white transition-all duration-300 hidden md:flex flex-col no-print shadow-2xl
         ${isSidebarOpen ? 'w-64' : 'w-20'}
@@ -129,71 +128,75 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        {/* Top Header (Responsive) */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 md:px-6 no-print justify-between z-30 shrink-0 sticky top-0 shadow-sm">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="md:hidden">
-                {settings.logo ? (
-                  <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+        {/* Top Header dengan dukungan Safe Area (Notch) */}
+        <header className="bg-white border-b border-slate-200 no-print z-30 shrink-0 sticky top-0 shadow-sm safe-top">
+          <div className="h-16 flex items-center px-4 md:px-6 justify-between">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="md:hidden">
+                  {settings.logo ? (
+                    <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" />
+                  ) : (
+                    <Package className="text-blue-600" size={24} />
+                  )}
+                </div>
+                <h1 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-widest truncate">
+                  {settings.appName}
+                </h1>
+                {isCloudConnected ? (
+                  <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full text-[8px] font-bold border border-emerald-100 whitespace-nowrap">
+                    <div className="w-1 h-1 bg-emerald-500 rounded-full sync-pulse shrink-0"></div> 
+                    <span>SYNC</span>
+                  </div>
                 ) : (
-                  <Package className="text-blue-600" size={24} />
+                  <div className="flex items-center gap-1.5 bg-slate-100 text-slate-400 px-2 py-1 rounded-full text-[8px] font-bold border border-slate-200 whitespace-nowrap">
+                    <WifiOff size={10} className="shrink-0" /> 
+                    <span>OFFLINE</span>
+                  </div>
                 )}
               </div>
-              <h1 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-widest truncate">
-                {settings.appName}
-              </h1>
-              {isCloudConnected ? (
-                <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full text-[8px] font-bold border border-emerald-100 whitespace-nowrap">
-                  <div className="w-1 h-1 bg-emerald-500 rounded-full sync-pulse shrink-0"></div> 
-                  <span>SYNC</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 bg-slate-100 text-slate-400 px-2 py-1 rounded-full text-[8px] font-bold border border-slate-200 whitespace-nowrap">
-                  <WifiOff size={10} className="shrink-0" /> 
-                  <span>OFFLINE</span>
-                </div>
-              )}
             </div>
-          </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="text-right hidden sm:block">
-               <p className="text-xs font-bold text-slate-700 leading-none">{settings.adminName}</p>
-               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{todayFormatted}</p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden shadow-sm">
-               {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" /> : settings.adminName.charAt(0)}
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="text-right hidden sm:block">
+                 <p className="text-xs font-bold text-slate-700 leading-none">{settings.adminName}</p>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{todayFormatted}</p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden shadow-sm">
+                 {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" /> : settings.adminName.charAt(0)}
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content Body */}
-        <main className="flex-1 overflow-auto p-4 md:p-8 pb-24 md:pb-10">
+        <main className="flex-1 overflow-auto p-4 md:p-8 pb-32 md:pb-10 scrollbar-hide">
           <div className="max-w-[1600px] mx-auto">
             {children}
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation (Only visible on small screens) */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-t border-slate-200 flex items-center justify-around px-4 pb-4 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-          {mobileMenus.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <NavLink 
-                key={item.path} 
-                to={item.path} 
-                className={`flex flex-col items-center gap-1.5 p-2 transition-all active-touch ${isActive ? 'text-blue-600 scale-110' : 'text-slate-400'}`}
-              >
-                <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-blue-50' : 'bg-transparent'}`}>
-                  {React.cloneElement(item.icon as React.ReactElement, { size: 22, strokeWidth: isActive ? 3 : 2 })}
-                </div>
-                <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${isActive ? 'opacity-100' : 'opacity-60'}`}>
-                  {item.name}
-                </span>
-              </NavLink>
-            );
-          })}
+        {/* Mobile Bottom Navigation dengan Safe Area Bottom */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 px-4 z-50 shadow-[0_-5px_25px_rgba(0,0,0,0.08)] safe-bottom">
+          <div className="h-20 flex items-center justify-around pb-2">
+            {mobileMenus.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <NavLink 
+                  key={item.path} 
+                  to={item.path} 
+                  className={`flex flex-col items-center gap-1.5 p-2 transition-all active-touch ${isActive ? 'text-blue-600 scale-110' : 'text-slate-400'}`}
+                >
+                  <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-blue-50' : 'bg-transparent'}`}>
+                    {React.cloneElement(item.icon as React.ReactElement, { size: 22, strokeWidth: isActive ? 3 : 2 })}
+                  </div>
+                  <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                    {item.name}
+                  </span>
+                </NavLink>
+              );
+            })}
+          </div>
         </nav>
       </div>
     </div>
