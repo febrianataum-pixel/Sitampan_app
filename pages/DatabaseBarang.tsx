@@ -129,8 +129,8 @@ const DatabaseBarang: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Database Barang</h2>
-          <p className="text-slate-500 text-sm font-medium">Pengelolaan data induk inventaris.</p>
+          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Database Barang</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Pengelolaan data induk inventaris.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {selectedIds.size > 0 && (
@@ -138,34 +138,34 @@ const DatabaseBarang: React.FC = () => {
               <Trash2 size={14} /> Hapus ({selectedIds.size})
             </button>
           )}
-          <button onClick={() => handleOpenModal()} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-white px-5 py-2.5 rounded-xl font-black shadow-xl text-[10px] uppercase" style={{ backgroundColor: settings.themeColor }}>
+          <button onClick={() => handleOpenModal()} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-white px-5 py-2.5 rounded-xl font-black shadow-xl text-[10px] uppercase transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
             <Plus size={16} /> Tambah
           </button>
-          <button onClick={handleExportPDF} className="p-2.5 bg-red-50 text-red-700 border border-red-100 rounded-xl"><FileText size={18}/></button>
-          <button onClick={handleExportExcel} className="p-2.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl"><Download size={18}/></button>
-          <label className="p-2.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl cursor-pointer">
+          <button onClick={handleExportPDF} className="p-2.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-xl"><FileText size={18}/></button>
+          <button onClick={handleExportExcel} className="p-2.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 rounded-xl"><Download size={18}/></button>
+          <label className="p-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-xl cursor-pointer">
             <Upload size={18} />
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
           </label>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 bg-white border-b border-slate-50 flex items-center relative group">
-          <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500" size={18} />
-          <input type="text" placeholder="Cari barang..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl outline-none text-sm font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+      <div className="bg-white dark:bg-surface-dark rounded-[2rem] shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
+        <div className="px-6 py-4 bg-white dark:bg-surface-dark border-b border-slate-50 dark:border-white/5 flex items-center relative group">
+          <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500" size={18} />
+          <input type="text" placeholder="Cari barang..." className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-white/5 border-none rounded-2xl outline-none text-sm font-medium dark:text-slate-200" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
 
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full text-left min-w-[650px]">
-            <thead className="bg-slate-50/50 text-slate-400 font-bold text-[10px] uppercase tracking-widest border-b">
+            <thead className="bg-slate-50/50 dark:bg-white/5 text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase tracking-widest border-b dark:border-white/5">
               <tr>
                 <th className="px-6 py-4 w-12 text-center">
                   <button onClick={() => {
                     if (selectedIds.size === filteredProducts.length) setSelectedIds(new Set());
                     else setSelectedIds(new Set(filteredProducts.map(p => p.id)));
                   }}>
-                    {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
+                    {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare size={18} className="text-blue-600 dark:text-blue-400" /> : <Square size={18} />}
                   </button>
                 </th>
                 <th className="px-6 py-4">Kode</th>
@@ -175,28 +175,28 @@ const DatabaseBarang: React.FC = () => {
                 <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {filteredProducts.map((p) => (
-                <tr key={p.id} className={`hover:bg-blue-50/30 transition-colors ${selectedIds.has(p.id) ? 'bg-blue-50/50' : ''}`}>
+                <tr key={p.id} className={`hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors ${selectedIds.has(p.id) ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}>
                   <td className="px-6 py-4 text-center">
                     <button onClick={() => toggleSelect(p.id)}>
-                      {selectedIds.has(p.id) ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} className="text-slate-200" />}
+                      {selectedIds.has(p.id) ? <CheckSquare size={18} className="text-blue-600 dark:text-blue-400" /> : <Square size={18} className="text-slate-200 dark:text-slate-800" />}
                     </button>
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs text-blue-600 font-bold">{p.kodeBarang}</td>
-                  <td className="px-6 py-4 font-bold text-slate-700 text-sm">{p.namaBarang}</td>
-                  <td className="px-6 py-4 text-slate-400 text-xs font-bold uppercase">{p.satuan}</td>
-                  <td className="px-6 py-4 font-black text-slate-900 text-sm">Rp {p.harga.toLocaleString('id-ID')}</td>
+                  <td className="px-6 py-4 font-mono text-xs text-blue-600 dark:text-blue-400 font-bold">{p.kodeBarang}</td>
+                  <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-sm">{p.namaBarang}</td>
+                  <td className="px-6 py-4 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase">{p.satuan}</td>
+                  <td className="px-6 py-4 font-black text-slate-900 dark:text-slate-100 text-sm">Rp {p.harga.toLocaleString('id-ID')}</td>
                   <td className="px-6 py-4">
                     <div className="flex justify-center gap-1">
-                      <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-400 hover:text-blue-600"><Edit2 size={16} /></button>
-                      <button onClick={() => { if(confirm('Hapus?')) setProducts(products.filter(it => it.id !== p.id)) }} className="p-2 text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>
+                      <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-blue-600 dark:hover:text-blue-400"><Edit2 size={16} /></button>
+                      <button onClick={() => { if(confirm('Hapus?')) setProducts(products.filter(it => it.id !== p.id)) }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
               ))}
               {filteredProducts.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">Database kosong.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Database kosong.</td></tr>
               )}
             </tbody>
           </table>
@@ -204,33 +204,33 @@ const DatabaseBarang: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h3 className="text-lg font-bold uppercase tracking-tight">{editingProduct ? 'Edit Barang' : 'Barang Baru'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><X size={24}/></button>
+        <div className="fixed inset-0 bg-slate-900/70 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white dark:bg-surface-dark rounded-[2rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300 border dark:border-white/5">
+            <div className="flex items-center justify-between p-6 border-b dark:border-white/5">
+              <h3 className="text-lg font-bold uppercase tracking-tight dark:text-slate-100">{editingProduct ? 'Edit Barang' : 'Barang Baru'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400"><X size={24}/></button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Kode Barang</label>
-                <input type="text" required className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50" value={formData.kodeBarang} onChange={(e) => setFormData({...formData, kodeBarang: e.target.value})} />
+                <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Kode Barang</label>
+                <input type="text" required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/20" value={formData.kodeBarang} onChange={(e) => setFormData({...formData, kodeBarang: e.target.value})} />
               </div>
               <div>
-                <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Nama Barang</label>
-                <input type="text" required className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50" value={formData.namaBarang} onChange={(e) => setFormData({...formData, namaBarang: e.target.value})} />
+                <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Nama Barang</label>
+                <input type="text" required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/20" value={formData.namaBarang} onChange={(e) => setFormData({...formData, namaBarang: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Satuan</label>
-                  <input type="text" required className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50" value={formData.satuan} onChange={(e) => setFormData({...formData, satuan: e.target.value})} />
+                  <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Satuan</label>
+                  <input type="text" required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/20" value={formData.satuan} onChange={(e) => setFormData({...formData, satuan: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Harga (Rp)</label>
-                  <input type="number" required className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50" value={formData.harga} onChange={(e) => setFormData({...formData, harga: parseInt(e.target.value) || 0})} />
+                  <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Harga (Rp)</label>
+                  <input type="number" required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-xl px-4 py-3 font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/20" value={formData.harga} onChange={(e) => setFormData({...formData, harga: parseInt(e.target.value) || 0})} />
                 </div>
               </div>
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px]">Batal</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-400 dark:text-slate-500 font-bold uppercase text-[10px]">Batal</button>
                 <button type="submit" className="flex-1 py-3 text-white font-bold rounded-xl shadow-lg uppercase text-[10px] transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>Simpan</button>
               </div>
             </form>

@@ -146,40 +146,40 @@ const BarangMasuk: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Barang Masuk</h2>
-          <p className="text-slate-500 text-sm font-medium">Log penerimaan stok barang ke gudang.</p>
+          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Barang Masuk</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Log penerimaan stok barang ke gudang.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => handleOpenModal()} className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg text-xs uppercase tracking-widest transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
             <Plus size={18} /> Tambah Data
           </button>
-          <button onClick={handleExportPDF} className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:bg-red-100">
+          <button onClick={handleExportPDF} className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:bg-red-100 transition-all">
             <FileText size={18} /> Export PDF
           </button>
-          <button onClick={handleExportExcel} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50">
+          <button onClick={handleExportExcel} className="flex items-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all">
             <Download size={18} className="text-emerald-500" /> Excel
           </button>
-          <label className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm cursor-pointer hover:bg-slate-50">
+          <label className="flex items-center gap-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm cursor-pointer hover:bg-slate-50 transition-all">
             <Upload size={18} className="text-blue-500" /> Import
             <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
           </label>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
-        <div className="px-6 py-5 bg-white relative group border-b border-slate-50">
-           <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={20} />
+      <div className="bg-white dark:bg-surface-dark rounded-[2rem] border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm theme-transition">
+        <div className="px-6 py-5 bg-white dark:bg-surface-dark relative group border-b border-slate-50 dark:border-white/5">
+           <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500 transition-colors" size={20} />
            <input 
             type="text" 
             placeholder="Cari transaksi berdasarkan kode atau nama..." 
-            className="w-full pl-14 pr-6 py-3 bg-white border border-slate-100 rounded-2xl outline-none text-sm font-medium focus:border-blue-200 focus:ring-4 focus:ring-blue-50 transition-all"
+            className="w-full pl-14 pr-6 py-3 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl outline-none text-sm font-medium focus:border-blue-200 dark:focus:ring-blue-900/20 transition-all dark:text-slate-200"
             value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} 
           />
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+            <thead className="bg-slate-50/50 dark:bg-white/5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b dark:border-white/5">
               <tr>
                 <th className="px-6 py-4">Tanggal</th>
                 <th className="px-6 py-4">Nama Barang</th>
@@ -190,29 +190,29 @@ const BarangMasuk: React.FC = () => {
                 <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {filteredInbound.map(i => {
                 const p = products.find(prod => prod.id === i.productId);
                 const total = (p?.harga || 0) * i.jumlah;
                 return (
-                  <tr key={i.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-400 whitespace-nowrap">{formatIndoDate(i.tanggal)}</td>
-                    <td className="px-6 py-4 font-bold text-slate-700 text-sm">{p?.namaBarang}</td>
-                    <td className="px-6 py-4 font-mono text-xs font-bold text-blue-600 uppercase tracking-tight">{p?.kodeBarang}</td>
-                    <td className="px-6 py-4 text-slate-400 text-xs font-semibold uppercase">{p?.satuan}</td>
-                    <td className="px-6 py-4 font-bold text-emerald-600">+{i.jumlah}</td>
-                    <td className="px-6 py-4 font-bold text-slate-900">Rp {total.toLocaleString('id-ID')}</td>
+                  <tr key={i.id} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors group">
+                    <td className="px-6 py-4 text-xs font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">{formatIndoDate(i.tanggal)}</td>
+                    <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-sm">{p?.namaBarang}</td>
+                    <td className="px-6 py-4 font-mono text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight">{p?.kodeBarang}</td>
+                    <td className="px-6 py-4 text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase">{p?.satuan}</td>
+                    <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">+{i.jumlah}</td>
+                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {total.toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleOpenModal(i)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl"><Edit2 size={16} /></button>
-                        <button onClick={() => { if(confirm('Hapus transaksi?')) setInbound(inbound.filter(it => it.id !== i.id)) }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl"><Trash2 size={16} /></button>
+                        <button onClick={() => handleOpenModal(i)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl"><Edit2 size={16} /></button>
+                        <button onClick={() => { if(confirm('Hapus transaksi?')) setInbound(inbound.filter(it => it.id !== i.id)) }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
                 );
               })}
               {filteredInbound.length === 0 && (
-                <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 italic">Data belum ditemukan.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Data belum ditemukan.</td></tr>
               )}
             </tbody>
           </table>
@@ -220,35 +220,35 @@ const BarangMasuk: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in duration-300">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tight">{editingEntry ? 'Edit Masuk' : 'Input Barang Masuk'}</h3>
-              <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400" /></button>
+        <div className="fixed inset-0 bg-slate-900/70 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] w-full max-lg shadow-2xl animate-in zoom-in duration-300 border dark:border-white/5">
+            <div className="p-8 border-b dark:border-white/5 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">{editingEntry ? 'Edit Masuk' : 'Input Barang Masuk'}</h3>
+              <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 dark:text-slate-600" /></button>
             </div>
             <form onSubmit={handleSave} className="p-8 space-y-5">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Pilih Barang</label>
-                <select required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50" value={formData.productId} onChange={(e) => setFormData({...formData, productId: e.target.value})}>
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Pilih Barang</label>
+                <select required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl px-5 py-3 font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/20" value={formData.productId} onChange={(e) => setFormData({...formData, productId: e.target.value})}>
                   <option value="">-- Pilih Barang --</option>
                   {products.map(p => <option key={p.id} value={p.id}>{p.namaBarang} ({p.kodeBarang})</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Jumlah</label>
-                  <input type="number" min="1" required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50" value={formData.jumlah} onChange={(e) => setFormData({...formData, jumlah: parseInt(e.target.value) || 0})} />
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Jumlah</label>
+                  <input type="number" min="1" required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl px-5 py-3 font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/20" value={formData.jumlah} onChange={(e) => setFormData({...formData, jumlah: parseInt(e.target.value) || 0})} />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tanggal</label>
-                  <input type="date" required className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3 font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-50" value={formData.tanggal} onChange={(e) => {
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Tanggal</label>
+                  <input type="date" required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl px-5 py-3 font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/20" value={formData.tanggal} onChange={(e) => {
                     const d = new Date(e.target.value);
                     setFormData({...formData, tanggal: e.target.value, bulan: MONTHS[d.getMonth()], tahun: d.getFullYear()});
                   }} />
                 </div>
               </div>
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Batal</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 text-slate-400 dark:text-slate-500 font-bold uppercase text-xs tracking-widest">Batal</button>
                 <button type="submit" className="flex-1 py-4 text-white font-bold rounded-2xl uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>Simpan</button>
               </div>
             </form>
