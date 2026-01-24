@@ -3,12 +3,13 @@
   "name": "SITAMPAN",
   "short_name": "SITAMPAN",
   "description": "Sistem Tanggap Pemantauan Logistik Kebencanaan",
-  "start_url": "/",
+  "id": "/sitampan-app",
+  "start_url": ".",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#000000",
-  "theme_color": "#000000",
+  "theme_color": "#2563eb",
   "icons": [
     {
       "src": "https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png",

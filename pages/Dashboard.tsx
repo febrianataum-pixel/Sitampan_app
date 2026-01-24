@@ -11,11 +11,11 @@ import {
   Box,
   Inbox,
   TrendingUp,
-  LayoutGrid,
   X,
   History,
   Smartphone,
-  Info
+  Info,
+  ChevronRight
 } from 'lucide-react';
 import { formatIndoDate } from '../types';
 
@@ -40,7 +40,7 @@ const Dashboard: React.FC = () => {
     ];
   }, [products, inbound, outbound, calculateStock]);
 
-  // 2. Data Grafik Ketersediaan Stok (DOMINAN - Lebih Besar)
+  // 2. Data Grafik Ketersediaan Stok (UTAMA & BESAR)
   const stockAvailabilityData = useMemo(() => {
     return products
       .map(p => ({ 
@@ -53,14 +53,14 @@ const Dashboard: React.FC = () => {
       .sort((a, b) => b.stock - a.stock);
   }, [products, calculateStock]);
 
-  // 3. Data Grafik Distribusi Per Kecamatan (Hitung KALI DISTRIBUSI - Orange)
+  // 3. Data Grafik Distribusi Per Kecamatan (FREKUENSI/COUNT - Orange)
   const distributionByKecamatan = useMemo(() => {
     const map = new Map<string, number>();
     
     outbound.forEach(tx => {
       const match = tx.alamat?.match(/(Kec\.\s+|Kecamatan\s+)([A-Za-z\s]+)/i);
       const kecName = match ? match[0].trim() : 'Lainnya';
-      // Menghitung COUNT (berapa kali pengiriman), bukan jumlah barang
+      // Menghitung FREKUENSI (berapa kali pengiriman dilakukan)
       map.set(kecName, (map.get(kecName) || 0) + 1);
     });
 
@@ -72,12 +72,12 @@ const Dashboard: React.FC = () => {
 
   const maxDist = Math.max(...distributionByKecamatan.map(d => d.value), 1);
 
-  // 4. Barang Stok Habis (Format Card)
+  // 4. Barang Stok Habis (Format Grid Card)
   const outOfStockItems = useMemo(() => {
     return products.filter(p => calculateStock(p.id) <= 0);
   }, [products, calculateStock]);
 
-  // 5. Data Transaksi Per Kecamatan (Untuk Modal)
+  // 5. Rincian Per Kecamatan
   const kecamatanDetails = useMemo(() => {
     if (!selectedKecName) return [];
     return outbound.filter(tx => {
@@ -102,15 +102,15 @@ const Dashboard: React.FC = () => {
             </h2>
           </div>
           <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-sm font-bold uppercase tracking-widest">
-            {settings.warehouseName} <span className="mx-2 opacity-30">|</span> Standalone System
+            {settings.warehouseName} <span className="mx-2 opacity-30">|</span> Standalone PWA
           </p>
         </div>
       </div>
 
-      {/* Grid Statistik - Mobile Optimized */}
+      {/* Grid Statistik */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         {stats.map((s, i) => (
-          <div key={i} className="bg-white dark:bg-surface-dark p-4 md:p-8 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all group overflow-hidden relative active:scale-95">
+          <div key={i} className="bg-white dark:bg-surface-dark p-4 md:p-8 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-sm hover:shadow-md transition-all group overflow-hidden relative active:scale-95 touch-manipulation">
             <div className={`absolute -right-4 -top-4 w-16 h-16 bg-${s.color}-500/5 rounded-full`}></div>
             <div className="flex flex-col md:flex-row md:items-center gap-3 relative z-10">
               <div className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-2xl bg-${s.color}-50 dark:bg-${s.color}-900/20 text-${s.color}-600 dark:text-${s.color}-400 shrink-0`}>
@@ -132,16 +132,16 @@ const Dashboard: React.FC = () => {
       {/* Layout Charts Utama */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* GRAFIK KETERSEDIAAN STOK (UTAMA & BESAR) */}
+        {/* GRAFIK KETERSEDIAAN STOK (LEBIH BESAR) */}
         <div className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between px-4">
             <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
-              <BarChart3 size={14} className="text-blue-500"/> Ketersediaan Logistik Sisa
+              <BarChart3 size={14} className="text-blue-500"/> Sisa Stok Logistik Terbesar
             </h3>
           </div>
           <div className="bg-white dark:bg-surface-dark p-6 md:p-10 rounded-[3rem] border border-slate-200 dark:border-white/5 shadow-sm">
             <div className="space-y-8">
-              {stockAvailabilityData.slice(0, 10).map((item) => {
+              {stockAvailabilityData.slice(0, 8).map((item) => {
                 const maxVal = stockAvailabilityData[0].stock || 1;
                 const percent = (item.stock / maxVal) * 100;
                 const isLow = item.stock < 10 && item.stock > 0;
@@ -164,7 +164,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="h-4 w-full bg-slate-50 dark:bg-white/5 rounded-full overflow-hidden border border-slate-100 dark:border-white/10 p-1">
                       <div 
-                        className={`h-full rounded-full transition-all duration-1000 ${isEmpty ? 'bg-red-500' : isLow ? 'bg-orange-500' : 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.3)]'}`}
+                        className={`h-full rounded-full transition-all duration-1000 ${isEmpty ? 'bg-red-500' : isLow ? 'bg-orange-500' : 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.2)]'}`}
                         style={{ width: `${Math.max(percent, isEmpty ? 0 : 2)}%` }}
                       ></div>
                     </div>
@@ -172,23 +172,26 @@ const Dashboard: React.FC = () => {
                 );
               })}
             </div>
+            <div className="mt-8 pt-6 border-t border-slate-50 dark:border-white/5 text-center">
+               <button className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] hover:opacity-70 active:scale-95 transition-all">Lihat Semua di Menu Stok</button>
+            </div>
           </div>
         </div>
 
-        {/* GRAFIK DISTRIBUSI PER KECAMATAN (ORANGE - HITUNG KALI PENGIRIMAN) */}
+        {/* GRAFIK DISTRIBUSI PER KECAMATAN (ORANGE - COUNT/KALI) */}
         <div className="lg:col-span-4 space-y-4">
           <div className="flex items-center justify-between px-4">
             <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
               <MapPin size={14} className="text-orange-500"/> Frekuensi Distribusi (Kec)
             </h3>
           </div>
-          <div className="bg-orange-500 p-8 rounded-[3rem] text-white shadow-xl shadow-orange-500/20 relative overflow-hidden group h-full">
+          <div className="bg-orange-500 p-8 rounded-[3rem] text-white shadow-xl shadow-orange-500/20 relative overflow-hidden group h-full flex flex-col">
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-10 -mt-10 blur-3xl"></div>
             
-            <div className="relative z-10 flex flex-col h-full">
-               <div className="mb-8">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Penyaluran</p>
-                  <p className="text-4xl font-black uppercase tracking-tighter">{outbound.length} <span className="text-xs">Kali</span></p>
+            <div className="relative z-10 flex flex-col h-full flex-1">
+               <div className="mb-10">
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Transaksi</p>
+                  <p className="text-4xl font-black uppercase tracking-tighter">{outbound.length} <span className="text-xs">Pengiriman</span></p>
                </div>
 
                <div className="flex-1 space-y-6">
@@ -202,7 +205,7 @@ const Dashboard: React.FC = () => {
                         <span className="truncate max-w-[150px]">{d.name.replace('Kec. ', '')}</span>
                         <span>{d.value} Kali</span>
                       </div>
-                      <div className="h-2.5 w-full bg-black/20 rounded-full overflow-hidden p-0.5">
+                      <div className="h-3 w-full bg-black/20 rounded-full overflow-hidden p-0.5">
                         <div 
                           className="h-full bg-white rounded-full transition-all duration-1000"
                           style={{ width: `${(d.value / maxDist) * 100}%` }}
@@ -212,9 +215,9 @@ const Dashboard: React.FC = () => {
                   ))}
                </div>
 
-               <div className="mt-10 pt-6 border-t border-white/10 text-center">
+               <div className="mt-10 pt-6 border-t border-white/10">
                   <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-80 animate-pulse">
-                    <Info size={12}/> Klik baris untuk detail
+                    <Info size={12}/> Klik untuk rincian data
                   </div>
                </div>
             </div>
@@ -225,7 +228,7 @@ const Dashboard: React.FC = () => {
       {/* STOK HABIS (MODERN CARD GRID) */}
       <div className="space-y-4">
         <h3 className="text-[10px] font-black text-red-500 uppercase tracking-[0.3em] px-4 flex items-center gap-2">
-          <AlertOctagon size={16}/> Peringatan Prioritas: Stok Kosong
+          <AlertOctagon size={16}/> Logistik Kosong (Segera Restock)
         </h3>
         {outOfStockItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -236,15 +239,15 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="relative z-10 flex flex-col gap-5">
                   <div className="flex justify-between items-start">
-                    <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center shadow-inner">
+                    <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center">
                       <Inbox size={24}/>
                     </div>
                     <div className="bg-red-600 text-white text-[9px] font-black px-4 py-2 rounded-xl uppercase shadow-lg shadow-red-500/20">
-                      RESTOCK
+                      RE-STOCK
                     </div>
                   </div>
                   <div>
-                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase truncate leading-tight tracking-tight">
+                    <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase truncate tracking-tight">
                       {item.namaBarang}
                     </h4>
                     <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 tracking-widest mt-1">
@@ -252,8 +255,8 @@ const Dashboard: React.FC = () => {
                     </p>
                   </div>
                   <div className="pt-4 border-t border-slate-50 dark:border-white/5 flex justify-between items-center text-[10px] font-black uppercase">
-                    <span className="text-slate-400">Unit Tersedia</span>
-                    <span className="text-red-500">0 UNIT</span>
+                    <span className="text-slate-400">Status Stok</span>
+                    <span className="text-red-500">KOSONG</span>
                   </div>
                 </div>
               </div>
@@ -266,7 +269,7 @@ const Dashboard: React.FC = () => {
              </div>
              <div>
                 <p className="text-lg font-black uppercase tracking-widest">Inventaris Aman</p>
-                <p className="text-[10px] font-medium opacity-70">Tidak ditemukan logistik dengan stok kosong saat ini.</p>
+                <p className="text-[10px] font-medium opacity-70">Semua logistik tersedia di gudang.</p>
              </div>
           </div>
         )}
@@ -279,15 +282,15 @@ const Dashboard: React.FC = () => {
           <div className="space-y-4 text-center md:text-left">
             <div className="flex items-center gap-3 justify-center md:justify-start">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Database Terpusat</h4>
+              <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Sistem Terintegrasi</h4>
             </div>
             <p className="text-xs opacity-60 font-medium max-w-sm mx-auto md:mx-0 leading-relaxed">
-              Laporan ini merangkum seluruh aktivitas logistik kebencanaan. Terakhir diperbarui pada {new Date().toLocaleTimeString('id-ID')} WIB.
+              Data sinkron secara otomatis. Terakhir diperbarui pada {new Date().toLocaleTimeString('id-ID')} WIB.
             </p>
           </div>
           <div className="flex gap-4">
              <div className="bg-white/10 px-8 py-6 rounded-[2rem] backdrop-blur-2xl border border-white/10 text-center min-w-[160px] shadow-2xl">
-                <p className="text-[9px] font-black uppercase opacity-60 mb-1 tracking-widest">Total Sisa Stok</p>
+                <p className="text-[9px] font-black uppercase opacity-60 mb-1 tracking-widest">Total Unit Stok</p>
                 <p className="text-4xl font-black">
                   {stockAvailabilityData.reduce((acc, curr) => acc + curr.stock, 0).toLocaleString('id-ID')}
                 </p>
@@ -296,11 +299,10 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL DRILL-DOWN KECAMATAN */}
+      {/* MODAL KECAMATAN */}
       {selectedKecName && (
         <div className="fixed inset-0 bg-slate-900/80 dark:bg-black/90 backdrop-blur-xl z-[200] flex items-end md:items-center justify-center p-0 md:p-6 animate-in slide-in-from-bottom duration-300">
           <div className="bg-white dark:bg-surface-dark w-full max-w-4xl h-[90vh] md:h-auto md:max-h-[85vh] rounded-t-[3rem] md:rounded-[3rem] shadow-2xl flex flex-col overflow-hidden border dark:border-white/5">
-            {/* Modal Header */}
             <div className="p-8 border-b dark:border-white/5 flex items-center justify-between bg-orange-500 text-white">
               <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
@@ -308,7 +310,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-black uppercase tracking-tighter">{selectedKecName}</h3>
-                  <p className="text-[10px] font-black opacity-70 uppercase tracking-widest">Rincian Riwayat Bantuan</p>
+                  <p className="text-[10px] font-black opacity-70 uppercase tracking-widest">Riwayat Distribusi Bantuan</p>
                 </div>
               </div>
               <button 
@@ -319,7 +321,6 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
 
-            {/* Modal Content - Table View */}
             <div className="flex-1 overflow-y-auto scrollbar-hide p-6 md:p-10">
               {kecamatanDetails.length > 0 ? (
                 <div className="space-y-8">
@@ -328,13 +329,13 @@ const Dashboard: React.FC = () => {
                       <div className="flex justify-between items-start">
                         <div className="space-y-1">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <History size={12}/> Waktu Penyerahan
+                            <History size={12}/> Tanggal
                           </p>
                           <p className="text-sm font-black text-slate-800 dark:text-slate-100">{formatIndoDate(tx.tanggal)}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Penerima</p>
-                          <p className="text-sm font-black text-orange-600 italic uppercase">{tx.penerima}</p>
+                          <p className="text-sm font-black text-orange-600 italic uppercase truncate max-w-[150px]">{tx.penerima}</p>
                         </div>
                       </div>
 
@@ -342,17 +343,17 @@ const Dashboard: React.FC = () => {
                         <table className="w-full text-left">
                           <thead className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b dark:border-white/10">
                             <tr>
-                              <th className="pb-4">Nama Barang</th>
-                              <th className="pb-4 text-right">Jumlah</th>
+                              <th className="pb-4">Barang</th>
+                              <th className="pb-4 text-right">Qty</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 dark:divide-white/5">
                             {tx.items.map((item, idx) => {
                               const p = products.find(prod => prod.id === item.productId);
                               return (
-                                <tr key={idx} className="group">
+                                <tr key={idx}>
                                   <td className="py-4">
-                                    <p className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-orange-500 transition-colors">{p?.namaBarang || '-'}</p>
+                                    <p className="text-sm font-black text-slate-700 dark:text-slate-200">{p?.namaBarang || '-'}</p>
                                     <p className="text-[10px] font-mono text-slate-400 uppercase">{p?.kodeBarang || '-'}</p>
                                   </td>
                                   <td className="py-4 text-right">
@@ -370,18 +371,17 @@ const Dashboard: React.FC = () => {
                 </div>
               ) : (
                 <div className="py-32 text-center opacity-20">
-                  <p className="text-xl font-black uppercase tracking-[0.5em]">NIHIL</p>
+                  <p className="text-xl font-black uppercase tracking-[0.5em]">Kosong</p>
                 </div>
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="p-8 bg-slate-50 dark:bg-black/20 border-t dark:border-white/5 flex justify-end shrink-0">
               <button 
                 onClick={() => setSelectedKecName(null)}
                 className="w-full md:w-auto px-12 py-5 bg-slate-900 dark:bg-orange-600 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl active:scale-95 transition-all"
               >
-                Tutup Detail
+                Tutup
               </button>
             </div>
           </div>
