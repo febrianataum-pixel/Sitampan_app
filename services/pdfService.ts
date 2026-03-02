@@ -14,7 +14,8 @@ export const generateReportPDF = (
   title: string, 
   columns: PDFColumn[], 
   data: any[], 
-  settings: AppSettings
+  settings: AppSettings,
+  narrative?: string
 ) => {
   const downloadDate = formatIndoDate(new Date().toISOString().split('T')[0]);
   const downloadTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -35,6 +36,12 @@ export const generateReportPDF = (
     }).join('');
     return `<tr>${cells}</tr>`;
   }).join('');
+
+  const narrativeHtml = narrative 
+    ? `<div style="margin-bottom: 25px; padding: 15px; background: #fdfcfb; border-left: 3px solid #000; font-size: 11px; line-height: 1.6; font-style: italic; color: #334155;">
+        ${narrative}
+       </div>`
+    : '';
 
   const content = `
     <div style="font-family: Arial, sans-serif; padding: 10px; color: #000;">
@@ -57,6 +64,9 @@ export const generateReportPDF = (
       <div style="text-align: center; margin-bottom: 20px;">
         <h2 style="margin: 0; font-size: 14px; text-decoration: underline; text-transform: uppercase;">LAPORAN ${title}</h2>
       </div>
+
+      <!-- Narrative -->
+      ${narrativeHtml}
 
       <!-- Table -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">

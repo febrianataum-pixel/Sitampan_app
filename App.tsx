@@ -1,8 +1,5 @@
-
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
-// Fix: Import from react-router-dom as a module to avoid missing named export errors in specific environments
-import * as ReactRouterDom from 'react-router-dom';
-const { HashRouter, Routes, Route, NavLink, Navigate, useLocation } = ReactRouterDom as any;
+import { HashRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 
 import { 
   Database, 
@@ -20,13 +17,13 @@ import {
   Home,
   Sun,
   Moon,
-  ChevronRight
+  ShieldAlert,
+  CloudUpload
 } from 'lucide-react';
-// Fix: Import from firebase/app as a module to avoid missing named export errors in specific environments
-import * as FirebaseApp from 'firebase/app';
-const { initializeApp, getApp, getApps } = FirebaseApp as any;
 
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+
 import Dashboard from './pages/Dashboard';
 import DatabaseBarang from './pages/DatabaseBarang';
 import BarangMasuk from './pages/BarangMasuk';
@@ -35,6 +32,8 @@ import CetakBeritaAcara from './pages/CetakBeritaAcara';
 import StokBarang from './pages/StokBarang';
 import RekapBulanan from './pages/RekapBulanan';
 import Profile from './pages/Profile';
+import LaporanBlora from './pages/LaporanBlora';
+
 import { Product, InboundEntry, OutboundTransaction, AppSettings, formatIndoDate } from './types';
 
 interface InventoryContextType {
@@ -48,7 +47,9 @@ interface InventoryContextType {
   setSettings: (newSettings: AppSettings) => void;
   calculateStock: (productId: string) => number;
   isCloudConnected: boolean;
+  isRescuing: boolean;
   toggleTheme: () => void;
+  syncError: string | null;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -61,13 +62,11 @@ export const useInventory = () => {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { settings, isCloudConnected, toggleTheme } = useInventory();
+  const { settings, isCloudConnected, isRescuing, toggleTheme, syncError } = useInventory();
   const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
 
-  useEffect(() => {
-    setIsSidebarOpen(false);
-  }, [location.pathname]);
+  useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
@@ -76,141 +75,83 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={20} /> },
     { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={20} /> },
     { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={20} /> },
+    { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={20} /> },
     { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={20} /> },
     { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
   ];
 
-  const mobileMenus = [
-    { name: 'Home', path: '/dashboard', icon: <Home size={22} /> },
-    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={22} /> },
-    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={22} /> },
-    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={22} /> },
-  ];
-
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-true-black theme-transition">
-      {/* Sidebar Desktop */}
-      <aside className={`
-        fixed md:relative z-40 h-full bg-slate-900 dark:bg-black text-white transition-all duration-300 hidden md:flex flex-col no-print shadow-2xl border-r dark:border-white/5
-        ${isSidebarOpen ? 'w-64' : 'w-20'}
-      `}>
-        <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
-          <div className="shrink-0">
-            {settings.logo ? (
-              <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" alt="Logo" />
-            ) : (
-              <Package className="text-blue-400" size={28} />
-            )}
-          </div>
-          <div className={`flex flex-col truncate transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
-            <span className="font-bold text-lg uppercase leading-tight truncate">{settings.appName}</span>
-          </div>
-        </div>
+    <div className="flex h-screen overflow-hidden bg-ios-bg-light dark:bg-ios-bg-dark theme-transition">
+      {/* Sidebar Backdrop for Mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
+      <aside className={`fixed md:relative z-40 h-full bg-ios-secondary-light dark:bg-ios-secondary-dark transition-all duration-300 flex flex-col no-print shadow-sm border-r border-slate-200 dark:border-white/5 ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-full md:translate-x-0'} md:flex`}>
+        <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
+          <div className="shrink-0">{settings.logo ? <img src={settings.logo} className="w-8 h-8 rounded-ios object-cover" referrerPolicy="no-referrer" /> : <Package className="text-ios-blue-light dark:text-ios-blue-dark" size={28} />}</div>
+          <div className={`flex flex-col truncate transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}><span className="font-bold text-lg leading-tight truncate text-slate-900 dark:text-white">{settings.appName}</span></div>
+        </div>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-hide">
           {menuItems.map((item) => (
-            <NavLink 
-              key={item.path} 
-              to={item.path} 
-              className={({ isActive }: any) => `
-                flex items-center gap-3 p-3 rounded-xl transition-all
-                ${isActive ? 'text-white shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white'}
-              `} 
-              style={({ isActive }: any) => isActive ? { backgroundColor: settings.themeColor } : {}}
-            >
+            <NavLink key={item.path} to={item.path} className={({ isActive }: any) => `flex items-center gap-3 p-3 rounded-ios transition-all ${isActive ? 'text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`} style={({ isActive }: any) => isActive ? { backgroundColor: settings.themeColor } : {}}>
               <div className="shrink-0">{item.icon}</div>
-              <span className={`font-semibold text-sm transition-all duration-300 ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
-                {item.name}
-              </span>
+              <span className={`font-bold text-sm transition-all duration-300 ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden'}`}>{item.name}</span>
             </NavLink>
           ))}
         </nav>
-
-        <button 
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-          className="hidden md:flex p-4 hover:bg-white/5 justify-center text-slate-400 border-t border-white/5"
-        >
-          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden md:flex p-4 hover:bg-slate-100 dark:hover:bg-white/5 justify-center text-slate-400 border-t border-slate-200 dark:border-white/5">{isSidebarOpen ? <X size={20} /> : <Menu size={20} />}</button>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <header className="bg-white dark:bg-surface-dark border-b border-slate-200 dark:border-white/5 no-print z-30 shrink-0 sticky top-0 shadow-sm safe-top theme-transition">
+        <header className="bg-white/80 dark:bg-ios-secondary-dark/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 no-print z-30 shrink-0 sticky top-0 shadow-sm theme-transition">
           <div className="h-16 flex items-center px-4 md:px-6 justify-between">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <div className="md:hidden">
-                  {settings.logo ? (
-                    <img src={settings.logo} className="w-8 h-8 rounded-lg object-cover" alt="Logo" />
-                  ) : (
-                    <Package className="text-blue-600" size={24} />
-                  )}
-                </div>
-                <h1 className="text-xs md:text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest truncate">
-                  {settings.appName}
-                </h1>
-                {isCloudConnected ? (
-                  <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full text-[8px] font-bold border border-emerald-100 dark:border-emerald-800 whitespace-nowrap">
-                    <div className="w-1 h-1 bg-emerald-500 rounded-full sync-pulse shrink-0"></div> 
-                    <span>SYNC</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-500 px-2 py-1 rounded-full text-[8px] font-bold border border-slate-200 dark:border-white/5 whitespace-nowrap">
-                    <WifiOff size={10} className="shrink-0" /> 
-                    <span>OFFLINE</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex items-center gap-2">
               <button 
-                onClick={toggleTheme}
-                className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 active-touch theme-transition border dark:border-white/10"
-                title={settings.theme === 'dark' ? "Mode Terang" : "Mode Gelap"}
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+                className="md:hidden p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-ios transition-colors"
               >
-                {settings.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                <Menu size={20} />
               </button>
-
+              <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{settings.appName}</h1>
+              {isRescuing ? (
+                <div className="flex items-center gap-1 bg-ios-blue-light/10 text-ios-blue-light px-2 py-1 rounded-full text-[8px] font-bold animate-pulse"><CloudUpload size={10} /> <span>RESCUING...</span></div>
+              ) : isCloudConnected ? (
+                <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded-full text-[8px] font-bold"><span>SYNC ACTIVE</span></div>
+              ) : syncError ? (
+                <div className="flex items-center gap-1 bg-red-500/10 text-red-500 px-2 py-1 rounded-full text-[8px] font-bold"><ShieldAlert size={10} /> <span>ERROR</span></div>
+              ) : (
+                <div className="flex items-center gap-1 bg-slate-500/10 text-slate-500 px-2 py-1 rounded-full text-[8px] font-bold"><WifiOff size={10} /> <span>OFFLINE</span></div>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <button onClick={toggleTheme} className="p-2.5 rounded-ios bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">{settings.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
               <div className="text-right hidden sm:block">
-                 <p className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-none">{settings.adminName}</p>
-                 <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{todayFormatted}</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold overflow-hidden shadow-sm">
-                 {settings.logo ? <img src={settings.logo} className="w-full h-full object-cover" alt="Admin" /> : settings.adminName.charAt(0)}
+                 <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-none">{settings.adminName}</p>
+                 <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mt-0.5">{todayFormatted}</p>
               </div>
             </div>
           </div>
         </header>
-
-        <main className="flex-1 overflow-auto p-4 md:p-8 pb-32 md:pb-10 scrollbar-hide dark:bg-true-black">
-          <div className="max-w-[1600px] mx-auto">
-            {children}
-          </div>
+        <main className="flex-1 overflow-auto p-4 md:p-8 pb-32 md:pb-10 scrollbar-hide">
+          <div className="max-w-[1600px] mx-auto">{children}</div>
         </main>
 
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-surface-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 px-4 z-50 shadow-[0_-5px_25px_rgba(0,0,0,0.08)] safe-bottom theme-transition">
-          <div className="h-20 flex items-center justify-around pb-2">
-            {mobileMenus.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <NavLink 
-                  key={item.path} 
-                  to={item.path} 
-                  className={`flex flex-col items-center gap-1.5 p-2 transition-all active-touch ${isActive ? 'text-blue-600 dark:text-blue-400 scale-110' : 'text-slate-400 dark:text-slate-500'}`}
-                >
-                  <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-transparent'}`}>
-                    {/* Fix: cast element to any and props to any to bypass property existence errors on cloneElement */}
-                    {React.cloneElement(item.icon as React.ReactElement<any>, { size: 22, strokeWidth: isActive ? 3 : 2 } as any)}
-                  </div>
-                  <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${isActive ? 'opacity-100' : 'opacity-60'}`}>
-                    {item.name}
-                  </span>
-                </NavLink>
-              );
-            })}
-          </div>
+        {/* Mobile Bottom Navigation */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-ios-secondary-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 flex items-center justify-around px-2 py-2 pb-8 z-50 no-print theme-transition shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
+          {menuItems.filter(item => ['Dashboard', 'Masuk', 'Keluar', 'Laporan', 'Profil'].includes(item.name)).map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }: any) => `flex flex-col items-center gap-1 px-2 py-1 transition-all ${isActive ? 'text-ios-blue-light dark:text-ios-blue-dark' : 'text-slate-400'}`}
+            >
+              <div className="shrink-0 scale-90">{item.icon}</div>
+              <span className="text-[8px] font-black uppercase tracking-tighter">{item.name}</span>
+            </NavLink>
+          ))}
         </nav>
       </div>
     </div>
@@ -218,218 +159,179 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
-  const [products, setProductsState] = useState<Product[]>([]);
-  const [inbound, setInboundState] = useState<InboundEntry[]>([]);
-  const [outbound, setOutboundState] = useState<OutboundTransaction[]>([]);
-  const [isCloudConnected, setIsCloudConnected] = useState(false);
-  const [settings, setSettingsState] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('inv_settings');
-    const baseSettings = saved ? JSON.parse(saved) : {
-      appName: 'SITAMPAN',
-      appSubtitle: 'Sistem Manajemen Inventaris',
-      logo: '',
-      themeColor: '#2563eb',
-      bgType: 'color',
-      bgColor: '#f8fafc',
-      adminName: 'Admin',
-      warehouseName: 'Gudang Utama',
-      syncEnabled: false,
-      theme: 'light'
-    };
-    return baseSettings;
+  const [products, setProductsState] = useState<Product[]>(() => {
+    try {
+      const saved = localStorage.getItem('inv_products');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
+  const [inbound, setInboundState] = useState<InboundEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('inv_inbound');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [outbound, setOutboundState] = useState<OutboundTransaction[]>(() => {
+    try {
+      const saved = localStorage.getItem('inv_outbound');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
+  const [isRescuing, setIsRescuing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [settings, setSettingsState] = useState<AppSettings>(() => {
+    try {
+      const saved = localStorage.getItem('inv_settings');
+      return saved ? JSON.parse(saved) : {
+        appName: "SITAMPAN",
+        theme: "light",
+        syncEnabled: false,
+        themeColor: "#007AFF",
+        adminName: "Admin",
+        warehouseName: "Gudang"
+      };
+    } catch (e) {
+      return {
+        appName: "SITAMPAN",
+        theme: "light",
+        syncEnabled: false,
+        themeColor: "#007AFF",
+        adminName: "Admin",
+        warehouseName: "Gudang"
+      };
+    }
+  });
+
+  const productsRef = useRef(products);
+  const inboundRef = useRef(inbound);
+  const outboundRef = useRef(outbound);
+  useEffect(() => { productsRef.current = products; }, [products]);
+  useEffect(() => { inboundRef.current = inbound; }, [inbound]);
+  useEffect(() => { outboundRef.current = outbound; }, [outbound]);
 
   const dbRef = useRef<any>(null);
   const isRemoteChange = useRef(false);
 
-  // Splash Screen Logic
-  useEffect(() => {
-    const splash = document.getElementById('splash-screen');
-    if (splash) {
-      const timer = setTimeout(() => {
-        splash.classList.add('fade-out');
-        setTimeout(() => {
-          splash.style.display = 'none';
-        }, 800);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // Theme effect
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (settings.theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) {
-      metaTheme.setAttribute('content', settings.theme === 'dark' ? '#000000' : '#ffffff');
-    }
-  }, [settings.theme]);
-
-  const toggleTheme = () => {
-    const nextTheme = settings.theme === 'dark' ? 'light' : 'dark';
-    setSettings({ ...settings, theme: nextTheme });
+  const rescueDataToCloud = async (colName: string, localData: any[]) => {
+    if (!dbRef.current || localData.length === 0) return;
+    setIsRescuing(true);
+    try {
+      const batch = writeBatch(dbRef.current);
+      localData.forEach(item => batch.set(doc(dbRef.current, colName, item.id), item));
+      await batch.commit();
+    } catch (e) { console.error("Rescue failed:", e); } finally { setIsRescuing(false); }
   };
 
-  // Firebase Sync Logic
   useEffect(() => {
-    let unsubProducts = () => {};
-    let unsubInbound = () => {};
-    let unsubOutbound = () => {};
-    let unsubSettings = () => {};
-
-    if (settings.fbApiKey && settings.fbProjectId && settings.syncEnabled) {
+    if (!settings.fbApiKey || !settings.fbProjectId || !settings.syncEnabled) {
+      setIsCloudConnected(false);
+      return;
+    }
+    let unsubs: (() => void)[] = [];
+    const connectCloud = async () => {
       try {
-        const firebaseConfig = {
-          apiKey: settings.fbApiKey,
-          projectId: settings.fbProjectId,
-          appId: settings.fbAppId
-        };
-        const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+        const app = getApps().length === 0 ? initializeApp({ apiKey: settings.fbApiKey, projectId: settings.fbProjectId, appId: settings.fbAppId }) : getApp();
         dbRef.current = getFirestore(app);
         setIsCloudConnected(true);
+        setSyncError(null);
 
-        unsubProducts = onSnapshot(collection(dbRef.current, 'products'), (snap) => {
-          isRemoteChange.current = true;
-          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-          setProductsState(remoteData);
-          localStorage.setItem('inv_products', JSON.stringify(remoteData));
-          setTimeout(() => { isRemoteChange.current = false; }, 500);
-        });
+        const syncCol = (name: string, ref: React.MutableRefObject<any[]>, setState: Function) => {
+          return onSnapshot(collection(dbRef.current, name), (snap) => {
+            if (snap.empty && ref.current.length > 0) {
+              rescueDataToCloud(name, ref.current);
+            } else if (!snap.empty) {
+              isRemoteChange.current = true;
+              const remote = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+              setState(remote);
+              localStorage.setItem(`inv_${name}`, JSON.stringify(remote));
+              setTimeout(() => { isRemoteChange.current = false; }, 500);
+            }
+          }, (err) => setSyncError(err.message));
+        };
 
-        unsubInbound = onSnapshot(collection(dbRef.current, 'inbound'), (snap) => {
-          isRemoteChange.current = true;
-          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as InboundEntry));
-          setInboundState(remoteData);
-          localStorage.setItem('inv_inbound', JSON.stringify(remoteData));
-          setTimeout(() => { isRemoteChange.current = false; }, 500);
-        });
-
-        unsubOutbound = onSnapshot(collection(dbRef.current, 'outbound'), (snap) => {
-          isRemoteChange.current = true;
-          const remoteData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as OutboundTransaction));
-          setOutboundState(remoteData);
-          localStorage.setItem('inv_outbound', JSON.stringify(remoteData));
-          setTimeout(() => { isRemoteChange.current = false; }, 500);
-        });
-
-        unsubSettings = onSnapshot(doc(dbRef.current, 'config', 'app_settings'), (snap) => {
-          if (snap.exists()) {
-            const remoteSettings = snap.data();
-            setSettingsState(prev => {
-              const merged = { ...prev, ...remoteSettings };
-              localStorage.setItem('inv_settings', JSON.stringify(merged));
-              return merged;
-            });
-          }
-        });
-
-      } catch (e) {
-        setIsCloudConnected(false);
-      }
-    } else {
-      setIsCloudConnected(false);
-      ['products', 'inbound', 'outbound'].forEach(key => {
-        const saved = localStorage.getItem(`inv_${key}`);
-        if (saved) {
-          if (key === 'products') setProductsState(JSON.parse(saved));
-          if (key === 'inbound') setInboundState(JSON.parse(saved));
-          if (key === 'outbound') setOutboundState(JSON.parse(saved));
-        }
-      });
-    }
-
-    return () => {
-      unsubProducts(); unsubInbound(); unsubOutbound(); unsubSettings();
+        unsubs.push(syncCol('products', productsRef, setProductsState));
+        unsubs.push(syncCol('inbound', inboundRef, setInboundState));
+        unsubs.push(syncCol('outbound', outboundRef, setOutboundState));
+      } catch (e: any) { setSyncError(e.message); }
     };
+    connectCloud();
+    return () => unsubs.forEach(u => u());
   }, [settings.fbApiKey, settings.fbProjectId, settings.syncEnabled]);
 
-  const setSettings = async (newSettings: AppSettings) => {
-    setSettingsState(newSettings);
-    localStorage.setItem('inv_settings', JSON.stringify(newSettings));
+  const setSettings = async (s: AppSettings) => {
+    setSettingsState(s);
+    localStorage.setItem('inv_settings', JSON.stringify(s));
     if (isCloudConnected && dbRef.current) {
-      const { fbApiKey, fbProjectId, fbAppId, ...syncable } = newSettings;
+      const { fbApiKey, fbProjectId, fbAppId, ...syncable } = s;
       await setDoc(doc(dbRef.current, 'config', 'app_settings'), syncable);
     }
   };
 
-  const setProducts = async (newData: Product[] | ((prev: Product[]) => Product[])) => {
-    const value = typeof newData === 'function' ? newData(products) : newData;
-    setProductsState(value);
-    localStorage.setItem('inv_products', JSON.stringify(value));
+  const updateCloud = async (col: string, data: any[], deleted?: any) => {
     if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
-      const deletedItems = products.filter(p => !value.some(v => v.id === p.id));
-      for (const item of deletedItems) {
-        await deleteDoc(doc(dbRef.current, 'products', item.id));
-      }
-      for (const item of value) {
-        await setDoc(doc(dbRef.current, 'products', item.id), item);
-      }
+      if (deleted) await deleteDoc(doc(dbRef.current, col, deleted.id));
+      for (const it of data) await setDoc(doc(dbRef.current, col, it.id), it);
     }
   };
 
-  const setInbound = async (newData: InboundEntry[] | ((prev: InboundEntry[]) => InboundEntry[])) => {
-    const value = typeof newData === 'function' ? newData(inbound) : newData;
-    setInboundState(value);
-    localStorage.setItem('inv_inbound', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
-      const deletedItems = inbound.filter(i => !value.some(v => v.id === i.id));
-      for (const item of deletedItems) {
-        await deleteDoc(doc(dbRef.current, 'inbound', item.id));
-      }
-      for (const item of value) {
-        await setDoc(doc(dbRef.current, 'inbound', item.id), item);
-      }
-    }
+  const setProducts = (newData: any) => {
+    const val = typeof newData === 'function' ? newData(products) : newData;
+    const deleted = products.find(p => !val.some((v:any) => v.id === p.id));
+    setProductsState(val);
+    localStorage.setItem('inv_products', JSON.stringify(val));
+    updateCloud('products', val, deleted);
   };
 
-  const setOutbound = async (newData: OutboundTransaction[] | ((prev: OutboundTransaction[]) => OutboundTransaction[])) => {
-    const value = typeof newData === 'function' ? newData(outbound) : newData;
-    setOutboundState(value);
-    localStorage.setItem('inv_outbound', JSON.stringify(value));
-    if (isCloudConnected && dbRef.current && !isRemoteChange.current) {
-      const deletedItems = outbound.filter(o => !value.some(v => v.id === o.id));
-      for (const item of deletedItems) {
-        await deleteDoc(doc(dbRef.current, 'outbound', item.id));
-      }
-      for (const item of value) {
-        await setDoc(doc(dbRef.current, 'outbound', item.id), item);
-      }
-    }
+  const setInbound = (newData: any) => {
+    const val = typeof newData === 'function' ? newData(inbound) : newData;
+    const deleted = inbound.find(i => !val.some((v:any) => v.id === i.id));
+    setInboundState(val);
+    localStorage.setItem('inv_inbound', JSON.stringify(val));
+    updateCloud('inbound', val, deleted);
+  };
+
+  const setOutbound = (newData: any) => {
+    const val = typeof newData === 'function' ? newData(outbound) : newData;
+    const deleted = outbound.find(o => !val.some((v:any) => v.id === o.id));
+    setOutboundState(val);
+    localStorage.setItem('inv_outbound', JSON.stringify(val));
+    updateCloud('outbound', val, deleted);
   };
 
   const calculateStock = (productId: string) => {
-    const totalIn = inbound.filter(i => i.productId === productId).reduce((acc, curr) => acc + curr.jumlah, 0);
-    const totalOut = outbound.reduce((acc, tx) => acc + tx.items.filter(item => item.productId === productId).reduce((sum, item) => sum + item.jumlah, 0), 0);
+    const totalIn = inbound.filter(i => i.productId === productId).reduce((acc, i) => acc + i.jumlah, 0);
+    const totalOut = outbound.reduce((acc, tx) => acc + (tx.items.find(i => i.productId === productId)?.jumlah || 0), 0);
     return totalIn - totalOut;
   };
 
+  const toggleTheme = () => {
+    const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
+    setSettings({ ...settings, theme: newTheme });
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
+
   return (
-    <InventoryContext.Provider value={{ 
-      products, setProducts, 
-      inbound, setInbound, 
-      outbound, setOutbound, 
-      settings, setSettings, 
-      calculateStock, 
-      isCloudConnected, 
-      toggleTheme 
-    }}>
+    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError }}>
       <HashRouter>
         <Layout>
           <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/database" element={<DatabaseBarang />} />
             <Route path="/dashboard/masuk" element={<BarangMasuk />} />
             <Route path="/dashboard/keluar" element={<BarangKeluar />} />
             <Route path="/dashboard/berita-acara" element={<CetakBeritaAcara />} />
             <Route path="/dashboard/stok" element={<StokBarang />} />
+            <Route path="/dashboard/laporan-blora" element={<LaporanBlora />} />
             <Route path="/dashboard/rekap" element={<RekapBulanan />} />
             <Route path="/dashboard/profile" element={<Profile />} />
-            <Route path="/" element={<Navigate to="/dashboard" />} />
           </Routes>
         </Layout>
       </HashRouter>

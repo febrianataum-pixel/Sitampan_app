@@ -50,26 +50,26 @@ const StokBarang: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Stok Barang</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Stok Barang</h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Monitoring ketersediaan stok secara real-time.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExportPDF} className="bg-red-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-black shadow-xl hover:bg-red-700 transition-all active:scale-95 text-xs uppercase tracking-widest">
+          <button onClick={handleExportPDF} className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 px-5 py-2 rounded-ios flex items-center gap-2 font-bold shadow-sm hover:bg-red-100 transition-all active:scale-95 text-xs">
             <FileText size={18}/> Export PDF
           </button>
-          <button onClick={handleExportCSV} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-2.5 rounded-xl flex items-center gap-2 font-black shadow-xl hover:bg-black transition-all active:scale-95 text-xs uppercase tracking-widest">
+          <button onClick={handleExportCSV} className="bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-5 py-2 rounded-ios flex items-center gap-2 font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95 text-xs">
             <Download size={18}/> Export CSV
           </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
-        <div className="relative group px-6 py-5 bg-white dark:bg-surface-dark border-b border-slate-50 dark:border-white/5">
-          <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-600 group-focus-within:text-blue-500 transition-colors" size={20} />
+      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
+        <div className="relative group px-6 py-3 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5">
+          <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light transition-colors" size={20} />
           <input 
             type="text" 
-            placeholder="Cari item untuk cek stok..." 
-            className="w-full pl-14 pr-6 py-3.5 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl outline-none text-sm transition-all font-medium focus:border-blue-200 dark:focus:ring-blue-900/20 dark:text-slate-200"
+            placeholder="Cari item..." 
+            className="w-full pl-14 pr-6 py-2.5 bg-slate-100 dark:bg-white/5 border-none rounded-full outline-none text-sm transition-all font-medium dark:text-slate-200"
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
           />
@@ -77,22 +77,22 @@ const StokBarang: React.FC = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-slate-50/50 dark:bg-white/5 text-slate-400 dark:text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] border-b dark:border-white/5">
+            <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wide border-b dark:border-white/5">
               <tr>
-                <th className="px-6 py-4">Kode</th>
-                <th className="px-6 py-4">Nama Barang</th>
-                <th className="px-6 py-4">Stok Saat Ini</th>
-                <th className="px-6 py-4">Harga Satuan</th>
-                <th className="px-6 py-4">Total Nilai</th>
+                <th className="px-6 py-3">Kode</th>
+                <th className="px-6 py-3">Nama Barang</th>
+                <th className="px-6 py-3">Stok Saat Ini</th>
+                <th className="px-6 py-3">Harga Satuan</th>
+                <th className="px-6 py-3">Total Nilai</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
               {filteredStock.map(s => (
-                <tr key={s.id} className={`hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors ${s.stokSaatIni <= 0 ? 'bg-red-50/40 dark:bg-red-900/10' : ''}`}>
-                  <td className="px-6 py-4 font-mono font-bold text-blue-600 dark:text-blue-400">{s.kodeBarang}</td>
-                  <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200">{s.namaBarang}</td>
+                <tr key={s.id} className={`hover:bg-ios-blue-light/5 dark:hover:bg-ios-blue-dark/5 transition-colors ${s.stokSaatIni <= 0 ? 'bg-red-50/40 dark:bg-red-900/10' : ''}`}>
+                  <td className="px-6 py-4 font-mono font-bold text-ios-blue-light dark:text-ios-blue-dark">{s.kodeBarang}</td>
+                  <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200">{s.namaBarang}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase flex items-center gap-1.5 w-fit border ${
+                    <span className={`px-3 py-1 rounded-full font-bold text-[10px] uppercase flex items-center gap-1.5 w-fit border ${
                       s.stokSaatIni <= 0 
                       ? 'bg-red-600 text-white border-red-700' 
                       : s.stokSaatIni < 5 
@@ -103,8 +103,8 @@ const StokBarang: React.FC = () => {
                       {s.stokSaatIni} {s.satuan}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-slate-400 dark:text-slate-500 font-bold">Rp {s.harga.toLocaleString('id-ID')}</td>
-                  <td className="px-6 py-4 font-black text-slate-900 dark:text-slate-100">Rp {s.nilaiStok.toLocaleString('id-ID')}</td>
+                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-bold">Rp {s.harga.toLocaleString('id-ID')}</td>
+                  <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {s.nilaiStok.toLocaleString('id-ID')}</td>
                 </tr>
               ))}
             </tbody>

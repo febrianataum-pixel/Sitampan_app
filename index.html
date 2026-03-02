@@ -26,7 +26,27 @@
           extend: {
             colors: {
               'true-black': '#000000',
-              'surface-dark': '#0a0a0a',
+              'surface-dark': '#1C1C1E',
+              'ios-blue': {
+                light: '#007AFF',
+                dark: '#0A84FF',
+              },
+              'ios-gray': {
+                light: '#8E8E93',
+                dark: '#8E8E93',
+              },
+              'ios-bg': {
+                light: '#F2F2F7',
+                dark: '#000000',
+              },
+              'ios-secondary': {
+                light: '#FFFFFF',
+                dark: '#1C1C1E',
+              }
+            },
+            borderRadius: {
+              'ios': '12px',
+              'ios-lg': '20px',
             }
           }
         }
@@ -40,10 +60,14 @@
         }
         body { 
             font-family: var(--font-main);
-            background: #000;
+            background: #F2F2F7;
             margin: 0;
             padding: 0;
             -webkit-tap-highlight-color: transparent;
+        }
+        
+        .dark body {
+            background: #000;
         }
         
         #splash-screen {
@@ -101,26 +125,6 @@
           }
         }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.12.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "xlsx": "https://esm.sh/xlsx@^0.18.5",
-    "firebase/app": "https://esm.sh/firebase@11.1.0/app",
-    "firebase/firestore": "https://esm.sh/firebase@11.1.0/firestore",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/",
-    "path": "https://esm.sh/path@^0.12.7",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "url": "https://esm.sh/url@^0.11.4"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-slate-50 dark:bg-true-black text-slate-900 dark:text-slate-100 overflow-x-hidden">
     <!-- Splash Screen Overlay -->
@@ -135,11 +139,13 @@
     </div>
 
     <script>
+      /* Service worker disabled for debugging
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW failed', err));
         });
       }
+      */
 
       (function() {
         const splashImg = document.getElementById('splash-logo');
@@ -158,11 +164,11 @@
         setTimeout(() => {
           const splash = document.getElementById('splash-screen');
           if (splash) splash.classList.add('fade-out');
-        }, 3000);
+        }, 1000);
       })();
     </script>
 
     <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
