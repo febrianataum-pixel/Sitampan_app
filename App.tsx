@@ -33,8 +33,9 @@ import StokBarang from './pages/StokBarang';
 import RekapBulanan from './pages/RekapBulanan';
 import Profile from './pages/Profile';
 import LaporanBlora from './pages/LaporanBlora';
+import Dokumen from './pages/Dokumen';
 
-import { Product, InboundEntry, OutboundTransaction, AppSettings, formatIndoDate } from './types';
+import { Product, InboundEntry, OutboundTransaction, AppSettings, formatIndoDate, ArchiveDocument } from './types';
 
 interface InventoryContextType {
   products: Product[];
@@ -43,6 +44,8 @@ interface InventoryContextType {
   setInbound: (data: InboundEntry[] | ((prev: InboundEntry[]) => InboundEntry[])) => void;
   outbound: OutboundTransaction[];
   setOutbound: (data: OutboundTransaction[] | ((prev: OutboundTransaction[]) => OutboundTransaction[])) => void;
+  documents: ArchiveDocument[];
+  setDocuments: (data: ArchiveDocument[] | ((prev: ArchiveDocument[]) => ArchiveDocument[])) => void;
   settings: AppSettings;
   setSettings: (newSettings: AppSettings) => void;
   calculateStock: (productId: string) => number;
@@ -76,6 +79,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={20} /> },
     { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={20} /> },
     { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={20} /> },
+    { name: 'Dokumen', path: '/dashboard/dokumen', icon: <Package size={20} /> },
     { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={20} /> },
     { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
   ];
@@ -183,6 +187,14 @@ const App: React.FC = () => {
       return [];
     }
   });
+  const [documents, setDocumentsState] = useState<ArchiveDocument[]>(() => {
+    try {
+      const saved = localStorage.getItem('inv_documents');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [isCloudConnected, setIsCloudConnected] = useState(false);
   const [isRescuing, setIsRescuing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -212,9 +224,11 @@ const App: React.FC = () => {
   const productsRef = useRef(products);
   const inboundRef = useRef(inbound);
   const outboundRef = useRef(outbound);
+  const documentsRef = useRef(documents);
   useEffect(() => { productsRef.current = products; }, [products]);
   useEffect(() => { inboundRef.current = inbound; }, [inbound]);
   useEffect(() => { outboundRef.current = outbound; }, [outbound]);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
 
   const dbRef = useRef<any>(null);
   const isRemoteChange = useRef(false);
@@ -259,6 +273,7 @@ const App: React.FC = () => {
         unsubs.push(syncCol('products', productsRef, setProductsState));
         unsubs.push(syncCol('inbound', inboundRef, setInboundState));
         unsubs.push(syncCol('outbound', outboundRef, setOutboundState));
+        unsubs.push(syncCol('documents', documentsRef, setDocumentsState));
       } catch (e: any) { setSyncError(e.message); }
     };
     connectCloud();
@@ -305,6 +320,14 @@ const App: React.FC = () => {
     updateCloud('outbound', val, deleted);
   };
 
+  const setDocuments = (newData: any) => {
+    const val = typeof newData === 'function' ? newData(documents) : newData;
+    const deleted = documents.find(d => !val.some((v:any) => v.id === d.id));
+    setDocumentsState(val);
+    localStorage.setItem('inv_documents', JSON.stringify(val));
+    updateCloud('documents', val, deleted);
+  };
+
   const calculateStock = (productId: string) => {
     const totalIn = inbound.filter(i => i.productId === productId).reduce((acc, i) => acc + i.jumlah, 0);
     const totalOut = outbound.reduce((acc, tx) => acc + (tx.items.find(i => i.productId === productId)?.jumlah || 0), 0);
@@ -318,7 +341,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError }}>
+    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError }}>
       <HashRouter>
         <Layout>
           <Routes>
@@ -330,6 +353,7 @@ const App: React.FC = () => {
             <Route path="/dashboard/berita-acara" element={<CetakBeritaAcara />} />
             <Route path="/dashboard/stok" element={<StokBarang />} />
             <Route path="/dashboard/laporan-blora" element={<LaporanBlora />} />
+            <Route path="/dashboard/dokumen" element={<Dokumen />} />
             <Route path="/dashboard/rekap" element={<RekapBulanan />} />
             <Route path="/dashboard/profile" element={<Profile />} />
           </Routes>

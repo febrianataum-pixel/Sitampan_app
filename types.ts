@@ -42,12 +42,23 @@ export interface AppSettings {
   adminName: string;
   warehouseName: string;
   baTemplate?: string;
+  sppbTemplate?: string;
   theme?: 'light' | 'dark';
   // Firebase Sync Config
   fbApiKey?: string;
   fbProjectId?: string;
   fbAppId?: string;
   syncEnabled?: boolean;
+}
+
+export interface ArchiveDocument {
+  id: string;
+  title: string;
+  category: string;
+  date: string;
+  fileUrl: string; // Base64 or URL
+  fileName: string;
+  description?: string;
 }
 
 export const MONTHS = [

@@ -33,6 +33,7 @@ type SortKey = 'tanggal' | 'penerima' | 'alamat';
 const CetakBeritaAcara: React.FC = () => {
   const { products, outbound, settings, setSettings } = useInventory();
   const [selectedTx, setSelectedTx] = useState<OutboundTransaction | null>(null);
+  const [docType, setDocType] = useState<'BA' | 'SPPB'>('BA');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -102,7 +103,63 @@ const CetakBeritaAcara: React.FC = () => {
     </div>
   `;
 
-  const [currentTemplate, setCurrentTemplate] = useState(settings.baTemplate || defaultBA);
+  const defaultSPPB = `
+    <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px; width:100%;">
+      <div style="width:15%; text-align:left;">[logo_app]</div>
+      <div style="width:85%; text-align:center; padding-right:15%;">
+        <h2 style="margin:0; font-size:14px; text-transform:uppercase; letter-spacing:0.5px; font-weight:normal;">Pemerintah Kabupaten Blora</h2>
+        <h1 style="margin:0; font-size:18px; text-transform:uppercase; font-weight:bold; line-height:1.2;">[nama_app]</h1>
+        <p style="margin:2px 0; font-size:10px; font-weight:bold;">[subtitle_app]</p>
+        <p style="margin:0; font-size:9px;">[nama_gudang]</p>
+      </div>
+    </div>
+    
+    <div style="text-align:center; margin-bottom:25px;">
+      <h3 style="text-decoration:underline; font-size:15px; margin:0; font-weight:bold; text-transform:uppercase;">SURAT PERINTAH PENGELUARAN BARANG (SPPB)</h3>
+      <p style="margin:5px 0 0 0; font-size:11px;">Nomor: [id_transaksi]/SPPB/[tahun]</p>
+    </div>
+    
+    <p style="font-size:12px; line-height:1.5; margin-bottom:15px;">Kepada Yth. Pengelola Gudang Logistik, diperintahkan untuk mengeluarkan barang bantuan logistik dengan rincian sebagai berikut:</p>
+    
+    <table style="width:100%; font-size:12px; margin-bottom:10px; border-collapse:collapse;">
+      <tr><td width="100" style="padding:2px 0;">Penerima</td><td width="15">:</td><td style="font-weight:bold;">[penerima]</td></tr>
+      <tr><td style="padding:2px 0;">Alamat</td><td>:</td><td>[alamat]</td></tr>
+      <tr><td style="padding:2px 0;">Tanggal</td><td>:</td><td>[tanggal_panjang]</td></tr>
+    </table>
+
+    <p style="font-size:12px; margin-bottom:10px;">Daftar Barang:</p>
+    [tabel_barang]
+    
+    <p style="font-size:12px; line-height:1.5; margin-top:20px;">Demikian surat perintah ini dibuat untuk dilaksanakan dengan penuh tanggung jawab.</p>
+    
+    <div style="margin-top:40px;">
+      <div style="text-align:right; font-size:12px; margin-bottom:5px;">[tanggal_panjang]</div>
+      <table style="width:100%; border:none; font-size:12px;">
+        <tr>
+          <td align="center" width="50%" style="vertical-align:top;">
+            PENERIMA,<br><br><br><br><br>
+            <b>( [penerima] )</b>
+          </td>
+          <td align="center" width="50%" style="vertical-align:top;">
+            PEMBERI PERINTAH,<br><br><br><br><br>
+            <div style="display:inline-block; text-align:left;">
+              <b style="text-decoration:underline;">[nama_pihak_kesatu]</b><br>
+              <b>[nip_pihak_kesatu]</b>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const [currentTemplate, setCurrentTemplate] = useState(docType === 'BA' ? (settings.baTemplate || defaultBA) : (settings.sppbTemplate || defaultSPPB));
+  const [editingDocType, setEditingDocType] = useState<'BA' | 'SPPB'>('BA');
+
+  const handleOpenEditor = (type: 'BA' | 'SPPB') => {
+    setEditingDocType(type);
+    setCurrentTemplate(type === 'BA' ? (settings.baTemplate || defaultBA) : (settings.sppbTemplate || defaultSPPB));
+    setIsEditorOpen(true);
+  };
 
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -129,7 +186,15 @@ const CetakBeritaAcara: React.FC = () => {
   });
 
   const renderBA = (tx: OutboundTransaction, forPdf = false) => {
-    let html = currentTemplate;
+    let html = docType === 'BA' 
+      ? (settings.baTemplate || defaultBA) 
+      : (settings.sppbTemplate || defaultSPPB);
+    
+    // If we are in the editor, use the currentTemplate state
+    if (isEditorOpen) {
+      html = currentTemplate;
+    }
+
     const dateObj = new Date(tx.tanggal);
     const datePanjang = formatIndoDate(tx.tanggal);
     const logoHtml = settings.logo 
@@ -144,9 +209,12 @@ const CetakBeritaAcara: React.FC = () => {
     }).join('');
     const tableHtml = `<table style="width:100%; border-collapse:collapse; margin:10px 0;"><thead><tr style="background-color:#fff; font-size:10px; text-transform:uppercase;"><th style="border:1px solid #000; padding:8px; width:30px;">No</th><th style="border:1px solid #000; padding:8px; text-align:left;">Nama Barang</th><th style="border:1px solid #000; padding:8px; width:60px;">Jumlah</th><th style="border:1px solid #000; padding:8px; width:80px;">Satuan</th><th style="border:1px solid #000; padding:8px; text-align:right; width:100px;">Harga</th><th style="border:1px solid #000; padding:8px; text-align:right; width:120px;">Total</th></tr></thead><tbody>${tableRows}<tr style="font-weight:bold; font-size:11px;"><td colspan="5" style="border:1px solid #000; padding:8px; text-align:right;">Grand Total</td><td style="border:1px solid #000; padding:8px; text-align:right;">Rp ${grandTotal.toLocaleString('id-ID')}</td></tr></tbody></table>`;
     html = html.replace(/\[logo_app\]/g, logoHtml).replace(/\[nama_app\]/g, settings.appName).replace(/\[subtitle_app\]/g, settings.appSubtitle).replace(/\[nama_gudang\]/g, settings.warehouseName).replace(/\[nama_admin\]/g, settings.adminName).replace(/\[id_transaksi\]/g, tx.id.split('-')[0].toUpperCase()).replace(/\[tahun\]/g, dateObj.getFullYear().toString()).replace(/\[penerima\]/g, tx.penerima).replace(/\[alamat\]/g, tx.alamat || '-').replace(/\[tanggal_panjang\]/g, datePanjang).replace(/\[tabel_barang\]/g, tableHtml);
-    if (!settings.baTemplate) {
+    
+    const isTemplateMissing = docType === 'BA' ? !settings.baTemplate : !settings.sppbTemplate;
+    if (isTemplateMissing) {
       html = html.replace(/\[nama_pihak_kesatu\]/g, "NURKHOLIS, S.Kep, MM.").replace(/\[jabatan_pihak_kesatu\]/g, "Plt. Kepala Bidang Sosial Dinsos PPPA Kab. Blora").replace(/\[nip_pihak_kesatu\]/g, "19680328 198803 1 004");
     }
+    
     if (forPdf) return `<div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; background: white; margin: 0; padding: 0;"><div style="width: 170mm; min-height: 240mm; font-family: 'Arial', sans-serif;">${html}</div></div>`;
     return html;
   };
@@ -199,10 +267,13 @@ const CetakBeritaAcara: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Berita Acara</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Buat dokumen serah terima resmi (Format A4).</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Berita Acara & SPPB</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Buat dokumen serah terima resmi atau surat perintah pengeluaran barang.</p>
         </div>
-        <button onClick={() => setIsEditorOpen(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios font-bold text-xs uppercase tracking-wide shadow-sm active:scale-95 transition-all"><Settings size={18}/> Atur Template</button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button onClick={() => handleOpenEditor('BA')} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-ios font-bold text-[10px] uppercase tracking-wide shadow-sm active:scale-95 transition-all"><Settings size={16}/> Template BA</button>
+          <button onClick={() => handleOpenEditor('SPPB')} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-ios font-bold text-[10px] uppercase tracking-wide shadow-sm active:scale-95 transition-all"><Settings size={16}/> Template SPPB</button>
+        </div>
       </div>
 
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
@@ -225,7 +296,10 @@ const CetakBeritaAcara: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 italic">{o.penerima}</td>
                   <td className="px-6 py-4 text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{o.alamat || '-'}</td>
                   <td className="px-6 py-4 text-center">
-                    <button onClick={() => setSelectedTx(o)} className="text-ios-blue-light dark:text-ios-blue-dark font-bold bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 px-4 py-1.5 rounded-ios text-[10px] uppercase hover:bg-ios-blue-light dark:hover:bg-ios-blue-dark hover:text-white transition-all">PDF</button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => { setDocType('BA'); setSelectedTx(o); }} className="text-ios-blue-light dark:text-ios-blue-dark font-bold bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 px-3 py-1.5 rounded-ios text-[10px] uppercase hover:bg-ios-blue-light dark:hover:bg-ios-blue-dark hover:text-white transition-all">BA</button>
+                      <button onClick={() => { setDocType('SPPB'); setSelectedTx(o); }} className="text-emerald-500 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-ios text-[10px] uppercase hover:bg-emerald-500 hover:text-white transition-all">SPPB</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -237,7 +311,26 @@ const CetakBeritaAcara: React.FC = () => {
       {isEditorOpen && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm z-[200] flex flex-col p-4 animate-in fade-in duration-300">
           <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark w-full max-w-[1400px] mx-auto rounded-ios-lg shadow-2xl flex flex-col overflow-hidden h-full border dark:border-white/5">
-            <div className="px-6 py-4 border-b dark:border-white/5 flex items-center justify-between shrink-0"><h3 className="font-bold uppercase text-slate-800 dark:text-slate-100">Editor Template</h3><button onClick={() => setIsEditorOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400"><X size={24}/></button></div>
+            <div className="px-6 py-4 border-b dark:border-white/5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-4">
+                <h3 className="font-bold uppercase text-slate-800 dark:text-slate-100">Editor Template {editingDocType}</h3>
+                <div className="flex p-1 bg-slate-100 dark:bg-white/5 rounded-ios gap-1">
+                  <button 
+                    onClick={() => { setEditingDocType('BA'); setCurrentTemplate(settings.baTemplate || defaultBA); }}
+                    className={`px-4 py-1.5 text-[10px] font-bold rounded-ios transition-all ${editingDocType === 'BA' ? 'bg-white dark:bg-ios-secondary-dark shadow-sm text-ios-blue-light dark:text-ios-blue-dark' : 'text-slate-500'}`}
+                  >
+                    Berita Acara
+                  </button>
+                  <button 
+                    onClick={() => { setEditingDocType('SPPB'); setCurrentTemplate(settings.sppbTemplate || defaultSPPB); }}
+                    className={`px-4 py-1.5 text-[10px] font-bold rounded-ios transition-all ${editingDocType === 'SPPB' ? 'bg-white dark:bg-ios-secondary-dark shadow-sm text-ios-blue-light dark:text-ios-blue-dark' : 'text-slate-500'}`}
+                  >
+                    SPPB
+                  </button>
+                </div>
+              </div>
+              <button onClick={() => setIsEditorOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400"><X size={24}/></button>
+            </div>
             <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
                <div className="w-full md:w-64 bg-slate-50 dark:bg-white/5 border-r dark:border-white/5 p-6 space-y-4 overflow-y-auto shrink-0 scrollbar-hide">
                   <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Placeholder Data:</p>
@@ -257,7 +350,22 @@ const CetakBeritaAcara: React.FC = () => {
                   </div>
                </div>
             </div>
-            <div className="p-6 border-t dark:border-white/5 flex justify-end gap-3 bg-ios-secondary-light dark:bg-ios-secondary-dark shrink-0"><button onClick={() => setIsEditorOpen(false)} className="px-6 py-2 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">Batal</button><button onClick={() => { setSettings({ ...settings, baTemplate: currentTemplate }); setIsEditorOpen(false); }} className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-10 py-2 rounded-ios font-bold text-[10px] uppercase tracking-wide">Simpan Template</button></div>
+            <div className="p-6 border-t dark:border-white/5 flex justify-end gap-3 bg-ios-secondary-light dark:bg-ios-secondary-dark shrink-0">
+              <button onClick={() => setIsEditorOpen(false)} className="px-6 py-2 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">Batal</button>
+              <button 
+                onClick={() => { 
+                  if (editingDocType === 'BA') {
+                    setSettings({ ...settings, baTemplate: currentTemplate });
+                  } else {
+                    setSettings({ ...settings, sppbTemplate: currentTemplate });
+                  }
+                  setIsEditorOpen(false); 
+                }} 
+                className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-10 py-2 rounded-ios font-bold text-[10px] uppercase tracking-wide"
+              >
+                Simpan Template {editingDocType}
+              </button>
+            </div>
           </div>
         </div>
       )}
