@@ -23,6 +23,8 @@ const Dokumen: React.FC = () => {
   const { documents, setDocuments } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<ArchiveDocument | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<ArchiveDocument | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
 
@@ -152,10 +154,8 @@ const Dokumen: React.FC = () => {
       return;
     }
 
-    const newWindow = window.open();
-    if (newWindow) {
-      newWindow.document.write(`<iframe src="${fileUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-    }
+    setPreviewUrl(fileUrl);
+    setPreviewDoc(doc);
   };
 
   const handleDownload = async (e: React.MouseEvent, doc: ArchiveDocument) => {
@@ -401,6 +401,56 @@ const Dokumen: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {previewDoc && previewUrl && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[300] flex flex-col animate-in fade-in duration-300">
+          {/* Toolbar */}
+          <div className="bg-slate-900/90 text-white px-4 py-3 flex items-center justify-between border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 bg-red-500 rounded text-white">
+                <FileText size={16}/>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold truncate max-w-[200px] md:max-w-md">{previewDoc.title}</h3>
+                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{previewDoc.category} • {formatIndoDate(previewDoc.date)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={async () => {
+                  const link = document.createElement('a');
+                  link.href = previewUrl;
+                  link.download = previewDoc.fileName;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                title="Download"
+              >
+                <Download size={20}/>
+              </button>
+              <button 
+                onClick={() => { setPreviewDoc(null); setPreviewUrl(null); }}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                title="Tutup"
+              >
+                <X size={24}/>
+              </button>
+            </div>
+          </div>
+          
+          {/* Content */}
+          <div className="flex-1 bg-slate-800 flex items-center justify-center overflow-hidden">
+            <iframe 
+              src={previewUrl} 
+              className="w-full h-full border-none"
+              title={previewDoc.title}
+            />
           </div>
         </div>
       )}
