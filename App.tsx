@@ -146,7 +146,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-ios-secondary-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 flex items-center justify-around px-2 py-2 pb-8 z-50 no-print theme-transition shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
-          {menuItems.filter(item => ['Dashboard', 'Masuk', 'Keluar', 'Laporan', 'Profil'].includes(item.name)).map((item) => (
+          {menuItems.filter(item => ['Dashboard', 'Keluar', 'Laporan', 'Dokumen', 'Profil'].includes(item.name)).map((item) => (
             <NavLink
               key={item.path}
               to={item.path}

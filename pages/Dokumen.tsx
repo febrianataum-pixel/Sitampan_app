@@ -7,7 +7,7 @@ import {
   Search, 
   Trash2, 
   Download, 
-  Eye, 
+  Pencil, 
   Filter,
   X,
   Upload,
@@ -21,6 +21,7 @@ import { ArchiveDocument, formatIndoDate } from '../types';
 const Dokumen: React.FC = () => {
   const { documents, setDocuments } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<ArchiveDocument | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
 
@@ -66,13 +67,18 @@ const Dokumen: React.FC = () => {
       return;
     }
 
-    const newDoc: ArchiveDocument = {
-      id: crypto.randomUUID(),
-      ...formData
-    };
+    if (editingDoc) {
+      setDocuments(documents.map(d => d.id === editingDoc.id ? { ...d, ...formData } : d));
+    } else {
+      const newDoc: ArchiveDocument = {
+        id: crypto.randomUUID(),
+        ...formData
+      };
+      setDocuments([...documents, newDoc]);
+    }
 
-    setDocuments([...documents, newDoc]);
     setIsModalOpen(false);
+    setEditingDoc(null);
     setFormData({
       title: '',
       category: 'Laporan',
@@ -81,6 +87,19 @@ const Dokumen: React.FC = () => {
       fileUrl: '',
       fileName: ''
     });
+  };
+
+  const handleEdit = (doc: ArchiveDocument) => {
+    setEditingDoc(doc);
+    setFormData({
+      title: doc.title,
+      category: doc.category,
+      date: doc.date,
+      description: doc.description || '',
+      fileUrl: doc.fileUrl,
+      fileName: doc.fileName
+    });
+    setIsModalOpen(true);
   };
 
   const handleDelete = (id: string) => {
@@ -117,7 +136,7 @@ const Dokumen: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Penyimpanan dokumen digital dan laporan resmi.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setEditingDoc(null); setFormData({ title: '', category: 'Laporan', date: new Date().toISOString().split('T')[0], description: '', fileUrl: '', fileName: '' }); setIsModalOpen(true); }}
           className="w-full md:w-auto bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 transition-all text-xs uppercase tracking-widest"
         >
           <Plus size={18}/> Tambah Dokumen
@@ -156,7 +175,7 @@ const Dokumen: React.FC = () => {
             <div key={doc.id} className="group bg-white dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden hover:shadow-md transition-all flex flex-col">
               <div className="p-4 flex-1 space-y-3">
                 <div className="flex justify-between items-start">
-                  <div className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-lg">
+                  <div className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-lg cursor-pointer" onClick={() => viewDocument(doc.fileUrl)}>
                     <FileText size={24}/>
                   </div>
                   <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 rounded-full">
@@ -164,7 +183,7 @@ const Dokumen: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight">{doc.title}</h4>
+                  <h4 className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight cursor-pointer hover:text-ios-blue-light transition-colors" onClick={() => viewDocument(doc.fileUrl)}>{doc.title}</h4>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 font-medium">
                     <Calendar size={10}/> {formatIndoDate(doc.date)}
                   </p>
@@ -178,11 +197,11 @@ const Dokumen: React.FC = () => {
               <div className="p-3 bg-slate-50 dark:bg-white/5 border-t dark:border-white/5 flex items-center justify-between">
                 <div className="flex gap-1">
                   <button 
-                    onClick={() => viewDocument(doc.fileUrl)}
+                    onClick={() => handleEdit(doc)}
                     className="p-2 text-ios-blue-light dark:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-colors"
-                    title="Lihat Dokumen"
+                    title="Edit Dokumen"
                   >
-                    <Eye size={18}/>
+                    <Pencil size={18}/>
                   </button>
                   <a 
                     href={doc.fileUrl} 
@@ -216,15 +235,16 @@ const Dokumen: React.FC = () => {
         </div>
       )}
 
-      {/* Upload Modal */}
+      {/* Upload/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-ios-secondary-dark w-full max-w-lg rounded-ios-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="px-6 py-4 border-b dark:border-white/5 flex items-center justify-between">
               <h3 className="font-bold uppercase text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Upload size={18} className="text-ios-blue-light"/> Tambah Dokumen Baru
+                {editingDoc ? <Pencil size={18} className="text-ios-blue-light"/> : <Upload size={18} className="text-ios-blue-light"/>} 
+                {editingDoc ? 'Edit Dokumen' : 'Tambah Dokumen Baru'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400">
+              <button onClick={() => { setIsModalOpen(false); setEditingDoc(null); }} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400">
                 <X size={24}/>
               </button>
             </div>
@@ -314,7 +334,7 @@ const Dokumen: React.FC = () => {
               <div className="pt-4 flex gap-3">
                 <button 
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); setEditingDoc(null); }}
                   className="flex-1 px-6 py-3 rounded-ios font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-widest hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
                 >
                   Batal
@@ -323,7 +343,7 @@ const Dokumen: React.FC = () => {
                   type="submit"
                   className="flex-[2] bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-3 rounded-ios font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
                 >
-                  Simpan ke Arsip
+                  {editingDoc ? 'Simpan Perubahan' : 'Simpan ke Arsip'}
                 </button>
               </div>
             </form>
