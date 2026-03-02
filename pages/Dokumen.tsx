@@ -17,6 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { ArchiveDocument, formatIndoDate } from '../types';
+import { saveFileToIDB, getFileFromIDB, deleteFileFromIDB } from '../utils/idb';
 
 const Dokumen: React.FC = () => {
   const { documents, setDocuments } = useInventory();
@@ -60,19 +61,36 @@ const Dokumen: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.fileUrl) {
       alert('Judul dan File wajib diisi!');
       return;
     }
 
+    const docId = editingDoc ? editingDoc.id : crypto.randomUUID();
+    
+    // Save file to IndexedDB
+    try {
+      await saveFileToIDB(docId, formData.fileUrl);
+    } catch (err) {
+      console.error("Failed to save to IndexedDB:", err);
+      alert("Gagal menyimpan file ke database lokal. Pastikan browser Anda mengizinkan penyimpanan.");
+      return;
+    }
+
+    // Prepare metadata for localStorage/Firestore (placeholder for fileUrl)
+    const docMetadata = {
+      ...formData,
+      fileUrl: '[IDB_FILE]'
+    };
+
     if (editingDoc) {
-      setDocuments(documents.map(d => d.id === editingDoc.id ? { ...d, ...formData } : d));
+      setDocuments(documents.map(d => d.id === docId ? { ...d, ...docMetadata, id: docId } : d));
     } else {
       const newDoc: ArchiveDocument = {
-        id: crypto.randomUUID(),
-        ...formData
+        id: docId,
+        ...docMetadata
       };
       setDocuments([...documents, newDoc]);
     }
@@ -89,22 +107,30 @@ const Dokumen: React.FC = () => {
     });
   };
 
-  const handleEdit = (doc: ArchiveDocument) => {
+  const handleEdit = async (doc: ArchiveDocument) => {
     setEditingDoc(doc);
+    
+    // Fetch file from IndexedDB
+    let actualFileUrl = doc.fileUrl;
+    if (doc.fileUrl === '[IDB_FILE]') {
+      actualFileUrl = await getFileFromIDB(doc.id) || '';
+    }
+
     setFormData({
       title: doc.title,
       category: doc.category,
       date: doc.date,
       description: doc.description || '',
-      fileUrl: doc.fileUrl,
+      fileUrl: actualFileUrl,
       fileName: doc.fileName
     });
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus dokumen ini dari arsip?')) {
       setDocuments(documents.filter(d => d.id !== id));
+      await deleteFileFromIDB(id);
     }
   };
 
@@ -115,10 +141,37 @@ const Dokumen: React.FC = () => {
     return matchesSearch && matchesCategory;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const viewDocument = (fileUrl: string) => {
+  const viewDocument = async (doc: ArchiveDocument) => {
+    let fileUrl = doc.fileUrl;
+    if (doc.fileUrl === '[IDB_FILE]') {
+      fileUrl = await getFileFromIDB(doc.id) || '';
+    }
+    
+    if (!fileUrl) {
+      alert("File tidak ditemukan di database lokal.");
+      return;
+    }
+
     const newWindow = window.open();
     if (newWindow) {
       newWindow.document.write(`<iframe src="${fileUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+    }
+  };
+
+  const handleDownload = async (e: React.MouseEvent, doc: ArchiveDocument) => {
+    if (doc.fileUrl === '[IDB_FILE]') {
+      e.preventDefault();
+      const fileUrl = await getFileFromIDB(doc.id);
+      if (fileUrl) {
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = doc.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert("File tidak ditemukan di database lokal.");
+      }
     }
   };
 
@@ -175,7 +228,7 @@ const Dokumen: React.FC = () => {
             <div key={doc.id} className="group bg-white dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden hover:shadow-md transition-all flex flex-col">
               <div className="p-4 flex-1 space-y-3">
                 <div className="flex justify-between items-start">
-                  <div className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-lg cursor-pointer" onClick={() => viewDocument(doc.fileUrl)}>
+                  <div className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-lg cursor-pointer" onClick={() => viewDocument(doc)}>
                     <FileText size={24}/>
                   </div>
                   <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 rounded-full">
@@ -183,7 +236,7 @@ const Dokumen: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight cursor-pointer hover:text-ios-blue-light transition-colors" onClick={() => viewDocument(doc.fileUrl)}>{doc.title}</h4>
+                  <h4 className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight cursor-pointer hover:text-ios-blue-light transition-colors" onClick={() => viewDocument(doc)}>{doc.title}</h4>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 font-medium">
                     <Calendar size={10}/> {formatIndoDate(doc.date)}
                   </p>
@@ -204,8 +257,9 @@ const Dokumen: React.FC = () => {
                     <Pencil size={18}/>
                   </button>
                   <a 
-                    href={doc.fileUrl} 
+                    href={doc.fileUrl === '[IDB_FILE]' ? '#' : doc.fileUrl} 
                     download={doc.fileName}
+                    onClick={(e) => handleDownload(e, doc)}
                     className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-ios transition-colors"
                     title="Download PDF"
                   >
