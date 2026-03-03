@@ -27,6 +27,9 @@ export interface OutboundTransaction {
   penerima: string;
   tanggal: string;
   alamat: string;
+  jenisBencana?: string;
+  subJenisBencana?: string;
+  keteranganBencana?: string;
   items: OutboundItem[];
   images?: string[];
 }

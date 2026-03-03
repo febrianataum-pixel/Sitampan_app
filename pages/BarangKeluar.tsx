@@ -47,8 +47,26 @@ const BarangKeluar: React.FC = () => {
   const [generalData, setGeneralData] = useState({
     penerima: '',
     tanggal: new Date().toISOString().split('T')[0],
-    alamat: ''
+    alamat: '',
+    jenisBencana: '',
+    subJenisBencana: '',
+    keteranganBencana: ''
   });
+
+  const disasterCategories = [
+    { 
+      name: 'Bencana Alam', 
+      subs: ['Gempa Bumi', 'Letusan Gunung', 'Banjir dan tanah longsor', 'lainnya (sebutkan)'] 
+    },
+    { 
+      name: 'Bencana Non Alam', 
+      subs: ['Kebakaran akibat korsleting listrik', 'kecelakaan industri', 'pencemaran lingkungan', 'wabah penyakit', 'lainnya (sebutkan)'] 
+    },
+    { 
+      name: 'Bencana Sosial', 
+      subs: ['Kerusuhan', 'konflik antarkelompok', 'aksi kekerasan yang merusak ketertiban masyarakat', 'lainnya (sebutkan)'] 
+    }
+  ];
 
   const [items, setItems] = useState<OutboundItem[]>([
     { id: crypto.randomUUID(), productId: '', jumlah: 1 }
@@ -90,12 +108,22 @@ const BarangKeluar: React.FC = () => {
       setGeneralData({ 
         penerima: tx.penerima, 
         tanggal: duplicate ? new Date().toISOString().split('T')[0] : tx.tanggal, 
-        alamat: tx.alamat 
+        alamat: tx.alamat,
+        jenisBencana: tx.jenisBencana || '',
+        subJenisBencana: tx.subJenisBencana || '',
+        keteranganBencana: tx.keteranganBencana || ''
       });
       setItems(tx.items.map(item => ({ ...item, id: crypto.randomUUID() })));
     } else {
       setEditingTx(null);
-      setGeneralData({ penerima: '', tanggal: new Date().toISOString().split('T')[0], alamat: '' });
+      setGeneralData({ 
+        penerima: '', 
+        tanggal: new Date().toISOString().split('T')[0], 
+        alamat: '',
+        jenisBencana: '',
+        subJenisBencana: '',
+        keteranganBencana: ''
+      });
       setItems([{ id: crypto.randomUUID(), productId: '', jumlah: 1 }]);
     }
     setSearchQueries({});
@@ -239,6 +267,7 @@ const BarangKeluar: React.FC = () => {
                 >
                   <div className="flex items-center gap-2">Alamat / Tujuan {renderSortIcon('alamat')}</div>
                 </th>
+                <th className="px-6 py-3">Jenis Bencana</th>
                 <th className="px-6 py-3">Status / Dokumentasi</th>
                 <th className="px-6 py-3 text-center">Aksi</th>
               </tr>
@@ -260,6 +289,14 @@ const BarangKeluar: React.FC = () => {
                       <div className="flex items-center gap-1.5">
                         <MapPin size={12} className="text-slate-300 dark:text-slate-700 shrink-0"/>
                         <span className="truncate">{o.alamat || '-'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">{o.jenisBencana || '-'}</span>
+                        <span className="text-[9px] text-slate-500 dark:text-slate-400 italic truncate max-w-[150px]">
+                          {o.subJenisBencana === 'lainnya (sebutkan)' ? o.keteranganBencana : o.subJenisBencana || '-'}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -288,7 +325,7 @@ const BarangKeluar: React.FC = () => {
                 );
               })}
               {sortedOutbound.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Belum ada catatan transaksi.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Belum ada catatan transaksi.</td></tr>
               )}
             </tbody>
           </table>
@@ -333,7 +370,9 @@ const BarangKeluar: React.FC = () => {
                 {[
                   { label: 'Tanggal', val: formatIndoDate(viewingTx.tanggal), icon: <Calendar size={12}/> },
                   { label: 'Penerima', val: viewingTx.penerima, icon: <User size={12}/> },
-                  { label: 'Alamat', val: viewingTx.alamat || '-', icon: <MapPin size={12}/> }
+                  { label: 'Alamat', val: viewingTx.alamat || '-', icon: <MapPin size={12}/> },
+                  { label: 'Jenis Bencana', val: viewingTx.jenisBencana || '-', icon: <AlertCircle size={12}/> },
+                  { label: 'Sub Jenis', val: viewingTx.subJenisBencana === 'lainnya (sebutkan)' ? viewingTx.keteranganBencana : viewingTx.subJenisBencana || '-', icon: <AlertCircle size={12}/> }
                 ].map((item, i) => (
                   <div key={i} className="space-y-1 bg-ios-secondary-light dark:bg-ios-secondary-dark p-3 rounded-ios border border-slate-100 dark:border-white/5">
                     <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{item.label}</p>
@@ -424,6 +463,51 @@ const BarangKeluar: React.FC = () => {
                   <label className="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Alamat Tujuan</label>
                   <input type="text" className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" value={generalData.alamat} onChange={(e) => setGeneralData({...generalData, alamat: e.target.value})} />
                 </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Jenis Bencana*</label>
+                  <select 
+                    required 
+                    className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" 
+                    value={generalData.jenisBencana} 
+                    onChange={(e) => setGeneralData({...generalData, jenisBencana: e.target.value, subJenisBencana: '', keteranganBencana: ''})}
+                  >
+                    <option value="">Pilih Jenis Bencana</option>
+                    {disasterCategories.map(cat => (
+                      <option key={cat.name} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Detail Bencana*</label>
+                  <select 
+                    required 
+                    disabled={!generalData.jenisBencana}
+                    className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20 disabled:opacity-50" 
+                    value={generalData.subJenisBencana} 
+                    onChange={(e) => setGeneralData({...generalData, subJenisBencana: e.target.value})}
+                  >
+                    <option value="">Pilih Detail</option>
+                    {disasterCategories.find(c => c.name === generalData.jenisBencana)?.subs.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {generalData.subJenisBencana === 'lainnya (sebutkan)' && (
+                  <div className="md:col-span-2 space-y-1 animate-in slide-in-from-top-2 duration-300">
+                    <label className="block text-[9px] font-bold text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-wide ml-1">Sebutkan Bencana Lainnya*</label>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="Masukkan detail bencana..."
+                      className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-ios-blue-light/30 dark:border-ios-blue-dark/30 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" 
+                      value={generalData.keteranganBencana} 
+                      onChange={(e) => setGeneralData({...generalData, keteranganBencana: e.target.value})} 
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
