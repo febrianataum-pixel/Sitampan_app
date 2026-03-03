@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useInventory } from '../App';
 import { 
   FileText, 
@@ -14,7 +14,10 @@ import {
   Archive,
   Calendar,
   Tag,
-  Info
+  Info,
+  Cloud,
+  CloudOff,
+  ExternalLink
 } from 'lucide-react';
 import { ArchiveDocument, formatIndoDate } from '../types';
 import { saveFileToIDB, getFileFromIDB, deleteFileFromIDB } from '../utils/idb';
@@ -27,6 +30,40 @@ const Dokumen: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Google Drive Integration State
+  const [googleTokens, setGoogleTokens] = useState<any>(() => {
+    const saved = localStorage.getItem('inv_google_tokens');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+        setGoogleTokens(event.data.tokens);
+        localStorage.setItem('inv_google_tokens', JSON.stringify(event.data.tokens));
+      }
+    };
+    window.addEventListener('message', handleAuthMessage);
+    return () => window.removeEventListener('message', handleAuthMessage);
+  }, []);
+
+  const connectGoogleDrive = async () => {
+    try {
+      const response = await fetch('/api/auth/url');
+      const { url } = await response.json();
+      window.open(url, 'google_auth', 'width=600,height=700');
+    } catch (error) {
+      console.error("Failed to get auth URL:", error);
+      alert("Gagal menghubungkan ke Google Drive.");
+    }
+  };
+
+  const disconnectGoogleDrive = () => {
+    setGoogleTokens(null);
+    localStorage.removeItem('inv_google_tokens');
+  };
 
   const [formData, setFormData] = useState({
     title: '',
@@ -70,21 +107,47 @@ const Dokumen: React.FC = () => {
       return;
     }
 
+    setIsUploading(true);
     const docId = editingDoc ? editingDoc.id : crypto.randomUUID();
+    let finalFileUrl = '[IDB_FILE]';
     
-    // Save file to IndexedDB
     try {
-      await saveFileToIDB(docId, formData.fileUrl);
+      if (googleTokens) {
+        // Upload to Google Drive
+        const uploadRes = await fetch('/api/drive/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokens: googleTokens,
+            fileName: formData.fileName,
+            fileData: formData.fileUrl,
+            mimeType: 'application/pdf'
+          })
+        });
+
+        if (uploadRes.ok) {
+          const driveData = await uploadRes.json();
+          finalFileUrl = driveData.webViewLink; // Use Drive link
+        } else {
+          const err = await uploadRes.json();
+          console.warn("Drive upload failed, falling back to IDB:", err);
+          await saveFileToIDB(docId, formData.fileUrl);
+        }
+      } else {
+        // Save file to IndexedDB
+        await saveFileToIDB(docId, formData.fileUrl);
+      }
     } catch (err) {
-      console.error("Failed to save to IndexedDB:", err);
-      alert("Gagal menyimpan file ke database lokal. Pastikan browser Anda mengizinkan penyimpanan.");
+      console.error("Storage failed:", err);
+      alert("Gagal menyimpan file. Pastikan koneksi stabil.");
+      setIsUploading(false);
       return;
     }
 
-    // Prepare metadata for localStorage/Firestore (placeholder for fileUrl)
+    // Prepare metadata
     const docMetadata = {
       ...formData,
-      fileUrl: '[IDB_FILE]'
+      fileUrl: finalFileUrl
     };
 
     if (editingDoc) {
@@ -97,6 +160,7 @@ const Dokumen: React.FC = () => {
       setDocuments([...documents, newDoc]);
     }
 
+    setIsUploading(false);
     setIsModalOpen(false);
     setEditingDoc(null);
     setFormData({
@@ -145,12 +209,18 @@ const Dokumen: React.FC = () => {
 
   const viewDocument = async (doc: ArchiveDocument) => {
     let fileUrl = doc.fileUrl;
+    
     if (doc.fileUrl === '[IDB_FILE]') {
       fileUrl = await getFileFromIDB(doc.id) || '';
+    } else if (doc.fileUrl.includes('drive.google.com')) {
+      // For Google Drive, we can try to use the preview link directly
+      // or open it in a new tab if iframe is blocked
+      window.open(doc.fileUrl, '_blank');
+      return;
     }
     
     if (!fileUrl) {
-      alert("File tidak ditemukan di database lokal.");
+      alert("File tidak ditemukan.");
       return;
     }
 
@@ -170,8 +240,11 @@ const Dokumen: React.FC = () => {
         link.click();
         document.body.removeChild(link);
       } else {
-        alert("File tidak ditemukan di database lokal.");
+        alert("File tidak ditemukan.");
       }
+    } else if (doc.fileUrl.includes('drive.google.com')) {
+      // Google Drive handles its own download, but we can provide a direct link if we had webContentLink
+      // For now, opening the webViewLink is the safest "shortcut"
     }
   };
 
@@ -188,12 +261,29 @@ const Dokumen: React.FC = () => {
           </div>
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Penyimpanan dokumen digital dan laporan resmi.</p>
         </div>
-        <button 
-          onClick={() => { setEditingDoc(null); setFormData({ title: '', category: 'Laporan', date: new Date().toISOString().split('T')[0], description: '', fileUrl: '', fileName: '' }); setIsModalOpen(true); }}
-          className="w-full md:w-auto bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 transition-all text-xs uppercase tracking-widest"
-        >
-          <Plus size={18}/> Tambah Dokumen
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          {googleTokens ? (
+            <button 
+              onClick={disconnectGoogleDrive}
+              className="px-4 py-2.5 rounded-ios border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-2 font-bold text-[10px] uppercase tracking-widest active:scale-95 transition-all"
+            >
+              <Cloud size={16}/> Google Drive Aktif
+            </button>
+          ) : (
+            <button 
+              onClick={connectGoogleDrive}
+              className="px-4 py-2.5 rounded-ios border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-400 flex items-center justify-center gap-2 font-bold text-[10px] uppercase tracking-widest active:scale-95 transition-all hover:bg-slate-50 dark:hover:bg-white/10"
+            >
+              <CloudOff size={16}/> Hubungkan Drive
+            </button>
+          )}
+          <button 
+            onClick={() => { setEditingDoc(null); setFormData({ title: '', category: 'Laporan', date: new Date().toISOString().split('T')[0], description: '', fileUrl: '', fileName: '' }); setIsModalOpen(true); }}
+            className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+          >
+            <Plus size={18}/> Tambah Dokumen
+          </button>
+        </div>
       </div>
 
       {/* Filters & Search */}
@@ -231,9 +321,16 @@ const Dokumen: React.FC = () => {
                   <div className="p-2 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-lg cursor-pointer" onClick={() => viewDocument(doc)}>
                     <FileText size={24}/>
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 rounded-full">
-                    {doc.category}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 rounded-full">
+                      {doc.category}
+                    </span>
+                    {doc.fileUrl.includes('drive.google.com') && (
+                      <span className="flex items-center gap-1 text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">
+                        <Cloud size={10}/> Drive
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-tight cursor-pointer hover:text-ios-blue-light transition-colors" onClick={() => viewDocument(doc)}>{doc.title}</h4>
@@ -257,13 +354,14 @@ const Dokumen: React.FC = () => {
                     <Pencil size={18}/>
                   </button>
                   <a 
-                    href={doc.fileUrl === '[IDB_FILE]' ? '#' : doc.fileUrl} 
+                    href={doc.fileUrl.includes('drive.google.com') ? doc.fileUrl : (doc.fileUrl === '[IDB_FILE]' ? '#' : doc.fileUrl)} 
                     download={doc.fileName}
+                    target={doc.fileUrl.includes('drive.google.com') ? '_blank' : undefined}
                     onClick={(e) => handleDownload(e, doc)}
                     className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-ios transition-colors"
                     title="Download PDF"
                   >
-                    <Download size={18}/>
+                    {doc.fileUrl.includes('drive.google.com') ? <ExternalLink size={18}/> : <Download size={18}/>}
                   </a>
                 </div>
                 <button 
@@ -395,9 +493,17 @@ const Dokumen: React.FC = () => {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-[2] bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-3 rounded-ios font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+                  disabled={isUploading}
+                  className="flex-[2] bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-3 rounded-ios font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {editingDoc ? 'Simpan Perubahan' : 'Simpan ke Arsip'}
+                  {isUploading ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Mengunggah...
+                    </>
+                  ) : (
+                    editingDoc ? 'Simpan Perubahan' : 'Simpan ke Arsip'
+                  )}
                 </button>
               </div>
             </form>
