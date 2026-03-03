@@ -137,6 +137,12 @@ app.post("/api/drive/upload", async (req, res) => {
   }
 });
 
+// API 404 handler
+app.all("/api/*", (req, res) => {
+  console.log(`API 404: ${req.method} ${req.url}`);
+  res.status(404).json({ error: `API route not found: ${req.url}` });
+});
+
 // Vite middleware for development
 async function setupVite() {
   if (process.env.NODE_ENV !== "production") {

@@ -59,7 +59,8 @@ const Dokumen: React.FC = () => {
         data = JSON.parse(text);
       } catch (e) {
         console.error("Server returned non-JSON response:", text);
-        throw new Error("Server tidak merespon dengan benar. Pastikan backend sudah berjalan dan variabel lingkungan sudah diatur.");
+        const snippet = text.substring(0, 100);
+        throw new Error(`Server tidak merespon dengan JSON. Respon: "${snippet}..."`);
       }
       
       if (!response.ok) {
