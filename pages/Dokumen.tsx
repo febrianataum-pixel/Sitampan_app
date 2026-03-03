@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { ArchiveDocument, formatIndoDate } from '../types';
 import { saveFileToIDB, getFileFromIDB, deleteFileFromIDB } from '../utils/idb';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { PDFDocument } from 'pdf-lib';
 
 const Dokumen: React.FC = () => {
   const { documents, setDocuments, storage } = useInventory();
@@ -32,6 +33,8 @@ const Dokumen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Google Drive Integration State
   const [googleTokens, setGoogleTokens] = useState<any>(() => {
@@ -91,27 +94,63 @@ const Dokumen: React.FC = () => {
 
   const categories = ['Semua', 'Laporan', 'Berita Acara', 'SPPB', 'Surat Masuk', 'Surat Keluar', 'Lainnya'];
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.type !== 'application/pdf') {
         alert('Hanya file PDF yang diperbolehkan!');
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Ukuran file maksimal 5MB!');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({
-          ...formData,
-          fileUrl: reader.result as string,
-          fileName: file.name
+      
+      setIsCompressing(true);
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Load the PDF
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        
+        // Create a new PDF and copy pages (this often reduces size by removing unused objects/metadata)
+        const compressedPdfDoc = await PDFDocument.create();
+        const copiedPages = await compressedPdfDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
+        copiedPages.forEach((page) => compressedPdfDoc.addPage(page));
+        
+        // Save with object streams for better compression
+        const pdfBytes = await compressedPdfDoc.save({ 
+          useObjectStreams: true,
+          addDefaultPage: false
         });
-      };
-      reader.readAsDataURL(file);
+        
+        // Convert back to base64 for preview/storage
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFormData({
+            ...formData,
+            fileUrl: reader.result as string,
+            fileName: file.name
+          });
+          setIsCompressing(false);
+          
+          // Log compression result
+          const originalSize = (file.size / 1024 / 1024).toFixed(2);
+          const compressedSize = (blob.size / 1024 / 1024).toFixed(2);
+          console.log(`PDF Compressed: ${originalSize}MB -> ${compressedSize}MB`);
+        };
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        console.error("Compression failed:", err);
+        // Fallback to original if compression fails
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFormData({
+            ...formData,
+            fileUrl: reader.result as string,
+            fileName: file.name
+          });
+          setIsCompressing(false);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -149,15 +188,28 @@ const Dokumen: React.FC = () => {
           throw new Error("Drive failed"); // Trigger fallback
         }
       } else if (storage) {
-        // Upload to Firebase Storage
+        // Upload to Firebase Storage with progress
         const storageRef = ref(storage, `documents/${docId}_${formData.fileName}`);
         
         // Convert base64 to Blob
         const response = await fetch(formData.fileUrl);
         const blob = await response.blob();
         
-        const snapshot = await uploadBytes(storageRef, blob);
-        finalFileUrl = await getDownloadURL(snapshot.ref);
+        const uploadTask = uploadBytesResumable(storageRef, blob);
+        
+        await new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(Math.round(progress));
+            }, 
+            (error) => reject(error), 
+            async () => {
+              finalFileUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(true);
+            }
+          );
+        });
       } else {
         // Save file to IndexedDB
         await saveFileToIDB(docId, formData.fileUrl);
@@ -190,6 +242,7 @@ const Dokumen: React.FC = () => {
     }
 
     setIsUploading(false);
+    setUploadProgress(0);
     setIsModalOpen(false);
     setEditingDoc(null);
     setFormData({
@@ -495,7 +548,15 @@ const Dokumen: React.FC = () => {
                     htmlFor="pdf-upload"
                     className={`w-full flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed rounded-ios cursor-pointer transition-all ${formData.fileUrl ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10' : 'border-slate-200 dark:border-white/10 hover:border-ios-blue-light bg-slate-50 dark:bg-white/5'}`}
                   >
-                    {formData.fileUrl ? (
+                    {isCompressing ? (
+                      <>
+                        <div className="w-8 h-8 border-4 border-ios-blue-light/30 border-t-ios-blue-light rounded-full animate-spin"></div>
+                        <div className="text-center">
+                          <p className="text-xs font-bold text-ios-blue-light">Mengompresi PDF...</p>
+                          <p className="text-[10px] text-slate-400">Mohon tunggu sebentar</p>
+                        </div>
+                      </>
+                    ) : formData.fileUrl ? (
                       <>
                         <FileText className="text-emerald-500" size={32}/>
                         <div className="text-center">
@@ -508,7 +569,7 @@ const Dokumen: React.FC = () => {
                         <Upload className="text-slate-400" size={32}/>
                         <div className="text-center">
                           <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Pilih File PDF</p>
-                          <p className="text-[10px] text-slate-400">Maksimal 5MB</p>
+                          <p className="text-[10px] text-slate-400">Auto-compress aktif</p>
                         </div>
                       </>
                     )}
@@ -526,13 +587,23 @@ const Dokumen: React.FC = () => {
                 </button>
                 <button 
                   type="submit"
-                  disabled={isUploading}
-                  className="flex-[2] bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-3 rounded-ios font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  disabled={isUploading || isCompressing}
+                  className="flex-[2] bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-3 rounded-ios font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-1"
                 >
                   {isUploading ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Mengunggah...
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>{uploadProgress > 0 ? `Mengunggah ${uploadProgress}%` : 'Menyiapkan...'}</span>
+                      </div>
+                      {uploadProgress > 0 && (
+                        <div className="w-full h-1 bg-white/20 rounded-full mt-1 overflow-hidden">
+                          <div 
+                            className="h-full bg-white transition-all duration-300" 
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                      )}
                     </>
                   ) : (
                     editingDoc ? 'Simpan Perubahan' : 'Simpan ke Arsip'
