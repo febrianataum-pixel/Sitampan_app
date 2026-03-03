@@ -52,7 +52,15 @@ const Dokumen: React.FC = () => {
   const connectGoogleDrive = async () => {
     try {
       const response = await fetch('/api/auth/url');
-      const data = await response.json();
+      const text = await response.text();
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Server returned non-JSON response:", text);
+        throw new Error("Server tidak merespon dengan benar. Pastikan backend sudah berjalan dan variabel lingkungan sudah diatur.");
+      }
       
       if (!response.ok) {
         throw new Error(data.error || "Gagal mendapatkan URL autentikasi.");
