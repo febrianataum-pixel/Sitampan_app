@@ -23,6 +23,7 @@ import {
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 import Dashboard from './pages/Dashboard';
 import DatabaseBarang from './pages/DatabaseBarang';
@@ -53,6 +54,7 @@ interface InventoryContextType {
   isRescuing: boolean;
   toggleTheme: () => void;
   syncError: string | null;
+  storage: FirebaseStorage | null;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -198,6 +200,7 @@ const App: React.FC = () => {
   const [isCloudConnected, setIsCloudConnected] = useState(false);
   const [isRescuing, setIsRescuing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [storage, setStorage] = useState<FirebaseStorage | null>(null);
   const [settings, setSettingsState] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem('inv_settings');
@@ -251,8 +254,14 @@ const App: React.FC = () => {
     let unsubs: (() => void)[] = [];
     const connectCloud = async () => {
       try {
-        const app = getApps().length === 0 ? initializeApp({ apiKey: settings.fbApiKey, projectId: settings.fbProjectId, appId: settings.fbAppId }) : getApp();
+        const app = getApps().length === 0 ? initializeApp({ 
+          apiKey: settings.fbApiKey, 
+          projectId: settings.fbProjectId, 
+          appId: settings.fbAppId,
+          storageBucket: settings.fbStorageBucket
+        }) : getApp();
         dbRef.current = getFirestore(app);
+        setStorage(getStorage(app));
         setIsCloudConnected(true);
         setSyncError(null);
 
@@ -341,7 +350,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError }}>
+    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage }}>
       <HashRouter>
         <Layout>
           <Routes>

@@ -48,6 +48,7 @@ export interface AppSettings {
   fbApiKey?: string;
   fbProjectId?: string;
   fbAppId?: string;
+  fbStorageBucket?: string;
   syncEnabled?: boolean;
 }
 

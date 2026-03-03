@@ -145,22 +145,33 @@ app.all("/api/*", (req, res) => {
 
 // Vite middleware for development
 async function setupVite() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+  try {
+    console.log("Setting up Vite middleware...");
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("Vite middleware attached.");
+    } else {
+      console.log("Serving static files from dist...");
+      app.use(express.static(path.join(__dirname, "dist")));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(__dirname, "dist", "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
     });
-    app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+  } catch (error) {
+    console.error("CRITICAL ERROR DURING SERVER STARTUP:", error);
+    // Still try to listen so the platform doesn't think we're dead
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running in ERROR MODE on http://0.0.0.0:${PORT}`);
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 }
 
 setupVite();

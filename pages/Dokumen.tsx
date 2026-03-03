@@ -21,9 +21,10 @@ import {
 } from 'lucide-react';
 import { ArchiveDocument, formatIndoDate } from '../types';
 import { saveFileToIDB, getFileFromIDB, deleteFileFromIDB } from '../utils/idb';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const Dokumen: React.FC = () => {
-  const { documents, setDocuments } = useInventory();
+  const { documents, setDocuments, storage } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<ArchiveDocument | null>(null);
   const [previewDoc, setPreviewDoc] = useState<ArchiveDocument | null>(null);
@@ -144,18 +145,32 @@ const Dokumen: React.FC = () => {
           finalFileUrl = driveData.webViewLink; // Use Drive link
         } else {
           const err = await uploadRes.json();
-          console.warn("Drive upload failed, falling back to IDB:", err);
-          await saveFileToIDB(docId, formData.fileUrl);
+          console.warn("Drive upload failed, falling back to Firebase/IDB:", err);
+          throw new Error("Drive failed"); // Trigger fallback
         }
+      } else if (storage) {
+        // Upload to Firebase Storage
+        const storageRef = ref(storage, `documents/${docId}_${formData.fileName}`);
+        
+        // Convert base64 to Blob
+        const response = await fetch(formData.fileUrl);
+        const blob = await response.blob();
+        
+        const snapshot = await uploadBytes(storageRef, blob);
+        finalFileUrl = await getDownloadURL(snapshot.ref);
       } else {
         // Save file to IndexedDB
         await saveFileToIDB(docId, formData.fileUrl);
       }
     } catch (err) {
-      console.error("Storage failed:", err);
-      alert("Gagal menyimpan file. Pastikan koneksi stabil.");
-      setIsUploading(false);
-      return;
+      if (!googleTokens || (err as Error).message !== "Drive failed") {
+        console.error("Storage failed:", err);
+        alert("Gagal menyimpan file ke Cloud. File akan disimpan secara lokal.");
+      }
+      // Fallback to IDB if Cloud fails
+      if (finalFileUrl === '[IDB_FILE]') {
+        await saveFileToIDB(docId, formData.fileUrl);
+      }
     }
 
     // Prepare metadata
@@ -226,8 +241,8 @@ const Dokumen: React.FC = () => {
     
     if (doc.fileUrl === '[IDB_FILE]') {
       fileUrl = await getFileFromIDB(doc.id) || '';
-    } else if (doc.fileUrl.includes('drive.google.com')) {
-      // For Google Drive, we can try to use the preview link directly
+    } else if (doc.fileUrl.includes('drive.google.com') || doc.fileUrl.includes('firebasestorage.googleapis.com')) {
+      // For Cloud files, we can try to use the preview link directly
       // or open it in a new tab if iframe is blocked
       window.open(doc.fileUrl, '_blank');
       return;
@@ -256,9 +271,8 @@ const Dokumen: React.FC = () => {
       } else {
         alert("File tidak ditemukan.");
       }
-    } else if (doc.fileUrl.includes('drive.google.com')) {
-      // Google Drive handles its own download, but we can provide a direct link if we had webContentLink
-      // For now, opening the webViewLink is the safest "shortcut"
+    } else if (doc.fileUrl.includes('drive.google.com') || doc.fileUrl.includes('firebasestorage.googleapis.com')) {
+      // Cloud handles its own download
     }
   };
 
@@ -342,6 +356,11 @@ const Dokumen: React.FC = () => {
                     {doc.fileUrl.includes('drive.google.com') && (
                       <span className="flex items-center gap-1 text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">
                         <Cloud size={10}/> Drive
+                      </span>
+                    )}
+                    {doc.fileUrl.includes('firebasestorage.googleapis.com') && (
+                      <span className="flex items-center gap-1 text-[8px] font-bold text-orange-500 uppercase tracking-tighter">
+                        <Cloud size={10}/> Firebase
                       </span>
                     )}
                   </div>

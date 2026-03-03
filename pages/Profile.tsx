@@ -161,6 +161,10 @@ const Profile: React.FC = () => {
                   <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide ml-1">Firebase Project ID</label>
                   <input type="text" placeholder="my-project-id" className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.fbProjectId || ''} onChange={(e) => setSettings({ ...settings, fbProjectId: sanitizeInput(e.target.value) })} />
                </div>
+               <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide ml-1">Firebase Storage Bucket</label>
+                  <input type="text" placeholder="my-project.firebasestorage.app" className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.fbStorageBucket || ''} onChange={(e) => setSettings({ ...settings, fbStorageBucket: sanitizeInput(e.target.value) })} />
+               </div>
             </div>
 
             <div className="flex gap-4 w-full md:w-auto justify-end">
