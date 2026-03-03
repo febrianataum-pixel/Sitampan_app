@@ -28,12 +28,23 @@ const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 // API Routes
 app.get("/api/auth/url", (req, res) => {
-  const url = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-    prompt: 'consent'
-  });
-  res.json({ url });
+  try {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+      return res.status(400).json({ 
+        error: "Konfigurasi Google API belum lengkap. Pastikan GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, dan GOOGLE_REDIRECT_URI sudah diatur di environment variables." 
+      });
+    }
+
+    const url = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: SCOPES,
+      prompt: 'consent'
+    });
+    res.json({ url });
+  } catch (error: any) {
+    console.error("Error generating auth URL:", error);
+    res.status(500).json({ error: error.message || "Gagal membuat URL autentikasi" });
+  }
 });
 
 app.get("/api/auth/callback", async (req, res) => {

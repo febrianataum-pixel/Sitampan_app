@@ -52,11 +52,16 @@ const Dokumen: React.FC = () => {
   const connectGoogleDrive = async () => {
     try {
       const response = await fetch('/api/auth/url');
-      const { url } = await response.json();
-      window.open(url, 'google_auth', 'width=600,height=700');
-    } catch (error) {
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal mendapatkan URL autentikasi.");
+      }
+      
+      window.open(data.url, 'google_auth', 'width=600,height=700');
+    } catch (error: any) {
       console.error("Failed to get auth URL:", error);
-      alert("Gagal menghubungkan ke Google Drive.");
+      alert(error.message || "Gagal menghubungkan ke Google Drive.");
     }
   };
 
