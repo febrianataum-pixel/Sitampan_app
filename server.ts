@@ -174,7 +174,7 @@ app.post("/api/drive/upload", async (req, res) => {
 });
 
 // API 404 handler
-app.all("/api/*", (req, res) => {
+app.all("/api/(.*)", (req, res) => {
   console.log(`API 404: ${req.method} ${req.url}`);
   res.status(404).json({ error: `API route not found: ${req.url}` });
 });
@@ -203,8 +203,8 @@ async function setupVite() {
       console.log("Serving static files from dist...");
       const distPath = path.join(__dirname, "dist");
       app.use(express.static(distPath));
-      // In Express v5, use *all for catch-all
-      app.get("*all", (req, res) => {
+      // In Express v5, use * for catch-all (or (.*) for regex)
+      app.get("*", (req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
     }

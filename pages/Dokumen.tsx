@@ -108,7 +108,8 @@ const Dokumen: React.FC = () => {
     date: new Date().toISOString().split('T')[0],
     description: '',
     fileUrl: '',
-    fileName: ''
+    fileName: '',
+    storageType: 'upload' as 'upload' | 'link'
   });
 
   const categories = ['Semua', 'Laporan', 'Berita Acara', 'SPPB', 'Surat Masuk', 'Surat Keluar', 'Lainnya'];
@@ -182,77 +183,92 @@ const Dokumen: React.FC = () => {
 
     setIsUploading(true);
     const docId = editingDoc ? editingDoc.id : crypto.randomUUID();
-    let finalFileUrl = '[IDB_FILE]';
-    
-    try {
-      if (googleTokens) {
-        // Upload to Google Drive
-        const uploadRes = await fetch('/api/drive/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tokens: googleTokens,
-            fileName: formData.fileName,
-            fileData: formData.fileUrl,
-            mimeType: 'application/pdf',
-            config: {
-              clientId: settings.googleClientId,
-              clientSecret: settings.googleClientSecret,
-              folderId: settings.googleFolderId
-            }
-          })
-        });
+    let finalFileUrl = formData.storageType === 'link' ? formData.fileUrl : '[IDB_FILE]';
+    let finalFileName = formData.fileName;
 
-        if (uploadRes.ok) {
-          const driveData = await uploadRes.json();
-          finalFileUrl = driveData.webViewLink; // Use Drive link
+    if (formData.storageType === 'link') {
+      // For manual link, we don't need to upload anything
+      if (!formData.fileUrl.startsWith('http')) {
+        alert('URL harus diawali dengan http:// atau https://');
+        setIsUploading(false);
+        return;
+      }
+      finalFileName = 'Link Eksternal';
+    } else {
+      try {
+        if (googleTokens) {
+          // Upload to Google Drive
+          const uploadRes = await fetch('/api/drive/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokens: googleTokens,
+              fileName: formData.fileName,
+              fileData: formData.fileUrl,
+              mimeType: 'application/pdf',
+              config: {
+                clientId: settings.googleClientId,
+                clientSecret: settings.googleClientSecret,
+                folderId: settings.googleFolderId
+              }
+            })
+          });
+
+          if (uploadRes.ok) {
+            const driveData = await uploadRes.json();
+            finalFileUrl = driveData.webViewLink; // Use Drive link
+          } else {
+            const err = await uploadRes.json();
+            console.warn("Drive upload failed, falling back to Firebase/IDB:", err);
+            throw new Error("Drive failed"); // Trigger fallback
+          }
+        } else if (storage) {
+          // Upload to Firebase Storage with progress
+          const storageRef = ref(storage, `documents/${docId}_${formData.fileName}`);
+          
+          // Convert base64 to Blob
+          const response = await fetch(formData.fileUrl);
+          const blob = await response.blob();
+          
+          const uploadTask = uploadBytesResumable(storageRef, blob);
+          
+          await new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', 
+              (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                setUploadProgress(Math.round(progress));
+              }, 
+              (error) => reject(error), 
+              async () => {
+                finalFileUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                resolve(true);
+              }
+            );
+          });
         } else {
-          const err = await uploadRes.json();
-          console.warn("Drive upload failed, falling back to Firebase/IDB:", err);
-          throw new Error("Drive failed"); // Trigger fallback
+          // Save file to IndexedDB
+          await saveFileToIDB(docId, formData.fileUrl);
         }
-      } else if (storage) {
-        // Upload to Firebase Storage with progress
-        const storageRef = ref(storage, `documents/${docId}_${formData.fileName}`);
-        
-        // Convert base64 to Blob
-        const response = await fetch(formData.fileUrl);
-        const blob = await response.blob();
-        
-        const uploadTask = uploadBytesResumable(storageRef, blob);
-        
-        await new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(Math.round(progress));
-            }, 
-            (error) => reject(error), 
-            async () => {
-              finalFileUrl = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve(true);
-            }
-          );
-        });
-      } else {
-        // Save file to IndexedDB
-        await saveFileToIDB(docId, formData.fileUrl);
-      }
-    } catch (err) {
-      if (!googleTokens || (err as Error).message !== "Drive failed") {
-        console.error("Storage failed:", err);
-        alert("Gagal menyimpan file ke Cloud. File akan disimpan secara lokal.");
-      }
-      // Fallback to IDB if Cloud fails
-      if (finalFileUrl === '[IDB_FILE]') {
-        await saveFileToIDB(docId, formData.fileUrl);
+      } catch (err) {
+        if (!googleTokens || (err as Error).message !== "Drive failed") {
+          console.error("Storage failed:", err);
+          alert("Gagal menyimpan file ke Cloud. File akan disimpan secara lokal.");
+        }
+        // Fallback to IDB if Cloud fails
+        if (finalFileUrl === '[IDB_FILE]') {
+          await saveFileToIDB(docId, formData.fileUrl);
+        }
       }
     }
 
     // Prepare metadata
     const docMetadata = {
-      ...formData,
-      fileUrl: finalFileUrl
+      title: formData.title,
+      category: formData.category,
+      date: formData.date,
+      description: formData.description,
+      fileUrl: finalFileUrl,
+      fileName: finalFileName
     };
 
     if (editingDoc) {
@@ -282,6 +298,8 @@ const Dokumen: React.FC = () => {
   const handleEdit = async (doc: ArchiveDocument) => {
     setEditingDoc(doc);
     
+    const isLink = doc.fileUrl.startsWith('http') && !doc.fileUrl.includes('firebasestorage.googleapis.com') && !doc.fileUrl.includes('drive.google.com');
+
     // Fetch file from IndexedDB
     let actualFileUrl = doc.fileUrl;
     if (doc.fileUrl === '[IDB_FILE]') {
@@ -294,7 +312,8 @@ const Dokumen: React.FC = () => {
       date: doc.date,
       description: doc.description || '',
       fileUrl: actualFileUrl,
-      fileName: doc.fileName
+      fileName: doc.fileName,
+      storageType: isLink ? 'link' : 'upload'
     });
     setIsModalOpen(true);
   };
@@ -318,9 +337,8 @@ const Dokumen: React.FC = () => {
     
     if (doc.fileUrl === '[IDB_FILE]') {
       fileUrl = await getFileFromIDB(doc.id) || '';
-    } else if (doc.fileUrl.includes('drive.google.com') || doc.fileUrl.includes('firebasestorage.googleapis.com')) {
-      // For Cloud files, we can try to use the preview link directly
-      // or open it in a new tab if iframe is blocked
+    } else if (doc.fileUrl.startsWith('http')) {
+      // For Cloud files or manual links, open in a new tab
       window.open(doc.fileUrl, '_blank');
       return;
     }
@@ -383,7 +401,19 @@ const Dokumen: React.FC = () => {
             </button>
           )}
           <button 
-            onClick={() => { setEditingDoc(null); setFormData({ title: '', category: 'Laporan', date: new Date().toISOString().split('T')[0], description: '', fileUrl: '', fileName: '' }); setIsModalOpen(true); }}
+            onClick={() => { 
+              setEditingDoc(null); 
+              setFormData({ 
+                title: '', 
+                category: 'Laporan', 
+                date: new Date().toISOString().split('T')[0], 
+                description: '', 
+                fileUrl: '', 
+                fileName: '',
+                storageType: 'upload'
+              }); 
+              setIsModalOpen(true); 
+            }}
             className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 transition-all text-[10px] uppercase tracking-widest"
           >
             <Plus size={18}/> Tambah Dokumen
@@ -438,6 +468,11 @@ const Dokumen: React.FC = () => {
                     {doc.fileUrl.includes('firebasestorage.googleapis.com') && (
                       <span className="flex items-center gap-1 text-[8px] font-bold text-orange-500 uppercase tracking-tighter">
                         <Cloud size={10}/> Firebase
+                      </span>
+                    )}
+                    {doc.fileUrl.startsWith('http') && !doc.fileUrl.includes('drive.google.com') && !doc.fileUrl.includes('firebasestorage.googleapis.com') && (
+                      <span className="flex items-center gap-1 text-[8px] font-bold text-ios-blue-light uppercase tracking-tighter">
+                        <ExternalLink size={10}/> Link
                       </span>
                     )}
                   </div>
@@ -511,6 +546,23 @@ const Dokumen: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              <div className="flex p-1 bg-slate-100 dark:bg-white/5 rounded-ios mb-2">
+                <button 
+                  type="button"
+                  onClick={() => setFormData({...formData, storageType: 'upload'})}
+                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-ios transition-all ${formData.storageType === 'upload' ? 'bg-white dark:bg-white/10 text-ios-blue-light shadow-sm' : 'text-slate-500'}`}
+                >
+                  Upload File
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setFormData({...formData, storageType: 'link'})}
+                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-ios transition-all ${formData.storageType === 'link' ? 'bg-white dark:bg-white/10 text-ios-blue-light shadow-sm' : 'text-slate-500'}`}
+                >
+                  Link Manual
+                </button>
+              </div>
+
               <div className="space-y-1">
                 <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Judul Dokumen</label>
                 <input 
@@ -559,46 +611,67 @@ const Dokumen: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">File PDF</label>
-                <div className="relative">
-                  <input 
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="pdf-upload"
-                  />
-                  <label 
-                    htmlFor="pdf-upload"
-                    className={`w-full flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed rounded-ios cursor-pointer transition-all ${formData.fileUrl ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10' : 'border-slate-200 dark:border-white/10 hover:border-ios-blue-light bg-slate-50 dark:bg-white/5'}`}
-                  >
-                    {isCompressing ? (
-                      <>
-                        <div className="w-8 h-8 border-4 border-ios-blue-light/30 border-t-ios-blue-light rounded-full animate-spin"></div>
-                        <div className="text-center">
-                          <p className="text-xs font-bold text-ios-blue-light">Mengompresi PDF...</p>
-                          <p className="text-[10px] text-slate-400">Mohon tunggu sebentar</p>
-                        </div>
-                      </>
-                    ) : formData.fileUrl ? (
-                      <>
-                        <FileText className="text-emerald-500" size={32}/>
-                        <div className="text-center">
-                          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formData.fileName}</p>
-                          <p className="text-[10px] text-emerald-500/60">Klik untuk mengganti file</p>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="text-slate-400" size={32}/>
-                        <div className="text-center">
-                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Pilih File PDF</p>
-                          <p className="text-[10px] text-slate-400">Auto-compress aktif</p>
-                        </div>
-                      </>
-                    )}
-                  </label>
-                </div>
+                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
+                  {formData.storageType === 'upload' ? 'File PDF' : 'URL Link (Google Drive/Lainnya)'}
+                </label>
+                {formData.storageType === 'upload' ? (
+                  <div className="relative">
+                    <input 
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="pdf-upload"
+                    />
+                    <label 
+                      htmlFor="pdf-upload"
+                      className={`w-full flex flex-col items-center justify-center gap-2 p-8 border-2 border-dashed rounded-ios cursor-pointer transition-all ${formData.fileUrl ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10' : 'border-slate-200 dark:border-white/10 hover:border-ios-blue-light bg-slate-50 dark:bg-white/5'}`}
+                    >
+                      {isCompressing ? (
+                        <>
+                          <div className="w-8 h-8 border-4 border-ios-blue-light/30 border-t-ios-blue-light rounded-full animate-spin"></div>
+                          <div className="text-center">
+                            <p className="text-xs font-bold text-ios-blue-light">Mengompresi PDF...</p>
+                            <p className="text-[10px] text-slate-400">Mohon tunggu sebentar</p>
+                          </div>
+                        </>
+                      ) : formData.fileUrl ? (
+                        <>
+                          <FileText className="text-emerald-500" size={32}/>
+                          <div className="text-center">
+                            <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formData.fileName}</p>
+                            <p className="text-[10px] text-emerald-500/60">Klik untuk mengganti file</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="text-slate-400" size={32}/>
+                          <div className="text-center">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Pilih File PDF</p>
+                            <p className="text-[10px] text-slate-400">Auto-compress aktif</p>
+                          </div>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input 
+                      type="url"
+                      required
+                      value={formData.fileUrl}
+                      onChange={(e) => setFormData({...formData, fileUrl: e.target.value})}
+                      placeholder="Tempel link Google Drive atau URL lainnya di sini..."
+                      className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-4 py-3 font-medium text-slate-800 dark:text-slate-200 outline-none text-sm"
+                    />
+                    <div className="p-3 bg-ios-blue-light/5 rounded-ios border border-ios-blue-light/10 flex gap-2">
+                      <Info size={14} className="text-ios-blue-light shrink-0 mt-0.5"/>
+                      <p className="text-[9px] text-ios-blue-light leading-tight">
+                        <b>Tips:</b> Anda bisa mengunggah file ke Google Drive secara manual, lalu salin link "Share" (pastikan akses disetel ke "Anyone with the link") dan tempel di sini.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 flex gap-3">
