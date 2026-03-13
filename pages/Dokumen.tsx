@@ -54,8 +54,20 @@ const Dokumen: React.FC = () => {
   }, []);
 
   const connectGoogleDrive = async () => {
+    const { settings } = useInventory();
     try {
-      const response = await fetch('/api/auth/url');
+      if (!settings.googleClientId || !settings.googleClientSecret || !settings.googleRedirectUri) {
+        alert("Konfigurasi Google API belum lengkap. Silakan atur di menu Profil.");
+        return;
+      }
+
+      const params = new URLSearchParams({
+        clientId: settings.googleClientId,
+        clientSecret: settings.googleClientSecret,
+        redirectUri: settings.googleRedirectUri
+      });
+      
+      const response = await fetch(`/api/auth/url?${params.toString()}`);
       const text = await response.text();
       
       let data;
@@ -155,6 +167,7 @@ const Dokumen: React.FC = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    const { settings } = useInventory();
     e.preventDefault();
     if (!formData.title || !formData.fileUrl) {
       alert('Judul dan File wajib diisi!');
@@ -175,7 +188,12 @@ const Dokumen: React.FC = () => {
             tokens: googleTokens,
             fileName: formData.fileName,
             fileData: formData.fileUrl,
-            mimeType: 'application/pdf'
+            mimeType: 'application/pdf',
+            config: {
+              clientId: settings.googleClientId,
+              clientSecret: settings.googleClientSecret,
+              folderId: settings.googleFolderId
+            }
           })
         });
 

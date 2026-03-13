@@ -49,6 +49,9 @@ const Profile: React.FC = () => {
     }, 1500);
   };
 
+  const currentOrigin = window.location.origin;
+  const suggestedRedirectUri = `${currentOrigin}/api/auth/callback`;
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-500 pb-20">
       <div className="flex justify-between items-end">
@@ -172,6 +175,53 @@ const Profile: React.FC = () => {
                  {isTesting ? <RefreshCw className="animate-spin" size={18}/> : <ShieldCheck size={18}/>}
                  {isTesting ? 'MENGHUBUNGKAN...' : 'AKTIFKAN CLOUD SYNC'}
                </button>
+            </div>
+         </div>
+      </div>
+
+      {/* Google Drive Configuration */}
+      <div className="bg-emerald-900 dark:bg-ios-secondary-dark text-white p-8 md:p-12 rounded-ios-lg shadow-2xl relative overflow-hidden group border dark:border-white/10">
+         <div className="relative z-10 space-y-8">
+            <div className="flex items-center gap-5">
+               <div className="p-4 bg-emerald-500 rounded-ios shadow-xl"><ImageIcon size={28}/></div>
+               <div>
+                  <h3 className="text-2xl font-bold tracking-tight">Google Drive Integration</h3>
+                  <p className="text-emerald-200 dark:text-emerald-400/60 text-xs font-semibold italic">Simpan arsip PDF langsung ke Google Drive Anda.</p>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Client ID</label>
+                  <input type="password" placeholder="123456789-abc.apps.googleusercontent.com" className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleClientId || ''} onChange={(e) => setSettings({ ...settings, googleClientId: sanitizeInput(e.target.value) })} />
+               </div>
+               <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Client Secret</label>
+                  <input type="password" placeholder="GOCSPX-..." className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleClientSecret || ''} onChange={(e) => setSettings({ ...settings, googleClientSecret: sanitizeInput(e.target.value) })} />
+               </div>
+               <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Redirect URI</label>
+                  <input type="text" placeholder={suggestedRedirectUri} className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleRedirectUri || ''} onChange={(e) => setSettings({ ...settings, googleRedirectUri: sanitizeInput(e.target.value) })} />
+                  <p className="text-[8px] text-emerald-300/60 mt-1 italic">Saran: {suggestedRedirectUri}</p>
+               </div>
+               <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Folder ID (Opsional)</label>
+                  <input type="text" placeholder="1Y4pgcJb9..." className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleFolderId || ''} onChange={(e) => setSettings({ ...settings, googleFolderId: sanitizeInput(e.target.value) })} />
+               </div>
+            </div>
+
+            <div className="bg-emerald-500/10 p-4 rounded-ios border border-emerald-500/20 flex gap-3">
+              <Info className="text-emerald-400 shrink-0" size={20}/>
+              <div className="space-y-1">
+                <p className="text-[10px] text-emerald-200 font-medium"><b>Cara Mendapatkan API Key:</b></p>
+                <ol className="text-[9px] text-emerald-300/80 list-decimal ml-4 space-y-0.5">
+                  <li>Buka Google Cloud Console.</li>
+                  <li>Buat Project baru & Aktifkan Google Drive API.</li>
+                  <li>Di menu Credentials, buat OAuth 2.0 Client ID (Web Application).</li>
+                  <li>Tambahkan Redirect URI di atas ke daftar "Authorized redirect URIs".</li>
+                  <li>Salin Client ID & Secret ke sini.</li>
+                </ol>
+              </div>
             </div>
          </div>
       </div>

@@ -21,9 +21,11 @@ import {
   CheckCircle2, 
   Clock,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 import { OutboundTransaction, OutboundItem, formatIndoDate, Product } from '../types';
+import { generateReportPDF } from '../services/pdfService';
 
 type SortKey = 'tanggal' | 'penerima' | 'alamat';
 
@@ -219,6 +221,45 @@ const BarangKeluar: React.FC = () => {
     return 0;
   });
 
+  const grandTotal = sortedOutbound.reduce((acc, tx) => {
+    const txTotal = tx.items.reduce((t, item) => {
+      const p = products.find(prod => prod.id === item.productId);
+      return t + (item.jumlah * (p?.harga || 0));
+    }, 0);
+    return acc + txTotal;
+  }, 0);
+
+  const handleExportPDF = () => {
+    const columns = [
+      { header: 'No', dataKey: 'no', align: 'center' as const },
+      { header: 'Tanggal', dataKey: 'tanggal' },
+      { header: 'Penerima', dataKey: 'penerima' },
+      { header: 'Alamat', dataKey: 'alamat' },
+      { header: 'Jenis Bencana', dataKey: 'bencana' },
+      { header: 'Total Nilai', dataKey: 'total', align: 'right' as const, format: (v: any) => `Rp ${v.toLocaleString('id-ID')}` }
+    ];
+
+    const data = sortedOutbound.map((o, idx) => {
+      const total = o.items.reduce((t, item) => {
+        const p = products.find(prod => prod.id === item.productId);
+        return t + (item.jumlah * (p?.harga || 0));
+      }, 0);
+      return {
+        no: idx + 1,
+        tanggal: formatIndoDate(o.tanggal),
+        penerima: o.penerima,
+        alamat: o.alamat || '-',
+        bencana: o.jenisBencana || '-',
+        total: total
+      };
+    });
+
+    generateReportPDF('LOG BARANG KELUAR', columns, data, settings, undefined, {
+      label: 'GRAND TOTAL',
+      value: `Rp ${grandTotal.toLocaleString('id-ID')}`
+    });
+  };
+
   const getFilteredAvailableProducts = (currentRowId: string) => {
     const currentItem = items.find(it => it.id === currentRowId);
     return [...products]
@@ -238,9 +279,14 @@ const BarangKeluar: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Barang Keluar</h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Manajemen distribusi dan pengurutan data.</p>
         </div>
-        <button onClick={() => handleOpenModal()} className="w-full sm:w-auto flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
-          <Plus size={18} /> Transaksi Baru
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button onClick={handleExportPDF} className="flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 px-5 py-2 rounded-ios font-bold shadow-sm hover:bg-red-100 transition-all active:scale-95 text-xs">
+            <FileText size={18} /> Export PDF
+          </button>
+          <button onClick={() => handleOpenModal()} className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
+            <Plus size={18} /> Transaksi Baru
+          </button>
+        </div>
       </div>
 
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden theme-transition">
@@ -326,6 +372,13 @@ const BarangKeluar: React.FC = () => {
               })}
               {sortedOutbound.length === 0 && (
                 <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Belum ada catatan transaksi.</td></tr>
+              )}
+              {sortedOutbound.length > 0 && (
+                <tr className="bg-slate-50 dark:bg-white/5 font-bold">
+                  <td colSpan={5} className="px-6 py-4 text-right text-slate-500 dark:text-slate-400 uppercase tracking-wider">Grand Total</td>
+                  <td className="px-6 py-4 text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</td>
+                  <td></td>
+                </tr>
               )}
             </tbody>
           </table>

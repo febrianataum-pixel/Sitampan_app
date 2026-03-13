@@ -15,7 +15,8 @@ export const generateReportPDF = (
   columns: PDFColumn[], 
   data: any[], 
   settings: AppSettings,
-  narrative?: string
+  narrative?: string,
+  summary?: { label: string; value: string }
 ) => {
   const downloadDate = formatIndoDate(new Date().toISOString().split('T')[0]);
   const downloadTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -36,6 +37,13 @@ export const generateReportPDF = (
     }).join('');
     return `<tr>${cells}</tr>`;
   }).join('');
+
+  const summaryHtml = summary 
+    ? `<tr>
+        <td colspan="${columns.length - 1}" style="border: 1px solid #000; padding: 8px; font-size: 11px; font-weight: bold; text-align: right; background: #f8fafc;">${summary.label}</td>
+        <td style="border: 1px solid #000; padding: 8px; font-size: 11px; font-weight: bold; text-align: right; background: #f8fafc;">${summary.value}</td>
+       </tr>`
+    : '';
 
   const narrativeHtml = narrative 
     ? `<div style="margin-bottom: 25px; padding: 15px; background: #fdfcfb; border-left: 3px solid #000; font-size: 11px; line-height: 1.6; font-style: italic; color: #334155;">
@@ -75,6 +83,7 @@ export const generateReportPDF = (
         </thead>
         <tbody>
           ${tableBodyHtml}
+          ${summaryHtml}
         </tbody>
       </table>
     </div>

@@ -2,11 +2,8 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import { google } from "googleapis";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,28 +27,40 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", env: process.env.NODE_ENV });
 });
 
-// Google OAuth Configuration
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
+// Google OAuth Helper
+const getOAuth2Client = (config: { clientId?: string, clientSecret?: string, redirectUri?: string }) => {
+  return new google.auth.OAuth2(
+    config.clientId,
+    config.clientSecret,
+    config.redirectUri
+  );
+};
 
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 // API Routes
 app.get("/api/auth/url", (req, res) => {
+  const { clientId, clientSecret, redirectUri } = req.query;
+  
   try {
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+    if (!clientId || !clientSecret || !redirectUri) {
       return res.status(400).json({ 
-        error: "Konfigurasi Google API belum lengkap. Pastikan GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, dan GOOGLE_REDIRECT_URI sudah diatur di environment variables." 
+        error: "Konfigurasi Google API belum lengkap di aplikasi. Silakan atur di menu Profil." 
       });
     }
 
-    const url = oauth2Client.generateAuthUrl({
+    const client = getOAuth2Client({ 
+      clientId: clientId as string, 
+      clientSecret: clientSecret as string, 
+      redirectUri: redirectUri as string 
+    });
+
+    const url = client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
-      prompt: 'consent'
+      prompt: 'consent',
+      // Pass config back in state so we can use it in callback
+      state: Buffer.from(JSON.stringify({ clientId, clientSecret, redirectUri })).toString('base64')
     });
     res.json({ url });
   } catch (error: any) {
@@ -61,9 +70,12 @@ app.get("/api/auth/url", (req, res) => {
 });
 
 app.get("/api/auth/callback", async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   try {
-    const { tokens } = await oauth2Client.getToken(code as string);
+    const config = JSON.parse(Buffer.from(state as string, 'base64').toString());
+    const client = getOAuth2Client(config);
+
+    const { tokens } = await client.getToken(code as string);
     // In a real app, you'd store this in a session or database
     // For this demo, we'll send it back to the client via postMessage
     res.send(`
@@ -88,13 +100,17 @@ app.get("/api/auth/callback", async (req, res) => {
 });
 
 app.post("/api/drive/upload", async (req, res) => {
-  const { tokens, fileName, fileData, mimeType } = req.body;
+  const { tokens, fileName, fileData, mimeType, config } = req.body;
   
   if (!tokens) return res.status(401).json({ error: "No tokens provided" });
+  if (!config || !config.clientId || !config.clientSecret) {
+    return res.status(400).json({ error: "Google API configuration missing" });
+  }
 
   try {
-    oauth2Client.setCredentials(tokens);
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    const client = getOAuth2Client(config);
+    client.setCredentials(tokens);
+    const drive = google.drive({ version: 'v3', auth: client });
 
     // Convert base64 to stream or buffer
     const buffer = Buffer.from(fileData.split(',')[1], 'base64');
@@ -103,7 +119,7 @@ app.post("/api/drive/upload", async (req, res) => {
     stream.push(buffer);
     stream.push(null);
 
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || '1Y4pgcJb9xohmgoEsMjecAmgD-qRt-ctp';
+    const folderId = config.folderId || 'root';
 
     const fileMetadata = {
       name: fileName,

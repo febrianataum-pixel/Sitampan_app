@@ -53,6 +53,11 @@ export interface AppSettings {
   fbAppId?: string;
   fbStorageBucket?: string;
   syncEnabled?: boolean;
+  // Google Drive Config
+  googleClientId?: string;
+  googleClientSecret?: string;
+  googleRedirectUri?: string;
+  googleFolderId?: string;
 }
 
 export interface ArchiveDocument {

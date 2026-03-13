@@ -20,6 +20,8 @@ const StokBarang: React.FC = () => {
     s.kodeBarang.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const grandTotal = filteredStock.reduce((acc, curr) => acc + curr.nilaiStok, 0);
+
   const handleExportCSV = () => {
     const data = filteredStock.map(s => ({
       'KODE BARANG': s.kodeBarang,
@@ -43,7 +45,10 @@ const StokBarang: React.FC = () => {
       { header: 'Total Nilai', dataKey: 'nilaiStok', align: 'right' as const, format: (v: any) => `Rp ${v.toLocaleString('id-ID')}` }
     ];
     const dataWithIndex = filteredStock.map((s, idx) => ({ ...s, no: idx + 1 }));
-    generateReportPDF('REKAPITULASI STOK BARANG', columns, dataWithIndex, settings);
+    generateReportPDF('REKAPITULASI STOK BARANG', columns, dataWithIndex, settings, undefined, {
+      label: 'TOTAL NILAI ASET',
+      value: `Rp ${grandTotal.toLocaleString('id-ID')}`
+    });
   };
 
   return (
@@ -107,6 +112,12 @@ const StokBarang: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {s.nilaiStok.toLocaleString('id-ID')}</td>
                 </tr>
               ))}
+              {filteredStock.length > 0 && (
+                <tr className="bg-slate-50 dark:bg-white/5 font-bold">
+                  <td colSpan={4} className="px-6 py-4 text-right text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Nilai Aset</td>
+                  <td className="px-6 py-4 text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

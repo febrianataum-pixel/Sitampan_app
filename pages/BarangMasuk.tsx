@@ -76,7 +76,10 @@ const BarangMasuk: React.FC = () => {
       };
     });
     
-    generateReportPDF('LOG BARANG MASUK', columns, data, settings);
+    generateReportPDF('LOG BARANG MASUK', columns, data, settings, undefined, {
+      label: 'GRAND TOTAL',
+      value: `Rp ${grandTotal.toLocaleString('id-ID')}`
+    });
   };
 
   const handleExportExcel = () => {
@@ -141,6 +144,11 @@ const BarangMasuk: React.FC = () => {
     const p = products.find(prod => prod.id === i.productId);
     return p?.namaBarang.toLowerCase().includes(searchQuery.toLowerCase()) || p?.kodeBarang.toLowerCase().includes(searchQuery.toLowerCase());
   }).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+
+  const grandTotal = filteredInbound.reduce((acc, curr) => {
+    const p = products.find(prod => prod.id === curr.productId);
+    return acc + ((p?.harga || 0) * curr.jumlah);
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -213,6 +221,13 @@ const BarangMasuk: React.FC = () => {
               })}
               {filteredInbound.length === 0 && (
                 <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Data belum ditemukan.</td></tr>
+              )}
+              {filteredInbound.length > 0 && (
+                <tr className="bg-slate-50 dark:bg-white/5 font-bold">
+                  <td colSpan={5} className="px-6 py-4 text-right text-slate-500 dark:text-slate-400 uppercase tracking-wider">Grand Total</td>
+                  <td className="px-6 py-4 text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</td>
+                  <td></td>
+                </tr>
               )}
             </tbody>
           </table>

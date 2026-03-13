@@ -32,11 +32,25 @@ const Dashboard: React.FC = () => {
     );
     const barangKosong = products.filter(p => calculateStock(p.id) <= 0).length;
 
+    const totalMasukRp = inbound.reduce((acc, i) => {
+      const p = products.find(prod => prod.id === i.productId);
+      return acc + (i.jumlah * (p?.harga || 0));
+    }, 0);
+
+    const totalKeluarRp = outbound.reduce((acc, tx) => 
+      acc + tx.items.reduce((sum, item) => {
+        const p = products.find(prod => prod.id === item.productId);
+        return sum + (item.jumlah * (p?.harga || 0));
+      }, 0), 0
+    );
+
+    const totalStokRp = products.reduce((acc, p) => acc + (calculateStock(p.id) * p.harga), 0);
+
     return [
-      { label: 'Jenis Logistik', value: jenisLogistik, icon: <Package size={18}/>, color: 'blue' },
-      { label: 'Total Unit Masuk', value: totalMasuk, icon: <ArrowDownCircle size={18}/>, color: 'emerald' },
-      { label: 'Total Unit Keluar', value: totalKeluar, icon: <ArrowUpCircle size={18}/>, color: 'orange' },
-      { label: 'Barang Kosong', value: barangKosong, icon: <AlertOctagon size={18}/>, color: 'red' },
+      { label: 'Jenis Logistik', value: jenisLogistik, subValue: `Rp ${totalStokRp.toLocaleString('id-ID')}`, icon: <Package size={18}/>, color: 'blue' },
+      { label: 'Total Unit Masuk', value: totalMasuk, subValue: `Rp ${totalMasukRp.toLocaleString('id-ID')}`, icon: <ArrowDownCircle size={18}/>, color: 'emerald' },
+      { label: 'Total Unit Keluar', value: totalKeluar, subValue: `Rp ${totalKeluarRp.toLocaleString('id-ID')}`, icon: <ArrowUpCircle size={18}/>, color: 'orange' },
+      { label: 'Barang Kosong', value: barangKosong, subValue: 'Peringatan Stok', icon: <AlertOctagon size={18}/>, color: 'red' },
     ];
   }, [products, inbound, outbound, calculateStock]);
 
@@ -122,6 +136,9 @@ const Dashboard: React.FC = () => {
                 </p>
                 <p className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 leading-none">
                   {s.value.toLocaleString('id-ID')}
+                </p>
+                <p className={`text-[9px] font-bold mt-1 ${s.color === 'red' ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`}>
+                  {s.subValue}
                 </p>
               </div>
             </div>
