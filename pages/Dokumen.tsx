@@ -25,7 +25,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { PDFDocument } from 'pdf-lib';
 
 const Dokumen: React.FC = () => {
-  const { documents, setDocuments, storage } = useInventory();
+  const { documents, setDocuments, storage, settings } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<ArchiveDocument | null>(null);
   const [previewDoc, setPreviewDoc] = useState<ArchiveDocument | null>(null);
@@ -54,12 +54,16 @@ const Dokumen: React.FC = () => {
   }, []);
 
   const connectGoogleDrive = async () => {
-    const { settings } = useInventory();
     try {
       if (!settings.googleClientId || !settings.googleClientSecret || !settings.googleRedirectUri) {
-        alert("Konfigurasi Google API belum lengkap. Silakan atur di menu Profil.");
+        alert("Konfigurasi Google API belum lengkap. Silakan atur Client ID, Client Secret, dan Redirect URI di menu Profil terlebih dahulu.");
         return;
       }
+
+      console.log("Connecting to Google Drive with config:", {
+        clientId: settings.googleClientId,
+        redirectUri: settings.googleRedirectUri
+      });
 
       const params = new URLSearchParams({
         clientId: settings.googleClientId,
@@ -75,15 +79,17 @@ const Dokumen: React.FC = () => {
         data = JSON.parse(text);
       } catch (e) {
         console.error("Server returned non-JSON response:", text);
-        const snippet = text.substring(0, 100);
-        throw new Error(`Server tidak merespon dengan JSON. Respon: "${snippet}..."`);
+        throw new Error("Server tidak merespon dengan format yang benar. Pastikan server berjalan dengan baik.");
       }
       
       if (!response.ok) {
         throw new Error(data.error || "Gagal mendapatkan URL autentikasi.");
       }
       
-      window.open(data.url, 'google_auth', 'width=600,height=700');
+      const authWindow = window.open(data.url, 'google_auth', 'width=600,height=700');
+      if (!authWindow) {
+        alert("Popup diblokir oleh browser. Silakan izinkan popup untuk melanjutkan autentikasi.");
+      }
     } catch (error: any) {
       console.error("Failed to get auth URL:", error);
       alert(error.message || "Gagal menghubungkan ke Google Drive.");
@@ -167,7 +173,6 @@ const Dokumen: React.FC = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    const { settings } = useInventory();
     e.preventDefault();
     if (!formData.title || !formData.fileUrl) {
       alert('Judul dan File wajib diisi!');

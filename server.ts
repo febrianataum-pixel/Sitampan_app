@@ -71,31 +71,51 @@ app.get("/api/auth/url", (req, res) => {
 
 app.get("/api/auth/callback", async (req, res) => {
   const { code, state } = req.query;
+  console.log("Auth callback received with code:", code ? "present" : "missing");
+  
   try {
+    if (!state) throw new Error("Missing state parameter");
     const config = JSON.parse(Buffer.from(state as string, 'base64').toString());
+    console.log("Config from state:", { clientId: config.clientId, redirectUri: config.redirectUri });
+    
     const client = getOAuth2Client(config);
-
     const { tokens } = await client.getToken(code as string);
-    // In a real app, you'd store this in a session or database
-    // For this demo, we'll send it back to the client via postMessage
+    console.log("Tokens received successfully");
+
     res.send(`
       <html>
-        <body>
+        <head><title>Authentication Successful</title></head>
+        <body style="font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0fdf4;">
+          <div style="background: white; padding: 2rem; border-radius: 1rem; shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center;">
+            <h1 style="color: #16a34a; margin-top: 0;">Berhasil!</h1>
+            <p style="color: #374151;">Autentikasi Google Drive berhasil.</p>
+            <p style="color: #6b7280; font-size: 0.875rem;">Jendela ini akan tertutup otomatis...</p>
+          </div>
           <script>
             if (window.opener) {
               window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', tokens: ${JSON.stringify(tokens)} }, '*');
-              window.close();
+              setTimeout(() => window.close(), 1000);
             } else {
-              window.location.href = '/';
+              setTimeout(() => window.location.href = '/', 2000);
             }
           </script>
-          <p>Authentication successful. You can close this window.</p>
         </body>
       </html>
     `);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error exchanging code for tokens:", error);
-    res.status(500).send("Authentication failed");
+    res.status(500).send(`
+      <html>
+        <body style="font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fef2f2;">
+          <div style="background: white; padding: 2rem; border-radius: 1rem; text-align: center; border: 1px solid #fee2e2;">
+            <h1 style="color: #dc2626; margin-top: 0;">Gagal</h1>
+            <p style="color: #374151;">Terjadi kesalahan saat autentikasi.</p>
+            <p style="color: #ef4444; font-size: 0.875rem;">${error.message || "Unknown error"}</p>
+            <button onclick="window.close()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">Tutup</button>
+          </div>
+        </body>
+      </html>
+    `);
   }
 });
 
