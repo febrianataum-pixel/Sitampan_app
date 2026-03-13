@@ -79,11 +79,12 @@ const Dokumen: React.FC = () => {
         data = JSON.parse(text);
       } catch (e) {
         console.error("Server returned non-JSON response:", text);
-        throw new Error("Server tidak merespon dengan format yang benar. Pastikan server berjalan dengan baik.");
+        const snippet = text.length > 100 ? text.substring(0, 100) + "..." : text;
+        throw new Error(`Server bermasalah (Status: ${response.status}). Respon bukan JSON: "${snippet}"`);
       }
       
       if (!response.ok) {
-        throw new Error(data.error || "Gagal mendapatkan URL autentikasi.");
+        throw new Error(data.error || `Gagal mendapatkan URL autentikasi (Status: ${response.status})`);
       }
       
       const authWindow = window.open(data.url, 'google_auth', 'width=600,height=700');

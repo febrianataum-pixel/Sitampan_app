@@ -179,6 +179,15 @@ app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `API route not found: ${req.url}` });
 });
 
+// Global error handler for API
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.path.startsWith('/api')) {
+    console.error("API Error:", err);
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
+  }
+  next(err);
+});
+
 // Vite middleware for development
 async function setupVite() {
   try {
@@ -192,9 +201,11 @@ async function setupVite() {
       console.log("Vite middleware attached.");
     } else {
       console.log("Serving static files from dist...");
-      app.use(express.static(path.join(__dirname, "dist")));
-      app.get("*", (req, res) => {
-        res.sendFile(path.join(__dirname, "dist", "index.html"));
+      const distPath = path.join(__dirname, "dist");
+      app.use(express.static(distPath));
+      // In Express v5, use *all for catch-all
+      app.get("*all", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
       });
     }
 
