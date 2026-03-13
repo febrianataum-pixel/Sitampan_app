@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useInventory } from '../App';
-import { Download, Search, AlertTriangle, FileText } from 'lucide-react';
+import { Download, Search, AlertTriangle, FileText, TrendingUp } from 'lucide-react';
 import { exportToCSV } from '../services/csvService';
 import { generateReportPDF } from '../services/pdfService';
 
@@ -69,15 +69,26 @@ const StokBarang: React.FC = () => {
       </div>
 
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
-        <div className="relative group px-6 py-3 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5">
-          <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light transition-colors" size={20} />
-          <input 
-            type="text" 
-            placeholder="Cari item..." 
-            className="w-full pl-14 pr-6 py-2.5 bg-slate-100 dark:bg-white/5 border-none rounded-full outline-none text-sm transition-all font-medium dark:text-slate-200"
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)} 
-          />
+        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-ios">
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Total Nilai Aset</p>
+              <p className="text-xl font-black text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</p>
+            </div>
+          </div>
+          <div className="relative group flex-1 max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light transition-colors" size={18} />
+            <input 
+              type="text" 
+              placeholder="Cari item..." 
+              className="w-full pl-12 pr-6 py-2 bg-slate-100 dark:bg-white/5 border-none rounded-full outline-none text-sm transition-all font-medium dark:text-slate-200"
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -112,12 +123,6 @@ const StokBarang: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {s.nilaiStok.toLocaleString('id-ID')}</td>
                 </tr>
               ))}
-              {filteredStock.length > 0 && (
-                <tr className="bg-slate-50 dark:bg-white/5 font-bold">
-                  <td colSpan={4} className="px-6 py-4 text-right text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Nilai Aset</td>
-                  <td className="px-6 py-4 text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>

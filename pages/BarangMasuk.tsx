@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useInventory } from '../App';
-import { Plus, Trash2, Download, Upload, Search, X, Edit2, FileText } from 'lucide-react';
+import { Plus, Trash2, Download, Upload, Search, X, Edit2, FileText, TrendingUp } from 'lucide-react';
 import { InboundEntry, MONTHS, formatIndoDate } from '../types';
 import { exportToExcel, parseExcel } from '../services/excelService';
 import { generateReportPDF } from '../services/pdfService';
@@ -175,14 +175,25 @@ const BarangMasuk: React.FC = () => {
       </div>
 
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm theme-transition">
-        <div className="px-6 py-3 bg-ios-secondary-light dark:bg-ios-secondary-dark relative group border-b border-slate-100 dark:border-white/5">
-           <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light transition-colors" size={20} />
-           <input 
-            type="text" 
-            placeholder="Cari transaksi..." 
-            className="w-full pl-14 pr-6 py-2.5 bg-slate-100 dark:bg-white/5 border-none rounded-full outline-none text-sm font-medium transition-all dark:text-slate-200"
-            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} 
-          />
+        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-ios">
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Grand Total Nilai</p>
+              <p className="text-xl font-black text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</p>
+            </div>
+          </div>
+          <div className="relative group flex-1 max-w-md">
+             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light transition-colors" size={18} />
+             <input 
+              type="text" 
+              placeholder="Cari transaksi..." 
+              className="w-full pl-12 pr-6 py-2 bg-slate-100 dark:bg-white/5 border-none rounded-full outline-none text-sm font-medium transition-all dark:text-slate-200"
+              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} 
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -221,13 +232,6 @@ const BarangMasuk: React.FC = () => {
               })}
               {filteredInbound.length === 0 && (
                 <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Data belum ditemukan.</td></tr>
-              )}
-              {filteredInbound.length > 0 && (
-                <tr className="bg-slate-50 dark:bg-white/5 font-bold">
-                  <td colSpan={5} className="px-6 py-4 text-right text-slate-500 dark:text-slate-400 uppercase tracking-wider">Grand Total</td>
-                  <td className="px-6 py-4 text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</td>
-                  <td></td>
-                </tr>
               )}
             </tbody>
           </table>

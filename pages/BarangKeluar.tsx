@@ -22,7 +22,8 @@ import {
   Clock,
   Image as ImageIcon,
   Loader2,
-  FileText
+  FileText,
+  TrendingUp
 } from 'lucide-react';
 import { OutboundTransaction, OutboundItem, formatIndoDate, Product } from '../types';
 import { generateReportPDF } from '../services/pdfService';
@@ -290,6 +291,17 @@ const BarangKeluar: React.FC = () => {
       </div>
 
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden theme-transition">
+        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-ios">
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Grand Total Distribusi</p>
+              <p className="text-xl font-black text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</p>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full text-left min-w-[1000px]">
             <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b dark:border-white/5 select-none">
@@ -372,13 +384,6 @@ const BarangKeluar: React.FC = () => {
               })}
               {sortedOutbound.length === 0 && (
                 <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Belum ada catatan transaksi.</td></tr>
-              )}
-              {sortedOutbound.length > 0 && (
-                <tr className="bg-slate-50 dark:bg-white/5 font-bold">
-                  <td colSpan={5} className="px-6 py-4 text-right text-slate-500 dark:text-slate-400 uppercase tracking-wider">Grand Total</td>
-                  <td className="px-6 py-4 text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</td>
-                  <td></td>
-                </tr>
               )}
             </tbody>
           </table>
