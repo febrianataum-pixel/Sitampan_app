@@ -59,7 +59,15 @@ const BarangKeluar: React.FC = () => {
   const disasterCategories = [
     { 
       name: 'Bencana Alam', 
-      subs: ['Gempa Bumi', 'Letusan Gunung', 'Banjir dan tanah longsor', 'lainnya (sebutkan)'] 
+      subs: ['Gempa Bumi', 'Letusan Gunung', 'Angin Kencang', 'lainnya (sebutkan)'] 
+    },
+    { 
+      name: 'Banjir', 
+      subs: ['Banjir Bandang', 'Banjir Luapan', 'lainnya (sebutkan)'] 
+    },
+    { 
+      name: 'Tanah Longsor', 
+      subs: ['Tanah Longsor', 'Gerakan Tanah', 'lainnya (sebutkan)'] 
     },
     { 
       name: 'Bencana Non Alam', 
