@@ -12,7 +12,8 @@ import {
   TrendingUp,
   X,
   Info,
-  FileText
+  FileText,
+  ChevronLeft
 } from 'lucide-react';
 import { useInventory } from '../App';
 import { Product, OutboundTransaction, InboundEntry } from '../types';
@@ -22,6 +23,9 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 const RekapIndikator: React.FC = () => {
   const { products, inbound, outbound, documents, calculateStock, settings } = useInventory();
   const [selectedData, setSelectedData] = useState<{ title: string; items: any[] } | null>(null);
+  
+  // Disaster Drill-down State
+  const [disasterView, setDisasterView] = useState<{ level: 'category' | 'sub'; category?: string }>({ level: 'category' });
 
   // 1. Rekapan Distribusi per Kecamatan
   const kecamatanData = useMemo(() => {
@@ -41,19 +45,33 @@ const RekapIndikator: React.FC = () => {
     return Object.values(counts).sort((a, b) => b.value - a.value);
   }, [outbound]);
 
-  // 2. Jenis Bencana
+  // 2. Jenis Bencana (Hierarchical)
   const bencanaData = useMemo(() => {
-    const counts: Record<string, { name: string; value: number; originalItems: OutboundTransaction[] }> = {};
+    const counts: Record<string, { name: string; value: number; originalItems: OutboundTransaction[]; hasSub: boolean }> = {};
+    
     outbound.forEach(tx => {
-      const key = tx.jenisBencana || 'Lainnya';
-      if (!counts[key]) {
-        counts[key] = { name: key, value: 0, originalItems: [] };
+      if (disasterView.level === 'category') {
+        const key = tx.jenisBencana || 'Lainnya';
+        if (!counts[key]) {
+          counts[key] = { name: key, value: 0, originalItems: [], hasSub: false };
+        }
+        counts[key].value += 1;
+        counts[key].originalItems.push(tx);
+        if (tx.subJenisBencana) counts[key].hasSub = true;
+      } else {
+        // Sub-category level
+        if (tx.jenisBencana === disasterView.category) {
+          const key = tx.subJenisBencana || 'Lainnya';
+          if (!counts[key]) {
+            counts[key] = { name: key, value: 0, originalItems: [], hasSub: false };
+          }
+          counts[key].value += 1;
+          counts[key].originalItems.push(tx);
+        }
       }
-      counts[key].value += 1;
-      counts[key].originalItems.push(tx);
     });
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [outbound]);
+  }, [outbound, disasterView]);
 
   // 3. Keuangan (Nilai Aset)
   const keuanganData = useMemo(() => {
@@ -132,6 +150,14 @@ const RekapIndikator: React.FC = () => {
   }, [documents]);
 
   const handleChartClick = (data: any, title: string) => {
+    if (title === 'Detail Jenis Bencana') {
+      if (disasterView.level === 'category' && data.hasSub) {
+        setDisasterView({ level: 'sub', category: data.name });
+        return;
+      }
+      title = `Detail Bencana: ${data.name}`;
+    }
+
     if (data && data.originalItems) {
       setSelectedData({ title, items: data.originalItems });
     } else if (data && data.name) {
@@ -199,9 +225,23 @@ const RekapIndikator: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <AlertTriangle className="text-amber-500" size={20} />
-              <h3 className="font-bold text-slate-900 dark:text-white">Jenis Bencana</h3>
+              <div className="flex flex-col">
+                <h3 className="font-bold text-slate-900 dark:text-white">Jenis Bencana</h3>
+                {disasterView.level === 'sub' && (
+                  <button 
+                    onClick={() => setDisasterView({ level: 'category' })}
+                    className="flex items-center gap-1 text-[10px] font-black text-ios-blue-light uppercase mt-0.5 hover:opacity-70 transition-opacity"
+                  >
+                    <ChevronLeft size={12} /> Kembali ke Kategori
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="text-[10px] font-black bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-full text-slate-500">PIE CHART</div>
+            <div className="flex flex-col items-end">
+              <div className="text-[10px] font-black bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-full text-slate-500 uppercase">
+                {disasterView.level === 'category' ? 'Kategori' : disasterView.category}
+              </div>
+            </div>
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -221,7 +261,13 @@ const RekapIndikator: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number, name: string, props: any) => {
+                    const item = props.payload;
+                    return [`${value} Kejadian`, item.hasSub && disasterView.level === 'category' ? `${name} (Klik untuk Detail)` : name];
+                  }}
+                />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
               </PieChart>
             </ResponsiveContainer>
