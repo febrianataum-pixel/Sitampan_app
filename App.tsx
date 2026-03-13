@@ -7,6 +7,7 @@ import {
   ArrowUpCircle, 
   FileText, 
   BarChart3, 
+  PieChart,
   Package, 
   Menu, 
   X,
@@ -35,6 +36,7 @@ import RekapBulanan from './pages/RekapBulanan';
 import Profile from './pages/Profile';
 import LaporanBlora from './pages/LaporanBlora';
 import Dokumen from './pages/Dokumen';
+import RekapIndikator from './pages/RekapIndikator';
 
 import { Product, InboundEntry, OutboundTransaction, AppSettings, formatIndoDate, ArchiveDocument } from './types';
 
@@ -83,6 +85,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={20} /> },
     { name: 'Dokumen', path: '/dashboard/dokumen', icon: <Package size={20} /> },
     { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={20} /> },
+    { name: 'Indikator', path: '/dashboard/rekap-indikator', icon: <PieChart size={20} /> },
     { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
   ];
 
@@ -148,7 +151,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-ios-secondary-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 flex items-center justify-around px-2 py-2 pb-8 z-50 no-print theme-transition shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
-          {menuItems.filter(item => ['Dashboard', 'Keluar', 'Laporan', 'Dokumen', 'Profil'].includes(item.name)).map((item) => (
+          {menuItems.filter(item => ['Dashboard', 'Keluar', 'Indikator', 'Dokumen', 'Profil'].includes(item.name)).map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -364,6 +367,7 @@ const App: React.FC = () => {
             <Route path="/dashboard/laporan-blora" element={<LaporanBlora />} />
             <Route path="/dashboard/dokumen" element={<Dokumen />} />
             <Route path="/dashboard/rekap" element={<RekapBulanan />} />
+            <Route path="/dashboard/rekap-indikator" element={<RekapIndikator />} />
             <Route path="/dashboard/profile" element={<Profile />} />
           </Routes>
         </Layout>
