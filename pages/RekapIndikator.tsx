@@ -13,7 +13,11 @@ import {
   X,
   Info,
   FileText,
-  ChevronLeft
+  ChevronLeft,
+  Filter,
+  Calendar,
+  RotateCcw,
+  ChevronDown
 } from 'lucide-react';
 import { useInventory } from '../App';
 import { Product, OutboundTransaction, InboundEntry } from '../types';
@@ -27,14 +31,60 @@ const RekapIndikator: React.FC = () => {
   // Disaster Drill-down State
   const [disasterView, setDisasterView] = useState<{ level: 'category' | 'sub'; category?: string }>({ level: 'category' });
 
+  // Ultimate Filter State
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    kecamatan: '',
+    jenisBencana: '',
+    subJenisBencana: ''
+  });
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Helper to extract kecamatan
+  const getKecamatan = (alamat: string) => {
+    const match = alamat.match(/Kec\.\s*([a-zA-Z\s]+)/i);
+    return match ? match[1].trim() : alamat || 'Lainnya';
+  };
+
+  // Unique values for filters
+  const uniqueKecamatans = useMemo(() => {
+    const set = new Set<string>();
+    outbound.forEach(tx => set.add(getKecamatan(tx.alamat)));
+    return Array.from(set).sort();
+  }, [outbound]);
+
+  const uniqueBencanas = useMemo(() => {
+    const set = new Set<string>();
+    outbound.forEach(tx => set.add(tx.jenisBencana || 'Lainnya'));
+    return Array.from(set).sort();
+  }, [outbound]);
+
+  // Filtered Data
+  const filteredOutbound = useMemo(() => {
+    return outbound.filter(tx => {
+      const dateMatch = (!filters.startDate || tx.tanggal >= filters.startDate) && 
+                         (!filters.endDate || tx.tanggal <= filters.endDate);
+      const kecamatanMatch = !filters.kecamatan || getKecamatan(tx.alamat) === filters.kecamatan;
+      const bencanaMatch = !filters.jenisBencana || tx.jenisBencana === filters.jenisBencana;
+      const subBencanaMatch = !filters.subJenisBencana || tx.subJenisBencana === filters.subJenisBencana;
+      return dateMatch && kecamatanMatch && bencanaMatch && subBencanaMatch;
+    });
+  }, [outbound, filters]);
+
+  const filteredInbound = useMemo(() => {
+    return inbound.filter(entry => {
+      const dateMatch = (!filters.startDate || entry.tanggal >= filters.startDate) && 
+                         (!filters.endDate || entry.tanggal <= filters.endDate);
+      return dateMatch;
+    });
+  }, [inbound, filters]);
+
   // 1. Rekapan Distribusi per Kecamatan
   const kecamatanData = useMemo(() => {
     const counts: Record<string, { name: string; value: number; originalItems: OutboundTransaction[] }> = {};
-    outbound.forEach(tx => {
-      // Simple extraction: assume kecamatan is part of address or just use address
-      // For now, let's try to extract kecamatan if the address format is "Kec. [Name]"
-      const match = tx.alamat.match(/Kec\.\s*([a-zA-Z\s]+)/i);
-      const key = match ? match[1].trim() : tx.alamat || 'Lainnya';
+    filteredOutbound.forEach(tx => {
+      const key = getKecamatan(tx.alamat);
       
       if (!counts[key]) {
         counts[key] = { name: key, value: 0, originalItems: [] };
@@ -43,13 +93,13 @@ const RekapIndikator: React.FC = () => {
       counts[key].originalItems.push(tx);
     });
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [outbound]);
+  }, [filteredOutbound]);
 
   // 2. Jenis Bencana (Hierarchical)
   const bencanaData = useMemo(() => {
     const counts: Record<string, { name: string; value: number; originalItems: OutboundTransaction[]; hasSub: boolean }> = {};
     
-    outbound.forEach(tx => {
+    filteredOutbound.forEach(tx => {
       if (disasterView.level === 'category') {
         const key = tx.jenisBencana || 'Lainnya';
         if (!counts[key]) {
@@ -71,21 +121,21 @@ const RekapIndikator: React.FC = () => {
       }
     });
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [outbound, disasterView]);
+  }, [filteredOutbound, disasterView]);
 
   // 3. Keuangan (Nilai Aset)
   const keuanganData = useMemo(() => {
     let totalMasuk = 0;
     let totalKeluar = 0;
 
-    inbound.forEach(entry => {
+    filteredInbound.forEach(entry => {
       const product = products.find(p => p.id === entry.productId);
       if (product) {
         totalMasuk += entry.jumlah * product.harga;
       }
     });
 
-    outbound.forEach(tx => {
+    filteredOutbound.forEach(tx => {
       tx.items.forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (product) {
@@ -99,7 +149,7 @@ const RekapIndikator: React.FC = () => {
       { name: 'Total Keluar', value: totalKeluar, color: '#ef4444' },
       { name: 'Sisa Stok', value: totalMasuk - totalKeluar, color: '#3b82f6' }
     ];
-  }, [products, inbound, outbound]);
+  }, [products, filteredInbound, filteredOutbound]);
 
   // 4. Urgensi Tambah Stok
   const urgensiStok = useMemo(() => {
@@ -123,7 +173,7 @@ const RekapIndikator: React.FC = () => {
   // 5. Tren Bulanan (Barang Keluar)
   const trenBulanan = useMemo(() => {
     const months: Record<string, { month: string; count: number }> = {};
-    outbound.forEach(tx => {
+    filteredOutbound.forEach(tx => {
       const date = new Date(tx.tanggal);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       if (!months[key]) {
@@ -132,7 +182,7 @@ const RekapIndikator: React.FC = () => {
       months[key].count += 1;
     });
     return Object.values(months).sort((a, b) => a.month.localeCompare(b.month));
-  }, [outbound]);
+  }, [filteredOutbound]);
 
   // 6. Kategori Dokumen
   const dokumenData = useMemo(() => {
@@ -177,15 +227,89 @@ const RekapIndikator: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="p-2 rounded-ios bg-ios-blue-light/10 text-ios-blue-light dark:bg-ios-blue-dark/10 dark:text-ios-blue-dark">
-          <LayoutDashboard size={24} />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-ios bg-ios-blue-light/10 text-ios-blue-light dark:bg-ios-blue-dark/10 dark:text-ios-blue-dark">
+            <LayoutDashboard size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">REKAP INDIKATOR</h2>
+            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Visualisasi Data & Analitik Sistem</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">REKAP INDIKATOR</h2>
-          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Visualisasi Data & Analitik Sistem</p>
-        </div>
+        <button 
+          onClick={() => setIsFilterOpen(!isFilterOpen)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-ios font-bold text-sm transition-all ${isFilterOpen ? 'bg-ios-blue-light text-white' : 'bg-white dark:bg-ios-secondary-dark text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/5 shadow-sm'}`}
+        >
+          <Filter size={18} />
+          ULTIMATE FILTER
+          <ChevronDown size={16} className={`transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
+        </button>
       </div>
+
+      {/* Ultimate Filter Section */}
+      {isFilterOpen && (
+        <div className="bg-white dark:bg-ios-secondary-dark rounded-ios-lg p-6 shadow-md border border-ios-blue-light/20 animate-in slide-in-from-top-4 duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <Calendar size={10} /> Tanggal Mulai
+              </label>
+              <input 
+                type="date" 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-ios-blue-light/20"
+                value={filters.startDate}
+                onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <Calendar size={10} /> Tanggal Akhir
+              </label>
+              <input 
+                type="date" 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-ios-blue-light/20"
+                value={filters.endDate}
+                onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <MapPin size={10} /> Kecamatan
+              </label>
+              <select 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-ios-blue-light/20"
+                value={filters.kecamatan}
+                onChange={(e) => setFilters({...filters, kecamatan: e.target.value})}
+              >
+                <option value="">Semua Kecamatan</option>
+                {uniqueKecamatans.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <AlertTriangle size={10} /> Jenis Bencana
+              </label>
+              <select 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-ios-blue-light/20"
+                value={filters.jenisBencana}
+                onChange={(e) => setFilters({...filters, jenisBencana: e.target.value})}
+              >
+                <option value="">Semua Bencana</option>
+                {uniqueBencanas.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button 
+              onClick={() => setFilters({ startDate: '', endDate: '', kecamatan: '', jenisBencana: '', subJenisBencana: '' })}
+              className="flex items-center gap-2 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
+            >
+              <RotateCcw size={12} /> Reset Filter
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 1. Distribusi per Kecamatan */}
@@ -427,21 +551,35 @@ const RekapIndikator: React.FC = () => {
                   <div key={idx} className="p-4 rounded-ios bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-ios-blue-light/30 transition-all">
                     {item.penerima ? (
                       // Outbound Transaction
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <span className="font-black text-slate-900 dark:text-white">{item.penerima}</span>
                           <span className="text-[10px] font-bold text-slate-400 uppercase">{item.tanggal}</span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 italic">{item.alamat}</p>
-                        <div className="mt-2 flex flex-wrap gap-1">
+                        <div className="mt-2 space-y-2">
                           {item.items.map((it: any, i: number) => {
                             const p = products.find(prod => prod.id === it.productId);
+                            const subtotal = it.jumlah * (p?.harga || 0);
                             return (
-                              <span key={i} className="text-[10px] font-bold bg-ios-blue-light/10 text-ios-blue-light px-2 py-0.5 rounded-full">
-                                {p?.namaBarang || 'Unknown'}: {it.jumlah} {p?.satuan}
-                              </span>
+                              <div key={i} className="flex items-center justify-between bg-white dark:bg-white/5 p-2 rounded-ios border border-slate-100 dark:border-white/5">
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{p?.namaBarang || 'Unknown'}</span>
+                                  <span className="text-[10px] text-slate-500">{it.jumlah} {p?.satuan} x {formatCurrency(p?.harga || 0)}</span>
+                                </div>
+                                <span className="text-xs font-black text-ios-blue-light">{formatCurrency(subtotal)}</span>
+                              </div>
                             );
                           })}
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-white/10 flex justify-between items-center">
+                          <span className="text-[10px] font-black text-slate-400 uppercase">Total Transaksi</span>
+                          <span className="text-sm font-black text-slate-900 dark:text-white">
+                            {formatCurrency(item.items.reduce((acc: number, it: any) => {
+                              const p = products.find(prod => prod.id === it.productId);
+                              return acc + (it.jumlah * (p?.harga || 0));
+                            }, 0))}
+                          </span>
                         </div>
                       </div>
                     ) : item.category ? (
