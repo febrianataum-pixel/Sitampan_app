@@ -17,7 +17,10 @@ import {
   Filter,
   Calendar,
   RotateCcw,
-  ChevronDown
+  ChevronDown,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Boxes
 } from 'lucide-react';
 import { useInventory } from '../App';
 import { Product, OutboundTransaction, InboundEntry } from '../types';
@@ -37,14 +40,39 @@ const RekapIndikator: React.FC = () => {
     endDate: '',
     kecamatan: '',
     jenisBencana: '',
-    subJenisBencana: ''
+    subJenisBencana: '',
+    kategori: '',
+    tipeTransaksi: 'Semua', // Semua, Masuk, Keluar, Stock
+    periode: 'Semua' // Semua, Bulan Ini, Triwulan Ini, Tahun Ini
   });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const CATEGORIES = ['Permakanan', 'Sandang', 'Tenda', 'Peralatan Dapur', 'Kesehatan', 'Lain-lain'];
 
   // Helper to extract kecamatan
   const getKecamatan = (alamat: string) => {
     const match = alamat.match(/Kec\.\s*([a-zA-Z\s]+)/i);
     return match ? match[1].trim() : alamat || 'Lainnya';
+  };
+
+  // Helper for period filtering
+  const isInPeriod = (dateStr: string, periode: string) => {
+    if (periode === 'Semua') return true;
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    if (periode === 'Bulan Ini') {
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    }
+    if (periode === 'Triwulan Ini') {
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      const itemQuarter = Math.floor(date.getMonth() / 3);
+      return currentQuarter === itemQuarter && date.getFullYear() === now.getFullYear();
+    }
+    if (periode === 'Tahun Ini') {
+      return date.getFullYear() === now.getFullYear();
+    }
+    return true;
   };
 
   // Unique values for filters
@@ -65,20 +93,103 @@ const RekapIndikator: React.FC = () => {
     return outbound.filter(tx => {
       const dateMatch = (!filters.startDate || tx.tanggal >= filters.startDate) && 
                          (!filters.endDate || tx.tanggal <= filters.endDate);
+      const periodMatch = isInPeriod(tx.tanggal, filters.periode);
       const kecamatanMatch = !filters.kecamatan || getKecamatan(tx.alamat) === filters.kecamatan;
       const bencanaMatch = !filters.jenisBencana || tx.jenisBencana === filters.jenisBencana;
       const subBencanaMatch = !filters.subJenisBencana || tx.subJenisBencana === filters.subJenisBencana;
-      return dateMatch && kecamatanMatch && bencanaMatch && subBencanaMatch;
+      
+      // Filter by category if selected
+      const categoryMatch = !filters.kategori || tx.items.some(item => {
+        const p = products.find(prod => prod.id === item.productId);
+        return p?.kategori === filters.kategori;
+      });
+
+      const typeMatch = filters.tipeTransaksi === 'Semua' || filters.tipeTransaksi === 'Keluar';
+
+      return dateMatch && periodMatch && kecamatanMatch && bencanaMatch && subBencanaMatch && categoryMatch && typeMatch;
     });
-  }, [outbound, filters]);
+  }, [outbound, filters, products]);
 
   const filteredInbound = useMemo(() => {
     return inbound.filter(entry => {
       const dateMatch = (!filters.startDate || entry.tanggal >= filters.startDate) && 
                          (!filters.endDate || entry.tanggal <= filters.endDate);
-      return dateMatch;
+      const periodMatch = isInPeriod(entry.tanggal, filters.periode);
+      
+      const p = products.find(prod => prod.id === entry.productId);
+      const categoryMatch = !filters.kategori || p?.kategori === filters.kategori;
+
+      const typeMatch = filters.tipeTransaksi === 'Semua' || filters.tipeTransaksi === 'Masuk';
+
+      return dateMatch && periodMatch && categoryMatch && typeMatch;
     });
-  }, [inbound, filters]);
+  }, [inbound, filters, products]);
+
+  // Detailed Item Recap Data
+  const itemRecapData = useMemo(() => {
+    const recap: Record<string, { 
+      productId: string; 
+      namaBarang: string; 
+      kategori: string; 
+      satuan: string; 
+      harga: number; 
+      jumlahMasuk: number; 
+      jumlahKeluar: number; 
+      stok: number;
+    }> = {};
+
+    // Initialize with products that match category filter
+    products.forEach(p => {
+      if (!filters.kategori || p.kategori === filters.kategori) {
+        recap[p.id] = {
+          productId: p.id,
+          namaBarang: p.namaBarang,
+          kategori: p.kategori || 'Lain-lain',
+          satuan: p.satuan,
+          harga: p.harga,
+          jumlahMasuk: 0,
+          jumlahKeluar: 0,
+          stok: calculateStock(p.id)
+        };
+      }
+    });
+
+    // Add inbound data
+    filteredInbound.forEach(entry => {
+      if (recap[entry.productId]) {
+        recap[entry.productId].jumlahMasuk += entry.jumlah;
+      }
+    });
+
+    // Add outbound data
+    filteredOutbound.forEach(tx => {
+      tx.items.forEach(item => {
+        if (recap[item.productId]) {
+          recap[item.productId].jumlahKeluar += item.jumlah;
+        }
+      });
+    });
+
+    // Filter by transaction type
+    return Object.values(recap).filter(item => {
+      if (filters.tipeTransaksi === 'Masuk') return item.jumlahMasuk > 0;
+      if (filters.tipeTransaksi === 'Keluar') return item.jumlahKeluar > 0;
+      if (filters.tipeTransaksi === 'Stock') return true; // Show all matching category
+      return item.jumlahMasuk > 0 || item.jumlahKeluar > 0;
+    }).sort((a, b) => a.namaBarang.localeCompare(b.namaBarang));
+  }, [products, filteredInbound, filteredOutbound, filters, calculateStock]);
+
+  const grandTotal = useMemo(() => {
+    return itemRecapData.reduce((acc, item) => {
+      let amount = 0;
+      if (filters.tipeTransaksi === 'Masuk') amount = item.jumlahMasuk;
+      else if (filters.tipeTransaksi === 'Keluar') amount = item.jumlahKeluar;
+      else if (filters.tipeTransaksi === 'Stock') amount = item.stok;
+      else amount = item.jumlahMasuk + item.jumlahKeluar; // Default view
+      
+      return acc + (amount * item.harga);
+    }, 0);
+  }, [itemRecapData, filters.tipeTransaksi]);
 
   // 1. Rekapan Distribusi per Kecamatan
   const kecamatanData = useMemo(() => {
@@ -299,10 +410,53 @@ const RekapIndikator: React.FC = () => {
                 {uniqueBencanas.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <Boxes size={10} /> Kategori Barang
+              </label>
+              <select 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-ios-blue-light/20"
+                value={filters.kategori}
+                onChange={(e) => setFilters({...filters, kategori: e.target.value})}
+              >
+                <option value="">Semua Kategori</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <LayoutDashboard size={10} /> Tipe Transaksi
+              </label>
+              <select 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-ios-blue-light/20"
+                value={filters.tipeTransaksi}
+                onChange={(e) => setFilters({...filters, tipeTransaksi: e.target.value})}
+              >
+                <option value="Semua">Semua Transaksi</option>
+                <option value="Masuk">Barang Masuk</option>
+                <option value="Keluar">Barang Keluar</option>
+                <option value="Stock">Posisi Stok</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1">
+                <TrendingUp size={10} /> Periode Waktu
+              </label>
+              <select 
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-ios-blue-light/20"
+                value={filters.periode}
+                onChange={(e) => setFilters({...filters, periode: e.target.value})}
+              >
+                <option value="Semua">Semua Waktu</option>
+                <option value="Bulan Ini">Bulan Ini</option>
+                <option value="Triwulan Ini">Triwulan Ini</option>
+                <option value="Tahun Ini">Tahun Ini</option>
+              </select>
+            </div>
           </div>
           <div className="mt-4 flex justify-end">
             <button 
-              onClick={() => setFilters({ startDate: '', endDate: '', kecamatan: '', jenisBencana: '', subJenisBencana: '' })}
+              onClick={() => setFilters({ startDate: '', endDate: '', kecamatan: '', jenisBencana: '', subJenisBencana: '', kategori: '', tipeTransaksi: 'Semua', periode: 'Semua' })}
               className="flex items-center gap-2 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
             >
               <RotateCcw size={12} /> Reset Filter
@@ -523,6 +677,85 @@ const RekapIndikator: React.FC = () => {
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
               </PieChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* 7. Rekap Data Barang (Table) */}
+        <div className="bg-white dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 lg:col-span-2 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-white/5">
+            <div className="flex items-center gap-2">
+              <PackageSearch className="text-ios-blue-light" size={20} />
+              <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Rekap Data Barang & Nominal</h3>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-slate-400 uppercase">Grand Total</span>
+                <span className="text-lg font-black text-ios-blue-light">{formatCurrency(grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest border-b dark:border-white/5">
+                <tr>
+                  <th className="px-6 py-4">Nama Barang</th>
+                  <th className="px-6 py-4">Kategori</th>
+                  <th className="px-6 py-4 text-center">
+                    {filters.tipeTransaksi === 'Masuk' ? 'Masuk' : 
+                     filters.tipeTransaksi === 'Keluar' ? 'Keluar' : 
+                     filters.tipeTransaksi === 'Stock' ? 'Stok' : 'Total Vol'}
+                  </th>
+                  <th className="px-6 py-4 text-right">Harga Satuan</th>
+                  <th className="px-6 py-4 text-right">Total Nominal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {itemRecapData.map((item) => {
+                  let volume = 0;
+                  if (filters.tipeTransaksi === 'Masuk') volume = item.jumlahMasuk;
+                  else if (filters.tipeTransaksi === 'Keluar') volume = item.jumlahKeluar;
+                  else if (filters.tipeTransaksi === 'Stock') volume = item.stok;
+                  else volume = item.jumlahMasuk + item.jumlahKeluar;
+
+                  const totalNominal = volume * item.harga;
+
+                  return (
+                    <tr key={item.productId} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.namaBarang}</span>
+                          <span className="text-[10px] text-slate-400 font-mono uppercase">{item.productId.slice(0, 8)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-[10px] font-black bg-ios-blue-light/10 text-ios-blue-light px-2 py-0.5 rounded-full uppercase">
+                          {item.kategori}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-black text-slate-900 dark:text-white">{volume.toLocaleString('id-ID')}</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-medium text-slate-600 dark:text-slate-400">
+                        {formatCurrency(item.harga)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(totalNominal)}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {itemRecapData.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-10 text-center text-slate-400 italic font-medium">
+                      Tidak ada data barang yang sesuai dengan filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

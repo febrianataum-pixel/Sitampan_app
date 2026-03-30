@@ -17,8 +17,11 @@ const DatabaseBarang: React.FC = () => {
     kodeBarang: '',
     namaBarang: '',
     satuan: '',
-    harga: 0
+    harga: 0,
+    kategori: ''
   });
+
+  const CATEGORIES = ['Permakanan', 'Sandang', 'Tenda', 'Peralatan Dapur', 'Kesehatan', 'Lain-lain'];
 
   const handleOpenModal = (product?: Product) => {
     if (product) {
@@ -27,11 +30,12 @@ const DatabaseBarang: React.FC = () => {
         kodeBarang: product.kodeBarang,
         namaBarang: product.namaBarang,
         satuan: product.satuan,
-        harga: product.harga
+        harga: product.harga,
+        kategori: product.kategori || ''
       });
     } else {
       setEditingProduct(null);
-      setFormData({ kodeBarang: '', namaBarang: '', satuan: '', harga: 0 });
+      setFormData({ kodeBarang: '', namaBarang: '', satuan: '', harga: 0, kategori: '' });
     }
     setIsModalOpen(true);
   };
@@ -72,6 +76,7 @@ const DatabaseBarang: React.FC = () => {
     const data = products.map(p => ({
       'KODE BARANG': p.kodeBarang,
       'NAMA BARANG': p.namaBarang,
+      'KATEGORI': p.kategori,
       'SATUAN': p.satuan,
       'HARGA': p.harga
     }));
@@ -83,6 +88,7 @@ const DatabaseBarang: React.FC = () => {
       { header: 'No', dataKey: 'no', align: 'center' as const, format: (v: any) => String(v) },
       { header: 'Kode', dataKey: 'kodeBarang' },
       { header: 'Nama Barang', dataKey: 'namaBarang' },
+      { header: 'Kategori', dataKey: 'kategori' },
       { header: 'Satuan', dataKey: 'satuan', align: 'center' as const },
       { header: 'Harga Satuan', dataKey: 'harga', align: 'right' as const, format: (v: any) => `Rp ${v.toLocaleString('id-ID')}` }
     ];
@@ -97,17 +103,18 @@ const DatabaseBarang: React.FC = () => {
         const rawData = await parseExcel(file);
         if (!rawData || rawData.length === 0) return;
         const firstRow = rawData[0];
-        const hasHeader = firstRow.some((cell: any) => /KODE|NAMA|SATUAN|HARGA/i.test(String(cell)));
+        const hasHeader = firstRow.some((cell: any) => /KODE|NAMA|KATEGORI|SATUAN|HARGA/i.test(String(cell)));
         const dataRows = hasHeader ? rawData.slice(1) : rawData;
         const imported = dataRows.map((row: any[]) => {
           if (!row || row.length < 2) return null;
           const kode = String(row[0] || '').trim();
           const nama = String(row[1] || '').trim();
-          const satuan = String(row[2] || '').trim();
-          const hargaRaw = row[3] || '0';
+          const kategori = String(row[2] || '').trim();
+          const satuan = String(row[3] || '').trim();
+          const hargaRaw = row[4] || '0';
           const harga = Number(String(hargaRaw).replace(/[^0-9.-]+/g, '')) || 0;
           if (!kode || !nama) return null;
-          return { id: crypto.randomUUID(), kodeBarang: kode, namaBarang: nama, satuan: satuan || 'Unit', harga };
+          return { id: crypto.randomUUID(), kodeBarang: kode, namaBarang: nama, kategori: kategori || 'Lain-lain', satuan: satuan || 'Unit', harga };
         }).filter(Boolean) as Product[];
         if (imported.length > 0) {
           const existingCodes = new Set(products.map(p => p.kodeBarang));
@@ -170,6 +177,7 @@ const DatabaseBarang: React.FC = () => {
                 </th>
                 <th className="px-6 py-3">Kode</th>
                 <th className="px-6 py-3">Nama Barang</th>
+                <th className="px-6 py-3">Kategori</th>
                 <th className="px-6 py-3">Satuan</th>
                 <th className="px-6 py-3">Harga</th>
                 <th className="px-6 py-3 text-center">Aksi</th>
@@ -185,6 +193,7 @@ const DatabaseBarang: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 font-mono text-xs text-ios-blue-light dark:text-ios-blue-dark font-bold">{p.kodeBarang}</td>
                   <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-sm">{p.namaBarang}</td>
+                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">{p.kategori || '-'}</td>
                   <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">{p.satuan}</td>
                   <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100 text-sm">Rp {p.harga.toLocaleString('id-ID')}</td>
                   <td className="px-6 py-4">
@@ -218,6 +227,13 @@ const DatabaseBarang: React.FC = () => {
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 ml-1">Nama Barang</label>
                 <input type="text" required className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" value={formData.namaBarang} onChange={(e) => setFormData({...formData, namaBarang: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 ml-1">Kategori</label>
+                <select className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" value={formData.kategori} onChange={(e) => setFormData({...formData, kategori: e.target.value})}>
+                  <option value="">Pilih Kategori</option>
+                  {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

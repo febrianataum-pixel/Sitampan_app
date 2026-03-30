@@ -5,6 +5,7 @@ export interface Product {
   namaBarang: string;
   satuan: string;
   harga: number;
+  kategori: string;
 }
 
 export interface InboundEntry {
