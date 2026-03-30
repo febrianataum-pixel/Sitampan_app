@@ -20,10 +20,12 @@ import {
   ChevronDown,
   ArrowDownCircle,
   ArrowUpCircle,
-  Boxes
+  Boxes,
+  Download
 } from 'lucide-react';
 import { useInventory } from '../App';
 import { Product, OutboundTransaction, InboundEntry } from '../types';
+import { generateReportPDF } from '../services/pdfService';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
 
@@ -190,6 +192,67 @@ const RekapIndikator: React.FC = () => {
       return acc + (amount * item.harga);
     }, 0);
   }, [itemRecapData, filters.tipeTransaksi]);
+
+  // Grouped Item Recap Data
+  const groupedRecapData = useMemo<Record<string, any[]>>(() => {
+    const groups: Record<string, any[]> = {};
+    itemRecapData.forEach(item => {
+      const cat = item.kategori || 'Lain-lain';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    });
+    return groups;
+  }, [itemRecapData]);
+
+  const handleExportPDF = () => {
+    const columns = [
+      { header: 'Nama Barang', dataKey: 'namaBarang' },
+      { header: 'Kategori', dataKey: 'kategori' },
+      { 
+        header: filters.tipeTransaksi === 'Masuk' ? 'Masuk' : filters.tipeTransaksi === 'Keluar' ? 'Keluar' : filters.tipeTransaksi === 'Stock' ? 'Stok' : 'Total Vol', 
+        dataKey: 'volume',
+        align: 'center' as const,
+        format: (v: any) => v.toLocaleString('id-ID')
+      },
+      { 
+        header: 'Harga Satuan', 
+        dataKey: 'harga', 
+        align: 'right' as const, 
+        format: (v: any) => formatCurrency(v) 
+      },
+      { 
+        header: 'Total Nominal', 
+        dataKey: 'totalNominal', 
+        align: 'right' as const, 
+        format: (v: any) => formatCurrency(v) 
+      }
+    ];
+
+    const flatData = itemRecapData.map(item => {
+      let volume = 0;
+      if (filters.tipeTransaksi === 'Masuk') volume = item.jumlahMasuk;
+      else if (filters.tipeTransaksi === 'Keluar') volume = item.jumlahKeluar;
+      else if (filters.tipeTransaksi === 'Stock') volume = item.stok;
+      else volume = item.jumlahMasuk + item.jumlahKeluar;
+
+      return {
+        ...item,
+        volume,
+        totalNominal: volume * item.harga
+      };
+    });
+
+    const narrative = `Laporan rekapitulasi barang berdasarkan filter: ${filters.tipeTransaksi} | Periode: ${filters.periode} | Kategori: ${filters.kategori || 'Semua'}`;
+    
+    generateReportPDF(
+      'REKAP DATA BARANG & NOMINAL', 
+      columns, 
+      flatData, 
+      settings, 
+      narrative,
+      { label: 'GRAND TOTAL', value: formatCurrency(grandTotal) }
+    );
+  };
 
   // 1. Rekapan Distribusi per Kecamatan
   const kecamatanData = useMemo(() => {
@@ -465,6 +528,95 @@ const RekapIndikator: React.FC = () => {
         </div>
       )}
 
+      {/* 7. Rekap Data Barang (Table) - MOVED TO TOP */}
+      <div className="bg-white dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-white/5">
+          <div className="flex items-center gap-2">
+            <PackageSearch className="text-ios-blue-light" size={20} />
+            <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Rekap Data Barang & Nominal</h3>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-black text-slate-400 uppercase">Grand Total</span>
+              <span className="text-lg font-black text-ios-blue-light">{formatCurrency(grandTotal)}</span>
+            </div>
+            <button 
+              onClick={handleExportPDF}
+              className="p-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-ios hover:bg-red-100 transition-colors"
+              title="Export PDF"
+            >
+              <Download size={18}/>
+            </button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest border-b dark:border-white/5">
+              <tr>
+                <th className="px-6 py-4">Nama Barang</th>
+                <th className="px-6 py-4 text-center">
+                  {filters.tipeTransaksi === 'Masuk' ? 'Masuk' : 
+                   filters.tipeTransaksi === 'Keluar' ? 'Keluar' : 
+                   filters.tipeTransaksi === 'Stock' ? 'Stok' : 'Total Vol'}
+                </th>
+                <th className="px-6 py-4 text-right">Harga Satuan</th>
+                <th className="px-6 py-4 text-right">Total Nominal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+              {Object.entries(groupedRecapData).map(([category, items]: [string, any[]]) => (
+                <React.Fragment key={category}>
+                  <tr className="bg-slate-100/50 dark:bg-white/5">
+                    <td colSpan={4} className="px-6 py-2">
+                      <span className="text-[10px] font-black text-ios-blue-light uppercase tracking-widest">{category}</span>
+                    </td>
+                  </tr>
+                  {items.map((item) => {
+                    let volume = 0;
+                    if (filters.tipeTransaksi === 'Masuk') volume = item.jumlahMasuk;
+                    else if (filters.tipeTransaksi === 'Keluar') volume = item.jumlahKeluar;
+                    else if (filters.tipeTransaksi === 'Stock') volume = item.stok;
+                    else volume = item.jumlahMasuk + item.jumlahKeluar;
+
+                    const totalNominal = volume * item.harga;
+
+                    return (
+                      <tr key={item.productId} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.namaBarang}</span>
+                            <span className="text-[10px] text-slate-400 font-mono uppercase">{item.productId.slice(0, 8)}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex flex-col items-center">
+                            <span className="text-sm font-black text-slate-900 dark:text-white">{volume.toLocaleString('id-ID')}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm font-medium text-slate-600 dark:text-slate-400">
+                          {formatCurrency(item.harga)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(totalNominal)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+              {itemRecapData.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-10 text-center text-slate-400 italic font-medium">
+                    Tidak ada data barang yang sesuai dengan filter.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 1. Distribusi per Kecamatan */}
         <div className="bg-white dark:bg-ios-secondary-dark rounded-ios-lg p-6 shadow-sm border border-slate-200 dark:border-white/5">
@@ -677,85 +829,6 @@ const RekapIndikator: React.FC = () => {
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
               </PieChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* 7. Rekap Data Barang (Table) */}
-        <div className="bg-white dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 lg:col-span-2 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-white/5">
-            <div className="flex items-center gap-2">
-              <PackageSearch className="text-ios-blue-light" size={20} />
-              <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Rekap Data Barang & Nominal</h3>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black text-slate-400 uppercase">Grand Total</span>
-                <span className="text-lg font-black text-ios-blue-light">{formatCurrency(grandTotal)}</span>
-              </div>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest border-b dark:border-white/5">
-                <tr>
-                  <th className="px-6 py-4">Nama Barang</th>
-                  <th className="px-6 py-4">Kategori</th>
-                  <th className="px-6 py-4 text-center">
-                    {filters.tipeTransaksi === 'Masuk' ? 'Masuk' : 
-                     filters.tipeTransaksi === 'Keluar' ? 'Keluar' : 
-                     filters.tipeTransaksi === 'Stock' ? 'Stok' : 'Total Vol'}
-                  </th>
-                  <th className="px-6 py-4 text-right">Harga Satuan</th>
-                  <th className="px-6 py-4 text-right">Total Nominal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                {itemRecapData.map((item) => {
-                  let volume = 0;
-                  if (filters.tipeTransaksi === 'Masuk') volume = item.jumlahMasuk;
-                  else if (filters.tipeTransaksi === 'Keluar') volume = item.jumlahKeluar;
-                  else if (filters.tipeTransaksi === 'Stock') volume = item.stok;
-                  else volume = item.jumlahMasuk + item.jumlahKeluar;
-
-                  const totalNominal = volume * item.harga;
-
-                  return (
-                    <tr key={item.productId} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.namaBarang}</span>
-                          <span className="text-[10px] text-slate-400 font-mono uppercase">{item.productId.slice(0, 8)}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[10px] font-black bg-ios-blue-light/10 text-ios-blue-light px-2 py-0.5 rounded-full uppercase">
-                          {item.kategori}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="text-sm font-black text-slate-900 dark:text-white">{volume.toLocaleString('id-ID')}</span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-medium text-slate-600 dark:text-slate-400">
-                        {formatCurrency(item.harga)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(totalNominal)}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {itemRecapData.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-slate-400 italic font-medium">
-                      Tidak ada data barang yang sesuai dengan filter.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
