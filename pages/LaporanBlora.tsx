@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useInventory } from '../App';
 import { 
@@ -9,120 +8,128 @@ import {
   TrendingUp, 
   Package,
   ChevronRight,
-  Filter
+  Filter,
+  ArrowDownCircle,
+  ArrowUpCircle
 } from 'lucide-react';
 import { MONTHS, formatIndoDate } from '../types';
 import { exportToCSV } from '../services/csvService';
 import { generateReportPDF } from '../services/pdfService';
 
 const LaporanBlora: React.FC = () => {
-  const { products, outbound, settings } = useInventory();
+  const { products, inbound, outbound, settings, calculateStock } = useInventory();
   const [reportType, setReportType] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // Filter data berdasarkan Kabupaten Blora (asumsi alamat mengandung Blora)
-  // Dan berdasarkan periode yang dipilih
-  const filteredData = useMemo(() => {
-    return outbound.filter(tx => {
-      const txDate = new Date(tx.tanggal);
-      const isBlora = tx.alamat?.toLowerCase().includes('blora') || true; // Default true jika user minta laporan Blora
-      
+  // Filter data berdasarkan periode yang dipilih
+  const filteredInbound = useMemo(() => {
+    return inbound.filter(entry => {
+      if (!entry.tanggal) return false;
+      const entryDate = new Date(entry.tanggal);
       if (reportType === 'monthly') {
-        return isBlora && txDate.getMonth() === selectedMonth && txDate.getFullYear() === selectedYear;
+        return entryDate.getMonth() === selectedMonth && entryDate.getFullYear() === selectedYear;
       } else {
-        return isBlora && txDate.getFullYear() === selectedYear;
+        return entryDate.getFullYear() === selectedYear;
+      }
+    });
+  }, [inbound, reportType, selectedMonth, selectedYear]);
+
+  const filteredOutbound = useMemo(() => {
+    return outbound.filter(tx => {
+      if (!tx.tanggal) return false;
+      const txDate = new Date(tx.tanggal);
+      if (reportType === 'monthly') {
+        return txDate.getMonth() === selectedMonth && txDate.getFullYear() === selectedYear;
+      } else {
+        return txDate.getFullYear() === selectedYear;
       }
     });
   }, [outbound, reportType, selectedMonth, selectedYear]);
 
-  // Rekap jumlah per barang
+  // Rekap jumlah masuk, keluar, sisa per jenis barang
   const summaryItems = useMemo(() => {
-    const map = new Map<string, number>();
-    
-    filteredData.forEach(tx => {
-      tx.items.forEach(item => {
-        map.set(item.productId, (map.get(item.productId) || 0) + item.jumlah);
-      });
-    });
+    return products.map(product => {
+      // Calculate inbound for this product in current filtered period
+      const totalIn = filteredInbound
+        .filter(entry => entry.productId === product.id)
+        .reduce((sum, entry) => sum + entry.jumlah, 0);
 
-    return Array.from(map.entries()).map(([productId, total]) => {
-      const product = products.find(p => p.id === productId);
-      const hargaSatuan = product?.harga || 0;
+      // Calculate outbound for this product in current filtered period
+      const totalOut = filteredOutbound.reduce((sum, tx) => {
+        const matchItem = tx.items.find(item => item.productId === product.id);
+        return sum + (matchItem ? matchItem.jumlah : 0);
+      }, 0);
+
+      // Remaining stock of product as of now
+      const sisa = calculateStock(product.id);
+
       return {
-        id: productId,
-        namaBarang: product?.namaBarang || 'Barang Tidak Diketahui',
-        kodeBarang: product?.kodeBarang || '-',
-        satuan: product?.satuan || 'Unit',
-        hargaSatuan,
-        total,
-        totalHarga: total * hargaSatuan
+        id: product.id,
+        namaBarang: product.namaBarang,
+        kodeBarang: product.kodeBarang,
+        satuan: product.satuan,
+        hargaSatuan: product.harga,
+        jumlahMasuk: totalIn,
+        jumlahKeluar: totalOut,
+        sisaBarang: sisa,
+        totalHargaSisa: sisa * product.harga
       };
-    }).sort((a, b) => b.total - a.total);
-  }, [filteredData, products]);
+    })
+    // Tampilkan barang yang memiliki transaksi masuk, keluar, atau memiliki sisa stok > 0
+    .filter(item => item.jumlahMasuk > 0 || item.jumlahKeluar > 0 || item.sisaBarang > 0)
+    .sort((a, b) => a.namaBarang.localeCompare(b.namaBarang));
+  }, [products, filteredInbound, filteredOutbound, calculateStock]);
 
-  // Extract unique kecamatan from alamat
-  const listKecamatan = useMemo(() => {
-    const kecamatanSet = new Set<string>();
-    filteredData.forEach(tx => {
-      if (tx.alamat) {
-        const match = tx.alamat.match(/Kec\.\s*([a-zA-Z\s]+)/i);
-        if (match) {
-          kecamatanSet.add(match[1].trim());
-        } else {
-          const parts = tx.alamat.split(',');
-          if (parts.length > 0) {
-            kecamatanSet.add(parts[0].trim());
-          }
-        }
-      }
-    });
-    return Array.from(kecamatanSet);
-  }, [filteredData]);
-
-  const totalExpenditure = summaryItems.reduce((acc, curr) => acc + curr.total, 0);
-  const totalExpenditureValue = summaryItems.reduce((acc, curr) => acc + curr.totalHarga, 0);
+  const totalInbound = summaryItems.reduce((acc, curr) => acc + curr.jumlahMasuk, 0);
+  const totalOutbound = summaryItems.reduce((acc, curr) => acc + curr.jumlahKeluar, 0);
+  const totalSisa = summaryItems.reduce((acc, curr) => acc + curr.sisaBarang, 0);
+  const totalValuation = summaryItems.reduce((acc, curr) => acc + curr.totalHargaSisa, 0);
 
   const getFullNarrative = () => {
     const period = reportType === 'monthly' ? `${MONTHS[selectedMonth]} ${selectedYear}` : `Tahun ${selectedYear}`;
-    const baseNarrative = `Berdasarkan data transaksi pengeluaran logistik yang tercatat pada sistem inovasi SITAMPAN ((SISTEM TANGGAP PEMANTAUAN LOGISTIK KEBENCANAAN), berikut disampaikan laporan rekapitulasi pendistribusian barang untuk wilayah Kabupaten Blora pada periode ${period}. Laporan ini disusun sebagai bentuk transparansi dan akuntabilitas pengelolaan stok barang di gudang.`;
-    
-    const distributionNarrative = listKecamatan.length > 0 
-      ? `\n\nPada periode ini, logistik telah disalurkan ke wilayah kecamatan ${listKecamatan.join(', ')} dengan total barang yang didistribusikan sebanyak ${totalExpenditure.toLocaleString('id-ID')} unit.`
-      : `\n\nPada periode ini, total barang yang didistribusikan sebanyak ${totalExpenditure.toLocaleString('id-ID')} unit.`;
-    
-    return baseNarrative + distributionNarrative;
+    return `Berdasarkan data pencatatan logistik pada sistem SITAMPAN (SISTEM TANGGAP PEMANTAUAN LOGISTIK KEBENCANAAN), berikut disampaikan laporan rekapitulasi inventory barang untuk periode ${period}. Laporan ini menjabarkan rincian jenis barang, jumlah barang masuk, barang keluar, serta sisa sediaan nyata (stok akhir) yang tersedia di gudang.`;
   };
 
   const handleExportPDF = () => {
     const title = reportType === 'monthly' 
-      ? `PENGELUARAN KAB. BLORA - ${MONTHS[selectedMonth].toUpperCase()} ${selectedYear}`
-      : `PENGELUARAN KAB. BLORA - TAHUN ${selectedYear}`;
+      ? `REKAPITULASI LOGISTIK - ${MONTHS[selectedMonth].toUpperCase()} ${selectedYear}`
+      : `REKAPITULASI LOGISTIK - TAHUN ${selectedYear}`;
 
     const columns = [
-      { header: 'Kode', dataKey: 'kodeBarang' },
-      { header: 'Nama Barang', dataKey: 'namaBarang' },
-      { header: 'Jumlah', dataKey: 'total', align: 'center' as const },
-      { header: 'Satuan', dataKey: 'satuan' },
-      { header: 'Nominal Harga', dataKey: 'hargaSatuan', align: 'right' as const, format: (v: number) => `Rp ${v.toLocaleString('id-ID')}` },
-      { header: 'Total Harga', dataKey: 'totalHarga', align: 'right' as const, format: (v: number) => `Rp ${v.toLocaleString('id-ID')}` }
+      { header: 'Kode Barang', dataKey: 'kodeBarang' },
+      { header: 'Jenis Barang', dataKey: 'namaBarang' },
+      { header: 'Jumlah Masuk', dataKey: 'jumlahMasuk', align: 'center' as const, format: (v: number) => `${v.toLocaleString('id-ID')}` },
+      { header: 'Jumlah Keluar', dataKey: 'jumlahKeluar', align: 'center' as const, format: (v: number) => `${v.toLocaleString('id-ID')}` },
+      { header: 'Sisa Barang', dataKey: 'sisaBarang', align: 'center' as const, format: (v: number) => `${v.toLocaleString('id-ID')}` },
+      { header: 'Satuan', dataKey: 'satuan', align: 'center' as const },
+      { header: 'Nilai Sisa', dataKey: 'totalHargaSisa', align: 'right' as const, format: (v: number) => `Rp ${v.toLocaleString('id-ID')}` }
     ];
 
-    generateReportPDF(title, columns, summaryItems, settings, getFullNarrative());
+    generateReportPDF(
+      title, 
+      columns, 
+      summaryItems, 
+      settings, 
+      getFullNarrative(),
+      { label: 'REKAP NILAI SISA BARANG', value: `Rp ${totalValuation.toLocaleString('id-ID')}` }
+    );
   };
 
   const handleExportCSV = () => {
     const filename = reportType === 'monthly'
-      ? `Laporan_Blora_${MONTHS[selectedMonth]}_${selectedYear}`
-      : `Laporan_Blora_Tahun_${selectedYear}`;
+      ? `Laporan_Stok_Logistik_${MONTHS[selectedMonth]}_${selectedYear}`
+      : `Laporan_Stok_Logistik_Tahun_${selectedYear}`;
     
     const data = summaryItems.map(item => ({
-      'KODE': item.kodeBarang,
-      'NAMA BARANG': item.namaBarang,
-      'JUMLAH': item.total,
+      'KODE BARANG': item.kodeBarang,
+      'JENIS BARANG': item.namaBarang,
+      'JUMLAH MASUK': item.jumlahMasuk,
+      'JUMLAH KELUAR': item.jumlahKeluar,
+      'SISA BARANG': item.sisaBarang,
       'SATUAN': item.satuan,
       'HARGA SATUAN': item.hargaSatuan,
-      'TOTAL HARGA': item.totalHarga
+      'NILAI SISA': item.totalHargaSisa
     }));
 
     exportToCSV(data, filename);
@@ -134,12 +141,12 @@ const LaporanBlora: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="p-1.5 bg-orange-500 text-white rounded-lg shadow-sm">
+            <div className="p-1.5 bg-ios-blue-light text-white rounded-lg shadow-sm">
               <FileText size={16}/>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Laporan Kabupaten Blora</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Laporan Rekapitulasi Barang</h2>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Rekapitulasi pengeluaran logistik wilayah Blora.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Rekapitulasi aktivitas jumlah masuk, jumlah keluar, dan sisa stok barang.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <button 
@@ -162,19 +169,14 @@ const LaporanBlora: React.FC = () => {
         <div className="flex items-start gap-4">
           <div className="w-1 h-12 bg-ios-blue-light dark:bg-ios-blue-dark rounded-full shrink-0 mt-1"></div>
           <div className="space-y-2">
-            <h3 className="text-[10px] font-black text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-[0.2em]">Pernyataan Resmi</h3>
-            <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium italic space-y-3">
+            <h3 className="text-[10px] font-black text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-[0.2em]">Pernyataan Resmi Laporan</h3>
+            <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-medium italic">
               <p>
-                "Berdasarkan data transaksi pengeluaran logistik yang tercatat pada sistem inovasi <span className="font-bold text-slate-900 dark:text-white">SITAMPAN ((SISTEM TANGGAP PEMANTAUAN LOGISTIK KEBENCANAAN)</span>, 
-                berikut disampaikan laporan rekapitulasi pendistribusian barang untuk wilayah <span className="font-bold text-slate-900 dark:text-white">Kabupaten Blora</span> pada periode 
+                "Berdasarkan data pencatatan logistik pada sistem inovasi <span className="font-bold text-slate-900 dark:text-white">SITAMPAN (SISTEM TANGGAP PEMANTAUAN LOGISTIK KEBENCANAAN)</span>, 
+                berikut disampaikan laporan rekapitulasi data barang logistik untuk wilayah kerja gudang untuk periode 
                 <span className="text-ios-blue-light dark:text-ios-blue-dark font-bold"> {reportType === 'monthly' ? `${MONTHS[selectedMonth]} ${selectedYear}` : `Tahun ${selectedYear}`}</span>. 
-                Laporan ini disusun sebagai bentuk transparansi dan akuntabilitas pengelolaan stok barang di gudang."
+                Laporan ini mendokumentasikan rincian Jenis Barang, statistik transaksi masuk & keluar, beserta sisa nyata persediaan barang saat ini."
               </p>
-              {listKecamatan.length > 0 && (
-                <p>
-                  Pada periode ini, logistik telah disalurkan ke wilayah kecamatan <span className="font-bold text-slate-900 dark:text-white">{listKecamatan.join(', ')}</span> dengan total barang yang didistribusikan sebanyak <span className="font-bold text-ios-blue-light dark:text-ios-blue-dark">{totalExpenditure.toLocaleString('id-ID')} unit</span>.
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -237,68 +239,63 @@ const LaporanBlora: React.FC = () => {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-ios-blue-light dark:bg-ios-blue-dark p-6 rounded-ios-lg text-white shadow-lg shadow-blue-500/20 relative overflow-hidden group">
-          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
-            <TrendingUp size={120}/>
-          </div>
-          <div className="relative z-10">
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Total Pengeluaran</p>
-            <p className="text-3xl font-black">{totalExpenditure.toLocaleString('id-ID')} <span className="text-xs font-medium">Unit</span></p>
-            <p className="text-[10px] mt-2 font-medium opacity-80">
-              {reportType === 'monthly' ? `${MONTHS[selectedMonth]} ${selectedYear}` : `Tahun ${selectedYear}`}
-            </p>
-          </div>
-        </div>
-
         <div className="bg-emerald-500 p-6 rounded-ios-lg text-white shadow-lg shadow-emerald-500/20 relative overflow-hidden group">
           <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
-            <TrendingUp size={120}/>
+            <ArrowDownCircle size={120}/>
           </div>
           <div className="relative z-10">
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Total Nilai Logistik</p>
-            <p className="text-xl font-black">Rp {totalExpenditureValue.toLocaleString('id-ID')}</p>
-            <p className="text-[10px] mt-2 font-medium opacity-80">Akumulasi Nilai Barang</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Total Barang Masuk</p>
+            <p className="text-3xl font-black">{totalInbound.toLocaleString('id-ID')} <span className="text-xs font-medium">Unit</span></p>
+            <p className="text-[10px] mt-2 font-medium opacity-85">Transaksi Masuk Periode Ini</p>
           </div>
         </div>
 
-        <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-orange-50 dark:bg-orange-900/20 text-orange-500 rounded-ios flex items-center justify-center">
-            <MapPin size={24}/>
+        <div className="bg-rose-500 p-6 rounded-ios-lg text-white shadow-lg shadow-rose-500/20 relative overflow-hidden group">
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+            <ArrowUpCircle size={120}/>
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Wilayah Fokus</p>
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-100">Kabupaten Blora</p>
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Total Barang Keluar</p>
+            <p className="text-3xl font-black">{totalOutbound.toLocaleString('id-ID')} <span className="text-xs font-medium">Unit</span></p>
+            <p className="text-[10px] mt-2 font-medium opacity-85">Transaksi Keluar Periode Ini</p>
           </div>
         </div>
 
-        <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 rounded-ios flex items-center justify-center">
-            <Package size={24}/>
+        <div className="bg-ios-blue-light dark:bg-ios-blue-dark p-6 rounded-ios-lg text-white shadow-lg shadow-blue-500/20 relative overflow-hidden group">
+          <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+            <Package size={120}/>
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Item Terdistribusi</p>
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{summaryItems.length} Jenis</p>
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Total Sisa Barang</p>
+            <p className="text-3xl font-black">{totalSisa.toLocaleString('id-ID')} <span className="text-xs font-medium">Unit</span></p>
+            <p className="text-[10px] mt-2 font-medium opacity-85">Stok Sedia Saat Ini</p>
           </div>
+        </div>
+
+        <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex flex-col justify-center">
+          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total Nilai Sisa</p>
+          <p className="text-xl font-black text-slate-900 dark:text-white mt-1">Rp {totalValuation.toLocaleString('id-ID')}</p>
+          <p className="text-[9px] text-slate-400 font-medium uppercase mt-1">Valuasi Sisa Barang</p>
         </div>
       </div>
 
       {/* Table Section */}
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden">
         <div className="p-5 border-b dark:border-white/5 flex items-center justify-between">
-          <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Rincian Item Keluar</h3>
+          <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Rincian Transaksi & Stok Persediaan</h3>
           <span className="text-[10px] font-bold bg-slate-100 dark:bg-white/5 px-3 py-1 rounded-full text-slate-500">
-            {filteredData.length} Transaksi
+            {summaryItems.length} Jenis Barang
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
               <tr>
-                <th className="px-6 py-4">Informasi Barang</th>
+                <th className="px-6 py-4">Jenis Barang</th>
+                <th className="px-6 py-4 text-center">Jumlah Masuk</th>
                 <th className="px-6 py-4 text-center">Jumlah Keluar</th>
-                <th className="px-6 py-4 text-right">Nominal Harga</th>
-                <th className="px-6 py-4 text-right">Total Harga</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
+                <th className="px-6 py-4 text-center">Sisa Barang</th>
+                <th className="px-6 py-4 text-right">Nilai Sisa</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -306,23 +303,29 @@ const LaporanBlora: React.FC = () => {
                 <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
                   <td className="px-6 py-4">
                     <p className="font-bold text-slate-800 dark:text-slate-200">{item.namaBarang}</p>
-                    <p className="text-[10px] text-slate-500 font-mono">{item.kodeBarang}</p>
+                    <p className="text-[10px] text-slate-500 font-mono uppercase">{item.kodeBarang}</p>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
+                      <ArrowDownCircle size={14} className="opacity-70 shrink-0" />
+                      {item.jumlahMasuk.toLocaleString('id-ID')} <span className="text-[10px] font-medium opacity-60 uppercase">{item.satuan}</span>
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-sm">
+                      <ArrowUpCircle size={14} className="opacity-70 shrink-0" />
+                      {item.jumlahKeluar.toLocaleString('id-ID')} <span className="text-[10px] font-medium opacity-60 uppercase">{item.satuan}</span>
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark font-bold text-sm">
-                      {item.total} <span className="text-[10px] font-medium opacity-60 uppercase">{item.satuan}</span>
+                      <Package size={14} className="opacity-70 shrink-0" />
+                      {item.sisaBarang.toLocaleString('id-ID')} <span className="text-[10px] font-bold opacity-60 uppercase">{item.satuan}</span>
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <p className="text-xs font-bold text-slate-600 dark:text-slate-400">Rp {item.hargaSatuan.toLocaleString('id-ID')}</p>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <p className="text-sm font-black text-slate-900 dark:text-white">Rp {item.totalHarga.toLocaleString('id-ID')}</p>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-slate-400 hover:text-ios-blue-light dark:hover:text-ios-blue-dark transition-colors">
-                      <ChevronRight size={18}/>
-                    </button>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">Rp {item.totalHargaSisa.toLocaleString('id-ID')}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">Rp {item.hargaSatuan.toLocaleString('id-ID')}/unit</p>
                   </td>
                 </tr>
               )) : (
@@ -330,8 +333,8 @@ const LaporanBlora: React.FC = () => {
                   <td colSpan={5} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center opacity-30">
                       <Package size={48} className="mb-4"/>
-                      <p className="text-sm font-bold uppercase tracking-widest">Tidak Ada Data Pengeluaran</p>
-                      <p className="text-[10px] mt-1">Silakan pilih periode lain atau pastikan data tersedia.</p>
+                      <p className="text-sm font-bold uppercase tracking-widest">Tidak Ada Data Logistik</p>
+                      <p className="text-[10px] mt-1">Silakan pilih periode lain atau tambahkan data barang baru.</p>
                     </div>
                   </td>
                 </tr>
@@ -342,15 +345,14 @@ const LaporanBlora: React.FC = () => {
       </div>
 
       {/* Info Box */}
-      <div className="p-6 bg-orange-50 dark:bg-orange-900/10 rounded-ios-lg border border-orange-100 dark:border-orange-900/20 flex gap-4">
-        <div className="w-10 h-10 bg-orange-500 text-white rounded-ios flex items-center justify-center shrink-0">
+      <div className="p-6 bg-blue-50 dark:bg-blue-950/10 rounded-ios-lg border border-blue-100 dark:border-blue-900/20 flex gap-4">
+        <div className="w-10 h-10 bg-ios-blue-light text-white rounded-ios flex items-center justify-center shrink-0">
           <TrendingUp size={20}/>
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-bold text-orange-800 dark:text-orange-400 uppercase tracking-tight">Analisis Distribusi</p>
-          <p className="text-[11px] text-orange-700/70 dark:text-orange-400/60 leading-relaxed">
-            Laporan ini menyajikan data akumulasi pengeluaran logistik untuk wilayah Kabupaten Blora. 
-            Data ditarik dari transaksi "Barang Keluar" yang tercatat dalam sistem pada periode {reportType === 'monthly' ? MONTHS[selectedMonth] : 'Tahun'} {selectedYear}.
+          <p className="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase tracking-tight">Informasi Stok Akhir</p>
+          <p className="text-[11px] text-blue-700/70 dark:text-blue-400/60 leading-relaxed">
+            Laporan rekapitulasi data barang di atas memetakan detail sediaan fisik logistik gudang. Sisa barang (stok aktual) ditarik berdasarkan perhitungan total barang masuk dikurangi total barang keluar secara terus-menerus.
           </p>
         </div>
       </div>
