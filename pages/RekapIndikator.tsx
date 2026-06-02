@@ -29,6 +29,58 @@ import { generateReportPDF } from '../services/pdfService';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
 
+const isProductInFilterCategory = (namaBarang: string, filterCategory: string): boolean => {
+  if (!filterCategory) return true;
+  const name = namaBarang.toLowerCase().trim().replace(/\s+/g, '');
+  
+  if (filterCategory === 'Permakanan') {
+    return name.includes('makanansiapsaji') || 
+           name.includes('makanananak') || 
+           name.includes('laukpauksiapsaji');
+  }
+  if (filterCategory === 'Sandang') {
+    return name.includes('sandanganak') || 
+           name.includes('sandangdewasa') || 
+           name.includes('kidsware') || 
+           name.includes('selimut');
+  }
+  if (filterCategory === 'Penampungan') {
+    return name.includes('tendagulung') || 
+           name.includes('tendakeluarga') || 
+           name.includes('tendaserbaguna') || 
+           name.includes('kasur');
+  }
+  if (filterCategory === 'Penanganan Kelompok Rentan') {
+    return name.includes('familykit') || 
+           name.includes('makanananak') || 
+           name.includes('makanansiapsaji') || 
+           name.includes('laukpauksiapsaji');
+  }
+  if (filterCategory === 'Lain-lain') {
+    const isMatchedInOther = 
+      isProductInFilterCategory(namaBarang, 'Permakanan') ||
+      isProductInFilterCategory(namaBarang, 'Sandang') ||
+      isProductInFilterCategory(namaBarang, 'Penampungan') ||
+      isProductInFilterCategory(namaBarang, 'Penanganan Kelompok Rentan');
+    
+    return !isMatchedInOther || 
+           name.includes('lampusorot') || 
+           name.includes('penjernihair') || 
+           name.includes('peralatandapurkeluarga');
+  }
+  return false;
+};
+
+const getProductCategoriesText = (namaBarang: string): string => {
+  const cats: string[] = [];
+  if (isProductInFilterCategory(namaBarang, 'Permakanan')) cats.push('Permakanan');
+  if (isProductInFilterCategory(namaBarang, 'Sandang')) cats.push('Sandang');
+  if (isProductInFilterCategory(namaBarang, 'Penampungan')) cats.push('Penampungan');
+  if (isProductInFilterCategory(namaBarang, 'Penanganan Kelompok Rentan')) cats.push('Penanganan Kelompok Rentan');
+  if (cats.length === 0) cats.push('Lain-lain');
+  return cats.join(', ');
+};
+
 const RekapIndikator: React.FC = () => {
   const { products, inbound, outbound, documents, calculateStock, settings } = useInventory();
   const [selectedData, setSelectedData] = useState<{ title: string; items: any[] } | null>(null);
@@ -49,7 +101,7 @@ const RekapIndikator: React.FC = () => {
   });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const CATEGORIES = ['Permakanan', 'Sandang', 'Tenda', 'Peralatan Dapur', 'Kesehatan', 'Lain-lain'];
+  const CATEGORIES = ['Permakanan', 'Sandang', 'Penampungan', 'Penanganan Kelompok Rentan', 'Lain-lain'];
 
   // Helper to extract kecamatan
   const getKecamatan = (alamat: string) => {
@@ -103,7 +155,7 @@ const RekapIndikator: React.FC = () => {
       // Filter by category if selected
       const categoryMatch = !filters.kategori || tx.items.some(item => {
         const p = products.find(prod => prod.id === item.productId);
-        return p?.kategori === filters.kategori;
+        return p && isProductInFilterCategory(p.namaBarang, filters.kategori);
       });
 
       const typeMatch = filters.tipeTransaksi === 'Semua' || filters.tipeTransaksi === 'Keluar';
@@ -119,7 +171,7 @@ const RekapIndikator: React.FC = () => {
       const periodMatch = isInPeriod(entry.tanggal, filters.periode);
       
       const p = products.find(prod => prod.id === entry.productId);
-      const categoryMatch = !filters.kategori || p?.kategori === filters.kategori;
+      const categoryMatch = !filters.kategori || (p && isProductInFilterCategory(p.namaBarang, filters.kategori));
 
       const typeMatch = filters.tipeTransaksi === 'Semua' || filters.tipeTransaksi === 'Masuk';
 
@@ -142,11 +194,11 @@ const RekapIndikator: React.FC = () => {
 
     // Initialize with products that match category filter
     products.forEach(p => {
-      if (!filters.kategori || p.kategori === filters.kategori) {
+      if (!filters.kategori || isProductInFilterCategory(p.namaBarang, filters.kategori)) {
         recap[p.id] = {
           productId: p.id,
           namaBarang: p.namaBarang,
-          kategori: p.kategori || 'Lain-lain',
+          kategori: getProductCategoriesText(p.namaBarang),
           satuan: p.satuan,
           harga: p.harga,
           jumlahMasuk: 0,
@@ -197,12 +249,21 @@ const RekapIndikator: React.FC = () => {
   const groupedRecapData = useMemo<Record<string, any[]>>(() => {
     const groups: Record<string, any[]> = {};
     itemRecapData.forEach(item => {
-      const cat = item.kategori || 'Lain-lain';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(item);
+      const matchedCats: string[] = [];
+      if (isProductInFilterCategory(item.namaBarang, 'Permakanan')) matchedCats.push('Permakanan');
+      if (isProductInFilterCategory(item.namaBarang, 'Sandang')) matchedCats.push('Sandang');
+      if (isProductInFilterCategory(item.namaBarang, 'Penampungan')) matchedCats.push('Penampungan');
+      if (isProductInFilterCategory(item.namaBarang, 'Penanganan Kelompok Rentan')) matchedCats.push('Penanganan Kelompok Rentan');
+      if (matchedCats.length === 0) matchedCats.push('Lain-lain');
+
+      matchedCats.forEach(cat => {
+        if (filters.kategori && cat !== filters.kategori) return;
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(item);
+      });
     });
     return groups;
-  }, [itemRecapData]);
+  }, [itemRecapData, filters.kategori]);
 
   const handleExportPDF = () => {
     const columns = [

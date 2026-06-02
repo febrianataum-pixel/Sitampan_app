@@ -97,13 +97,25 @@ const LaporanBlora: React.FC = () => {
       : `REKAPITULASI LOGISTIK - TAHUN ${selectedYear}`;
 
     const columns = [
-      { header: 'Kode Barang', dataKey: 'kodeBarang' },
       { header: 'Jenis Barang', dataKey: 'namaBarang' },
-      { header: 'Jumlah Masuk', dataKey: 'jumlahMasuk', align: 'center' as const, format: (v: number) => `${v.toLocaleString('id-ID')}` },
-      { header: 'Jumlah Keluar', dataKey: 'jumlahKeluar', align: 'center' as const, format: (v: number) => `${v.toLocaleString('id-ID')}` },
-      { header: 'Sisa Barang', dataKey: 'sisaBarang', align: 'center' as const, format: (v: number) => `${v.toLocaleString('id-ID')}` },
-      { header: 'Satuan', dataKey: 'satuan', align: 'center' as const },
-      { header: 'Nilai Sisa', dataKey: 'totalHargaSisa', align: 'right' as const, format: (v: number) => `Rp ${v.toLocaleString('id-ID')}` }
+      { 
+        header: 'Jumlah Masuk', 
+        dataKey: 'jumlahMasuk', 
+        align: 'center' as const, 
+        format: (v: number, row: any) => `${v.toLocaleString('id-ID')} ${row.satuan || ''}` 
+      },
+      { 
+        header: 'Jumlah Keluar', 
+        dataKey: 'jumlahKeluar', 
+        align: 'center' as const, 
+        format: (v: number, row: any) => `${v.toLocaleString('id-ID')} ${row.satuan || ''}` 
+      },
+      { 
+        header: 'Sisa Barang', 
+        dataKey: 'sisaBarang', 
+        align: 'center' as const, 
+        format: (v: number, row: any) => `${v.toLocaleString('id-ID')} ${row.satuan || ''}` 
+      }
     ];
 
     generateReportPDF(

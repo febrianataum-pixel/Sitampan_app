@@ -7,7 +7,7 @@ interface PDFColumn {
   header: string;
   dataKey: string;
   align?: 'left' | 'center' | 'right';
-  format?: (val: any) => string;
+  format?: (val: any, row?: any) => string;
 }
 
 export const generateReportPDF = (
@@ -32,7 +32,7 @@ export const generateReportPDF = (
   const tableBodyHtml = data.map((row, idx) => {
     const cells = columns.map(col => {
       const val = row[col.dataKey];
-      const displayVal = col.format ? col.format(val) : val;
+      const displayVal = col.format ? col.format(val, row) : val;
       return `<td style="border: 1px solid #000; padding: 6px 8px; font-size: 10px; text-align: ${col.align || 'left'}">${displayVal}</td>`;
     }).join('');
     return `<tr>${cells}</tr>`;
