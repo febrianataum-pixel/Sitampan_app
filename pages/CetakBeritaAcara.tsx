@@ -123,12 +123,12 @@ const CetakBeritaAcara: React.FC = () => {
     <div style="margin-top:35px; font-family: Arial, sans-serif;">
       <table style="width:100%; border:none; font-size:12px; border-collapse:collapse;">
         <tr>
-          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:106px; color:#000; text-align:left;">
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:60px; color:#000; text-align:left; white-space: nowrap;">
             <span style="visibility:hidden; display:inline-block; user-select:none;">Blora, [tanggal]</span><br>
             PIHAK KEDUA<br><br><br><br><br>
             <b>[Nama_penerima]</b>
           </td>
-          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:130px; color:#000; text-align:left;">
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:90px; color:#000; text-align:left; white-space: nowrap;">
             Blora, [tanggal]<br>
             PIHAK KESATU<br><br><br><br><br>
             <b style="text-decoration:underline;">[nama_kabid]</b><br>
@@ -184,13 +184,13 @@ const CetakBeritaAcara: React.FC = () => {
     <div style="margin-top:35px; font-family: Arial, sans-serif;">
       <table style="width:100%; border:none; font-size:12px; border-collapse:collapse;">
         <tr>
-          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:106px; color:#000; text-align:left;">
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:60px; color:#000; text-align:left; white-space: nowrap;">
             <span style="visibility:hidden; display:inline-block; user-select:none;">Blora, [tanggal]</span><br>
             Petugas Logistik<br><br><br><br><br>
             <b>[Nama_petugaslogistik]</b><br>
             [NIP_petugaslogistik]
           </td>
-          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:130px; color:#000; text-align:left;">
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:90px; color:#000; text-align:left; white-space: nowrap;">
             Blora, [tanggal]<br>
             Kepala Bidang Sosial<br><br><br><br><br>
             <b style="text-decoration:underline;">[nama_kabid]</b><br>
@@ -332,7 +332,9 @@ const CetakBeritaAcara: React.FC = () => {
       .replace(/\[no_sk_petugas\]/g, petugasNoSk)
       .replace(/\[tanggal_sk_petugas\]/g, petugasTanggalSk)
       .replace(/\[tentang_sk_petugas\]/g, petugasTentangSk)
-      .replace(/\[nama_sk_petugas\]/g, petugasNamaSk);
+      .replace(/\[nama_sk_petugas\]/g, petugasNamaSk)
+      .replace(/padding-left:\s*106px/gi, "padding-left:60px; white-space:nowrap")
+      .replace(/padding-left:\s*130px/gi, "padding-left:90px; white-space:nowrap");
     
     const hasImages = docType === 'BA' && tx.images && tx.images.length > 0;
     
