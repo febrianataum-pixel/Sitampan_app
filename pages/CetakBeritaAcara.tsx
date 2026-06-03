@@ -322,8 +322,94 @@ const CetakBeritaAcara: React.FC = () => {
       .replace(/\[tentang_sk_petugas\]/g, petugasTentangSk)
       .replace(/\[nama_sk_petugas\]/g, petugasNamaSk);
     
-    if (forPdf) return `<div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; background: white; margin: 0; padding: 0;"><div style="width: 170mm; min-height: 240mm; font-family: 'Arial', sans-serif;">${html}</div></div>`;
-    return html;
+    const hasImages = docType === 'BA' && tx.images && tx.images.length > 0;
+    
+    if (forPdf) {
+      if (hasImages) {
+        const imageCount = tx.images?.length || 0;
+        let imgHeightStyle = "max-height: 110mm;";
+        if (imageCount >= 3) {
+          imgHeightStyle = "max-height: 60mm;";
+        } else if (imageCount === 2) {
+          imgHeightStyle = "max-height: 80mm;";
+        }
+
+        const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const dateObjRaw = new Date(tx.tanggal);
+        const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
+        const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+
+        const documentationHtml = `
+          <div class="html2pdf__page-break" style="page-break-before: always; text-align: center; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 170mm; min-height: auto; margin: 0 auto; padding-top: 0px;">
+            <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; color: #000; letter-spacing: 1px; text-align: center; width: 100%;">DOKUMENTASI</h2>
+            <p style="font-size: 14px; margin-bottom: 6px; color: #333; line-height: 1.4; text-align: center; width: 100%;">
+              Penyaluran Bantuan Sosial <strong>${tx.penerima}</strong>, di <strong>${tx.alamat || '-'}</strong>
+            </p>
+            <p style="font-size: 13px; margin-bottom: 30px; color: #555; text-align: center; width: 100%;">
+              ${formattedDateLabel}
+            </p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; width: 100%; max-width: 100%;">
+              ${(tx.images || []).map(img => `
+                <div style="border: 1px solid #ddd; padding: 10px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; box-sizing: border-box; display: inline-block;">
+                  <img src="${img}" style="${imgHeightStyle} max-width: 100%; object-fit: contain; border-radius: 4px;" />
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+
+        return `
+          <div style="background: white; margin: 0; padding: 0;">
+            <div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; box-sizing: border-box; background: white; margin: 0; padding: 0;">
+              <div style="width: 170mm; min-height: 240mm; font-family: 'Arial', sans-serif;">
+                ${html}
+              </div>
+            </div>
+            <div style="width: 210mm; height: 297mm; display: flex; align-items: flex-start; justify-content: center; box-sizing: border-box; background: white; margin: 0; padding: 25mm 0 0 0;">
+              ${documentationHtml}
+            </div>
+          </div>
+        `;
+      } else {
+        return `<div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; background: white; margin: 0; padding: 0;"><div style="width: 170mm; min-height: 240mm; font-family: 'Arial', sans-serif;">${html}</div></div>`;
+      }
+    } else {
+      if (hasImages) {
+        const imageCount = tx.images?.length || 0;
+        let imgHeightStyle = "max-height: 110mm;";
+        if (imageCount >= 3) {
+          imgHeightStyle = "max-height: 60mm;";
+        } else if (imageCount === 2) {
+          imgHeightStyle = "max-height: 80mm;";
+        }
+
+        const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const dateObjRaw = new Date(tx.tanggal);
+        const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
+        const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+
+        const documentationHtml = `
+          <div class="html2pdf__page-break" style="page-break-before: always; margin-top: 50px; border-top: 2px dashed #e2e8f0; padding-top: 50px; text-align: center; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%;">
+            <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; color: #000; letter-spacing: 1px; text-align: center; width: 100%;">DOKUMENTASI</h2>
+            <p style="font-size: 14px; margin-bottom: 6px; color: #333; line-height: 1.4; text-align: center; width: 100%;">
+              Penyaluran Bantuan Sosial <strong>${tx.penerima}</strong>, di <strong>${tx.alamat || '-'}</strong>
+            </p>
+            <p style="font-size: 13px; margin-bottom: 30px; color: #555; text-align: center; width: 100%;">
+              ${formattedDateLabel}
+            </p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; width: 100%; max-width: 100%;">
+              ${(tx.images || []).map(img => `
+                <div style="border: 1px solid #ddd; padding: 10px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; box-sizing: border-box; display: inline-block;">
+                  <img src="${img}" style="${imgHeightStyle} max-width: 100%; object-fit: contain; border-radius: 4px;" />
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+        return `<div>${html}</div>${documentationHtml}`;
+      }
+      return html;
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -360,8 +446,8 @@ const CetakBeritaAcara: React.FC = () => {
           </div>
         </div>
         <div className="flex justify-start sm:justify-center overflow-x-auto p-4 scrollbar-hide bg-slate-200/50 dark:bg-white/5 rounded-ios-lg border border-slate-300 dark:border-white/5">
-          <div ref={printAreaRef} className="bg-white w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl shrink-0 flex items-center justify-center">
-            <div className="w-[170mm] text-black">
+          <div ref={printAreaRef} className="bg-white w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl shrink-0 flex flex-col justify-start">
+            <div className="w-[170mm] mx-auto text-black">
               <div dangerouslySetInnerHTML={{ __html: renderBA(selectedTx) }} />
             </div>
           </div>
