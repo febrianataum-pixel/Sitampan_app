@@ -48,6 +48,20 @@ export interface AppSettings {
   baTemplate?: string;
   sppbTemplate?: string;
   theme?: 'light' | 'dark';
+  // Kepala Bidang Sosial
+  kabidNama?: string;
+  kabidNip?: string;
+  kabidJabatan?: string;
+  kabidInstansi?: string;
+  // Petugas Logistik
+  petugasNama?: string;
+  petugasNip?: string;
+  petugasJabatan?: string;
+  petugasInstansi?: string;
+  petugasNoSk?: string;
+  petugasTanggalSk?: string;
+  petugasTentangSk?: string;
+  petugasNamaSk?: string;
   // Firebase Sync Config
   fbApiKey?: string;
   fbProjectId?: string;

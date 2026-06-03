@@ -7,7 +7,7 @@ import { exportToCSV } from '../services/csvService';
 import { generateReportPDF } from '../services/pdfService';
 
 const RekapBulanan: React.FC = () => {
-  const { products, outbound, settings } = useInventory();
+  const { products, inbound, outbound, settings, calculateStock } = useInventory();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   // Menghitung data matriks: Barang x Bulan
@@ -26,51 +26,114 @@ const RekapBulanan: React.FC = () => {
 
     const totalYear = monthlyTotals.reduce((a, b) => a + b, 0);
 
+    // Hitung total masuk untuk tahun terpilih
+    const totalMasuk = inbound
+      .filter(tx => {
+        const d = new Date(tx.tanggal);
+        const y = tx.tahun || d.getFullYear();
+        return tx.productId === p.id && y === selectedYear;
+      })
+      .reduce((acc, tx) => acc + tx.jumlah, 0);
+
+    const sisa = calculateStock(p.id);
+
     return {
+      id: p.id,
       namaBarang: p.namaBarang,
       kodeBarang: p.kodeBarang,
       satuan: p.satuan,
       monthlyTotals,
-      totalYear
+      totalYear,
+      totalMasuk,
+      sisa
     };
-  }).filter(r => r.totalYear > 0); // Hanya tampilkan barang yang pernah keluar di tahun tersebut
+  })
+  .filter(r => r.totalYear > 0 || r.totalMasuk > 0)
+  .sort((a, b) => a.namaBarang.localeCompare(b.namaBarang, 'id')); // Urutkan secara abjad berdasarkan nama barang
+
+  // Menghitung grand total untuk baris paling bawah
+  const totalMasukAll = rekapTahunan.reduce((acc, r) => acc + r.totalMasuk, 0);
+  const monthlyTotalsAll = MONTHS.map((_, mIdx) => {
+    return rekapTahunan.reduce((acc, r) => acc + r.monthlyTotals[mIdx], 0);
+  });
+  const totalYearAll = rekapTahunan.reduce((acc, r) => acc + r.totalYear, 0);
+  const totalSisaAll = rekapTahunan.reduce((acc, r) => acc + r.sisa, 0);
 
   const handleExportCSV = () => {
     const data = rekapTahunan.map(r => {
       const row: any = {
         'KODE': r.kodeBarang,
         'NAMA BARANG': r.namaBarang,
+        'MASUK': r.totalMasuk,
       };
       MONTHS.forEach((m, idx) => {
         row[m.toUpperCase()] = r.monthlyTotals[idx];
       });
       row['TOTAL TAHUNAN'] = r.totalYear;
+      row['SISA'] = r.sisa;
       row['SATUAN'] = r.satuan;
       return row;
     });
+
+    // Add totals row to CSV
+    if (rekapTahunan.length > 0) {
+      const totalsRow: any = {
+        'KODE': '-',
+        'NAMA BARANG': 'JUMLAH TOTAL',
+        'MASUK': totalMasukAll,
+      };
+      MONTHS.forEach((m, idx) => {
+        totalsRow[m.toUpperCase()] = monthlyTotalsAll[idx];
+      });
+      totalsRow['TOTAL TAHUNAN'] = totalYearAll;
+      totalsRow['SISA'] = totalSisaAll;
+      totalsRow['SATUAN'] = '-';
+      data.push(totalsRow);
+    }
+
     exportToCSV(data, `Rekap_Tahunan_${selectedYear}`);
   };
 
   const handleExportPDF = () => {
     const columns = [
       { header: 'Nama Barang', dataKey: 'namaBarang' },
+      { header: 'Masuk', dataKey: 'totalMasuk', align: 'center' as const, format: (v: any) => String(v) },
       ...MONTHS.map((m, idx) => ({ 
         header: m.substring(0, 3), 
         dataKey: `m${idx}`, 
         align: 'center' as const 
       })),
-      { header: 'Total', dataKey: 'totalYear', align: 'center' as const, format: (v: any) => String(v) }
+      { header: 'Total Keluar', dataKey: 'totalYear', align: 'center' as const, format: (v: any) => String(v) },
+      { header: 'Sisa', dataKey: 'sisa', align: 'center' as const, format: (v: any) => String(v) }
     ];
 
     const data = rekapTahunan.map(r => {
-      const row: any = { namaBarang: r.namaBarang, totalYear: r.totalYear };
+      const row: any = { 
+        namaBarang: r.namaBarang, 
+        totalMasuk: r.totalMasuk || '-',
+        totalYear: r.totalYear || '-',
+        sisa: r.sisa || '-'
+      };
       r.monthlyTotals.forEach((val, idx) => {
         row[`m${idx}`] = val || '-';
       });
       return row;
     });
 
-    generateReportPDF(`REKAPITULASI PENGELUARAN TAHUN ${selectedYear}`, columns, data, settings);
+    if (rekapTahunan.length > 0) {
+      const totalsRow: any = {
+        namaBarang: 'JUMLAH TOTAL',
+        totalMasuk: String(totalMasukAll),
+        totalYear: String(totalYearAll),
+        sisa: String(totalSisaAll)
+      };
+      monthlyTotalsAll.forEach((val, idx) => {
+        totalsRow[`m${idx}`] = val || '-';
+      });
+      data.push(totalsRow);
+    }
+
+    generateReportPDF(`REKAPITULASI MUTASI BARANG TAHUN ${selectedYear}`, columns, data, settings);
   };
 
   return (
@@ -111,10 +174,12 @@ const RekapBulanan: React.FC = () => {
             <thead className="bg-slate-50 dark:bg-white/5 font-bold border-b dark:border-white/5 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               <tr>
                 <th className="px-6 py-4 sticky left-0 bg-slate-50 dark:bg-ios-secondary-dark z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Barang</th>
+                <th className="px-4 py-4 text-center w-20">Masuk</th>
                 {MONTHS.map(m => (
                   <th key={m} className="px-2 py-4 text-center w-16">{m.substring(0, 3)}</th>
                 ))}
-                <th className="px-6 py-4 text-center bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark">Total</th>
+                <th className="px-4 py-4 text-center bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark">Total</th>
+                <th className="px-4 py-4 text-center w-20">Sisa</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -124,19 +189,48 @@ const RekapBulanan: React.FC = () => {
                     <p className="font-bold text-slate-800 dark:text-slate-200">{r.namaBarang}</p>
                     <p className="text-[9px] text-slate-500 dark:text-slate-400 font-mono">{r.kodeBarang}</p>
                   </td>
+                  <td className="px-4 py-4 text-center font-bold text-emerald-600 dark:text-emerald-400">
+                    {r.totalMasuk || '-'}
+                  </td>
                   {r.monthlyTotals.map((val, mIdx) => (
                     <td key={mIdx} className={`px-2 py-4 text-center font-bold ${val > 0 ? 'text-slate-800 dark:text-slate-200' : 'text-slate-300 dark:text-slate-700 font-normal'}`}>
                       {val || '-'}
                     </td>
                   ))}
-                  <td className="px-6 py-4 text-center font-bold text-ios-blue-light dark:text-ios-blue-dark bg-ios-blue-light/10 dark:bg-ios-blue-dark/10">
+                  <td className="px-4 py-4 text-center font-bold text-ios-blue-light dark:text-ios-blue-dark bg-ios-blue-light/10 dark:bg-ios-blue-dark/10">
                     {r.totalYear} <span className="text-[8px] text-slate-500 dark:text-slate-400 font-normal ml-1">{r.satuan}</span>
+                  </td>
+                  <td className="px-4 py-4 text-center font-bold text-amber-600 dark:text-amber-400">
+                    {r.sisa}
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={14} className="px-6 py-24 text-center text-slate-400 dark:text-slate-600 italic">Tidak ada data pengeluaran barang untuk tahun {selectedYear}.</td></tr>
+                <tr><td colSpan={16} className="px-6 py-24 text-center text-slate-400 dark:text-slate-600 italic">Tidak ada data transaksi barang untuk tahun {selectedYear}.</td></tr>
               )}
             </tbody>
+            {rekapTahunan.length > 0 && (
+              <tfoot className="bg-slate-100 dark:bg-white/10 font-bold border-t border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-200">
+                <tr>
+                  <td className="px-6 py-4 sticky left-0 bg-slate-100 dark:bg-ios-secondary-dark z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] font-black uppercase">
+                    Jumlah
+                  </td>
+                  <td className="px-4 py-4 text-center font-black text-emerald-600 dark:text-emerald-400">
+                    {totalMasukAll}
+                  </td>
+                  {monthlyTotalsAll.map((val, mIdx) => (
+                    <td key={mIdx} className="px-2 py-4 text-center font-black">
+                      {val || '-'}
+                    </td>
+                  ))}
+                  <td className="px-4 py-4 text-center font-black text-ios-blue-light dark:text-ios-blue-dark bg-ios-blue-light/20 dark:bg-ios-blue-dark/20">
+                    {totalYearAll}
+                  </td>
+                  <td className="px-4 py-4 text-center font-black text-amber-600 dark:text-amber-400">
+                    {totalSisaAll}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
@@ -147,7 +241,7 @@ const RekapBulanan: React.FC = () => {
         </div>
         <div className="text-xs space-y-1">
           <p className="font-bold uppercase tracking-tight">Informasi Laporan</p>
-          <p className="font-medium opacity-80">Data di atas adalah ringkasan volume barang yang keluar (Barang Keluar) setiap bulannya. Angka 0 atau tanda (-) menunjukkan tidak ada aktivitas pengeluaran pada bulan tersebut.</p>
+          <p className="font-medium opacity-80">Data di atas adalah ringkasan volume barang yang masuk, keluar per bulan, total keluaan tahunan, dan sisa stok. Angka 0 atau tanda (-) menunjukkan tidak ada aktivitas transaksi pada bulan tersebut.</p>
         </div>
       </div>
     </div>

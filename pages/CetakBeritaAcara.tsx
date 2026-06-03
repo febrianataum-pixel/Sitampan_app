@@ -28,6 +28,41 @@ import { OutboundTransaction, MONTHS, formatIndoDate } from '../types';
 
 declare var html2pdf: any;
 
+const terbilang = (num: number): string => {
+  const words = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+  let res = "";
+  if (num < 12) {
+    res = words[num];
+  } else if (num < 20) {
+    res = words[num - 10] + " Belas";
+  } else if (num < 100) {
+    const main = words[Math.floor(num / 10)] + " Puluh";
+    const rest = words[num % 10];
+    res = rest ? main + " " + rest : main;
+  } else if (num < 2000) {
+    res = "Seribu " + terbilang(num - 1000);
+  } else if (num < 10000) {
+    const main = words[Math.floor(num / 1000)] + " Ribu";
+    const rest = terbilang(num % 1000);
+    res = rest ? main + " " + rest : main;
+  }
+  return res.trim();
+};
+
+const formatHariTanggalTahunIndo = (dateStr: string): string => {
+  const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  const months = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return dateStr;
+  
+  const dayName = days[dateObj.getDay()];
+  const dateNum = dateObj.getDate();
+  const monthName = months[dateObj.getMonth() + 1];
+  const yearNum = dateObj.getFullYear();
+  
+  return `Hari ${dayName}, Tanggal ${terbilang(dateNum)} Bulan ${monthName} Tahun ${terbilang(yearNum)}`;
+};
+
 type SortKey = 'tanggal' | 'penerima' | 'alamat';
 
 const CetakBeritaAcara: React.FC = () => {
@@ -45,58 +80,57 @@ const CetakBeritaAcara: React.FC = () => {
   });
 
   const defaultBA = `
-    <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px; width:100%;">
+    <div style="display:flex; align-items:center; border-bottom:3.5px double #000; padding-bottom:10px; margin-bottom:20px; width:100%; font-family: Arial, sans-serif;">
       <div style="width:15%; text-align:left;">[logo_app]</div>
       <div style="width:85%; text-align:center; padding-right:15%;">
-        <h2 style="margin:0; font-size:14px; text-transform:uppercase; letter-spacing:0.5px; font-weight:normal;">Pemerintah Kabupaten Blora</h2>
-        <h1 style="margin:0; font-size:18px; text-transform:uppercase; font-weight:bold; line-height:1.2;">[nama_app]</h1>
-        <p style="margin:2px 0; font-size:10px; font-weight:bold;">[subtitle_app]</p>
-        <p style="margin:0; font-size:9px;">[nama_gudang]</p>
+        <div style="margin:0; font-size:14px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px; color:#000;">PEMERINTAH KABUPATEN BLORA</div>
+        <div style="margin:2px 0 0 0; font-size:16px; font-weight:bold; text-transform:uppercase; line-height:1.2; color:#000;">DINAS SOSIAL PEMBERDAYAAN PEREMPUAN</div>
+        <div style="margin:0 0 2px 0; font-size:16px; font-weight:bold; text-transform:uppercase; line-height:1.2; color:#000;">DAN PERLINDUNGAN ANAK</div>
+        <div style="margin:3px 0; font-size:9px; font-weight:normal; color:#000;">Jl. Pemuda No.16 A Blora 58215, No. Tlp: (0296) 5298541</div>
+        <div style="margin:0; font-size:9px; font-weight:normal; color:#000;">Website : dinsos.blorakab.go.id / E-mail : dinsosp3a.bla.com</div>
       </div>
     </div>
     
-    <div style="text-align:center; margin-bottom:25px;">
-      <h3 style="text-decoration:underline; font-size:15px; margin:0; font-weight:bold; text-transform:uppercase;">BERITA ACARA SERAH TERIMA</h3>
-      <p style="margin:5px 0 0 0; font-size:11px;">Nomor: [id_transaksi]/BAST/[tahun]</p>
+    <div style="text-align:center; margin-bottom:25px; font-family: Arial, sans-serif;">
+      <h3 style="text-decoration:underline; font-size:15px; margin:0; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">BERITA ACARA SERAH TERIMA</h3>
     </div>
     
-    <p style="font-size:12px; line-height:1.5; margin-bottom:15px;">Pada hari ini <b>[tanggal_panjang]</b>, yang bertandatangan di bawah ini masing-masing :</p>
+    <p style="font-size:12px; line-height:1.6; margin-bottom:15px; font-family: Arial, sans-serif;">Pada hari ini <b>[hari_tanggal_tahun]</b>, yang bertandatangan di bawah ini masing-masing :</p>
     
-    <table style="width:100%; font-size:12px; margin-bottom:10px; border-collapse:collapse;">
-      <tr><td width="100" style="padding:2px 0;">Nama</td><td width="15">:</td><td style="font-weight:bold;">[nama_pihak_kesatu]</td></tr>
-      <tr><td style="padding:2px 0;">NIP</td><td>:</td><td style="font-weight:bold;">[nip_pihak_kesatu]</td></tr>
-      <tr><td style="padding:2px 0;">Jabatan</td><td>:</td><td>[jabatan_pihak_kesatu]</td></tr>
-      <tr><td style="padding:2px 0;">Instansi</td><td>:</td><td>[nama_app]</td></tr>
+    <table style="width:100%; font-size:12px; margin-bottom:12px; border-collapse:collapse; font-family: Arial, sans-serif;">
+      <tr><td width="100" style="padding:2px 0; vertical-align:top;">Nama</td><td width="15" style="padding:2px 0; vertical-align:top;">:</td><td style="font-weight:bold; padding:2px 0; vertical-align:top;">[nama_kabid]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">NIP</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="font-weight:bold; padding:2px 0; vertical-align:top;">[NIP_kabid]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">Jabatan</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="padding:2px 0; vertical-align:top;">[Jabatan_kabid]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">Instansi</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="padding:2px 0; vertical-align:top;">[Instansi_kabid]</td></tr>
     </table>
-    <p style="font-size:12px; margin-bottom:20px;">Selanjutnya disebut sebagai <b><i>PIHAK KESATU</i></b>.</p>
+    <p style="font-size:12px; margin-bottom:20px; font-family: Arial, sans-serif;">Selanjutnya disebut sebagai <b><i>PIHAK KESATU</i></b>.</p>
 
-    <p style="font-size:12px; margin-bottom:5px;">Yang menerima bantuan</p>
-    <table style="width:100%; font-size:12px; margin-bottom:10px; border-collapse:collapse;">
-      <tr><td width="100" style="padding:2px 0;">Penerima</td><td width="15">:</td><td style="font-weight:bold;">[penerima]</td></tr>
-      <tr><td style="padding:2px 0;">Alamat</td><td>:</td><td>[alamat]</td></tr>
+    <p style="font-size:12px; margin-bottom:5px; font-family: Arial, sans-serif;">Yang menerima bantuan :</p>
+    <table style="width:100%; font-size:12px; margin-bottom:12px; border-collapse:collapse; font-family: Arial, sans-serif;">
+      <tr><td width="100" style="padding:2px 0; vertical-align:top;">Nama</td><td width="15" style="padding:2px 0; vertical-align:top;">:</td><td style="font-weight:bold; padding:2px 0; vertical-align:top;">[Nama_penerima]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">Alamat</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="padding:2px 0; vertical-align:top;">[Alamat_penerima]</td></tr>
     </table>
-    <p style="font-size:12px; margin-bottom:20px;">Selanjutnya disebut sebagai <b><i>PIHAK KEDUA</i></b>.</p>
+    <p style="font-size:12px; margin-bottom:20px; font-family: Arial, sans-serif;">Selanjutnya disebut sebagai <b><i>PIHAK KEDUA</i></b>.</p>
 
-    <p style="font-size:12px; line-height:1.5; margin-bottom:15px;">Dengan ini menerangkan bahwa <b>PIHAK KESATU</b> telah menyerahkan Barang Bantuan Logistik Kebencanaan kepada <b>PIHAK KEDUA</b> dan <b>PIHAK KEDUA</b> telah menerima barang tersebut dari <b>PIHAK KESATU</b> dalam keadaan baik dan lengkap berupa :</p>
+    <p style="font-size:12px; line-height:1.6; margin-bottom:15px; font-family: Arial, sans-serif;">Dengan ini menerangkan bahwa <b>PIHAK KESATU</b> telah menyerahkan Barang Bantuan Logistik Kebencanaan kepada <b>PIHAK KEDUA</b> dan <b>PIHAK KEDUA</b> telah menerima barang tersebut dari <b>PIHAK KESATU</b> dalam keadaan baik dan lengkap berupa :</p>
     
-    [tabel_barang]
+    [table barang]
     
-    <p style="font-size:12px; line-height:1.5; margin-top:20px;">Demikian Berita Acara Serah Terima ini dibuat, untuk dipergunakan sebagaimana mestinya.</p>
+    <p style="font-size:12px; line-height:1.6; margin-top:20px; margin-bottom:30px; font-family: Arial, sans-serif;">Demikian Berita Acara Serah Terima ini dibuat, untuk dipergunakan sebagaimana mestinya.</p>
     
-    <div style="margin-top:40px;">
-      <div style="text-align:right; font-size:12px; margin-bottom:5px;">[tanggal_panjang]</div>
-      <table style="width:100%; border:none; font-size:12px;">
+    <div style="margin-top:35px; font-family: Arial, sans-serif;">
+      <table style="width:100%; border:none; font-size:12px; border-collapse:collapse;">
         <tr>
-          <td align="center" width="50%" style="vertical-align:top;">
-            PIHAK KEDUA,<br><br><br><br><br>
-            <b>( [penerima] )</b>
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:106px; color:#000; text-align:left;">
+            <span style="visibility:hidden; display:inline-block; user-select:none;">Blora, [tanggal]</span><br>
+            PIHAK KEDUA<br><br><br><br><br>
+            <b>[Nama_penerima]</b>
           </td>
-          <td align="center" width="50%" style="vertical-align:top;">
-            PIHAK KESATU,<br><br><br><br><br>
-            <div style="display:inline-block; text-align:left;">
-              <b style="text-decoration:underline;">[nama_pihak_kesatu]</b><br>
-              <b>[nip_pihak_kesatu]</b>
-            </div>
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:130px; color:#000; text-align:left;">
+            Blora, [tanggal]<br>
+            PIHAK KESATU<br><br><br><br><br>
+            <b style="text-decoration:underline;">[nama_kabid]</b><br>
+            NIP. [NIP_kabid]
           </td>
         </tr>
       </table>
@@ -104,48 +138,61 @@ const CetakBeritaAcara: React.FC = () => {
   `;
 
   const defaultSPPB = `
-    <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px; width:100%;">
+    <div style="display:flex; align-items:center; border-bottom:3.5px double #000; padding-bottom:10px; margin-bottom:20px; width:100%; font-family: Arial, sans-serif;">
       <div style="width:15%; text-align:left;">[logo_app]</div>
       <div style="width:85%; text-align:center; padding-right:15%;">
-        <h2 style="margin:0; font-size:14px; text-transform:uppercase; letter-spacing:0.5px; font-weight:normal;">Pemerintah Kabupaten Blora</h2>
-        <h1 style="margin:0; font-size:18px; text-transform:uppercase; font-weight:bold; line-height:1.2;">[nama_app]</h1>
-        <p style="margin:2px 0; font-size:10px; font-weight:bold;">[subtitle_app]</p>
-        <p style="margin:0; font-size:9px;">[nama_gudang]</p>
+        <div style="margin:0; font-size:14px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px; color:#000;">PEMERINTAH KABUPATEN BLORA</div>
+        <div style="margin:2px 0 0 0; font-size:16px; font-weight:bold; text-transform:uppercase; line-height:1.2; color:#000;">DINAS SOSIAL PEMBERDAYAAN PEREMPUAN</div>
+        <div style="margin:0 0 2px 0; font-size:16px; font-weight:bold; text-transform:uppercase; line-height:1.2; color:#000;">DAN PERLINDUNGAN ANAK</div>
+        <div style="margin:3px 0; font-size:9px; font-weight:normal; color:#000;">Jl. Pemuda No.16 A Blora 58215, No. Tlp: (0296) 5298541</div>
+        <div style="margin:0; font-size:9px; font-weight:normal; color:#000;">Website : dinsos.blorakab.go.id / E-mail : dinsosp3a.bla.com</div>
       </div>
     </div>
     
-    <div style="text-align:center; margin-bottom:25px;">
-      <h3 style="text-decoration:underline; font-size:15px; margin:0; font-weight:bold; text-transform:uppercase;">SURAT PERINTAH PENGELUARAN BARANG (SPPB)</h3>
-      <p style="margin:5px 0 0 0; font-size:11px;">Nomor: [id_transaksi]/SPPB/[tahun]</p>
+    <div style="text-align:center; margin-bottom:25px; font-family: Arial, sans-serif;">
+      <h3 style="text-decoration:underline; font-size:15px; margin:0; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">SURAT PERINTAH PENGELUARAN BARANG (SPPB)</h3>
     </div>
     
-    <p style="font-size:12px; line-height:1.5; margin-bottom:15px;">Kepada Yth. Pengelola Gudang Logistik, diperintahkan untuk mengeluarkan barang bantuan logistik dengan rincian sebagai berikut:</p>
+    <p style="font-size:12px; line-height:1.6; margin-bottom:15px; font-family: Arial, sans-serif;">Yang bertandatangan di bawah ini masing-masing :</p>
     
-    <table style="width:100%; font-size:12px; margin-bottom:10px; border-collapse:collapse;">
-      <tr><td width="100" style="padding:2px 0;">Penerima</td><td width="15">:</td><td style="font-weight:bold;">[penerima]</td></tr>
-      <tr><td style="padding:2px 0;">Alamat</td><td>:</td><td>[alamat]</td></tr>
-      <tr><td style="padding:2px 0;">Tanggal</td><td>:</td><td>[tanggal_panjang]</td></tr>
+    <table style="width:100%; font-size:12px; margin-bottom:12px; border-collapse:collapse; font-family: Arial, sans-serif;">
+      <tr><td width="100" style="padding:2px 0; vertical-align:top;">Nama</td><td width="15" style="padding:2px 0; vertical-align:top;">:</td><td style="font-weight:bold; padding:2px 0; vertical-align:top;">[nama_kabid]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">NIP</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="font-weight:bold; padding:2px 0; vertical-align:top;">[NIP_kabid]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">Jabatan</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="padding:2px 0; vertical-align:top;">[Jabatan_kabid]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">Instansi</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="padding:2px 0; vertical-align:top;">[Instansi_kabid]</td></tr>
     </table>
+    <p style="font-size:12px; margin-bottom:20px; font-family: Arial, sans-serif;">Selanjutnya disebut sebagai <b><i>Pejabat Penatausahaan Barang</i></b></p>
 
-    <p style="font-size:12px; margin-bottom:10px;">Daftar Barang:</p>
-    [tabel_barang]
+    <p style="font-size:12px; line-height:1.6; margin-bottom:15px; font-family: Arial, sans-serif;">Berdasarkan [No_SK dan Tanggal_SK], bersama ini memerintahkan :</p>
     
-    <p style="font-size:12px; line-height:1.5; margin-top:20px;">Demikian surat perintah ini dibuat untuk dilaksanakan dengan penuh tanggung jawab.</p>
+    <table style="width:100%; font-size:12px; margin-bottom:12px; border-collapse:collapse; font-family: Arial, sans-serif;">
+      <tr><td width="100" style="padding:2px 0; vertical-align:top;">Nama</td><td width="15" style="padding:2px 0; vertical-align:top;">:</td><td style="font-weight:bold; padding:2px 0; vertical-align:top;">[nama_petugaslogistik]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">NIP</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="font-weight:bold; padding:2px 0; vertical-align:top;">[NIP_ petugaslogistik]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">Jabatan</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="padding:2px 0; vertical-align:top;">[Jabatan_ petugaslogistik]</td></tr>
+      <tr><td style="padding:2px 0; vertical-align:top;">Instansi</td><td style="padding:2px 0; vertical-align:top;">:</td><td style="padding:2px 0; vertical-align:top;">[Instansi_ petugaslogistik]</td></tr>
+    </table>
+    <p style="font-size:12px; margin-bottom:20px; font-family: Arial, sans-serif;">Selanjutnya disebut sebagai <b><i>Petugas Logistik</i></b></p>
+
+    <p style="font-size:12px; line-height:1.6; margin-bottom:15px; font-family: Arial, sans-serif;">Untuk menyalurkan barang sebagai berikut :</p>
     
-    <div style="margin-top:40px;">
-      <div style="text-align:right; font-size:12px; margin-bottom:5px;">[tanggal_panjang]</div>
-      <table style="width:100%; border:none; font-size:12px;">
+    [table barang]
+    
+    <p style="font-size:12px; line-height:1.6; margin-top:20px; margin-bottom:30px; font-family: Arial, sans-serif;">Demikian Surat Perintah Pengeluaran Barang (SPPB) ini dibuat, untuk dipergunakan sebagaimana mestinya..</p>
+    
+    <div style="margin-top:35px; font-family: Arial, sans-serif;">
+      <table style="width:100%; border:none; font-size:12px; border-collapse:collapse;">
         <tr>
-          <td align="center" width="50%" style="vertical-align:top;">
-            PENERIMA,<br><br><br><br><br>
-            <b>( [penerima] )</b>
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:106px; color:#000; text-align:left;">
+            <span style="visibility:hidden; display:inline-block; user-select:none;">Blora, [tanggal]</span><br>
+            Petugas Logistik<br><br><br><br><br>
+            <b>[Nama_petugaslogistik]</b><br>
+            [NIP_petugaslogistik]
           </td>
-          <td align="center" width="50%" style="vertical-align:top;">
-            PEMBERI PERINTAH,<br><br><br><br><br>
-            <div style="display:inline-block; text-align:left;">
-              <b style="text-decoration:underline;">[nama_pihak_kesatu]</b><br>
-              <b>[nip_pihak_kesatu]</b>
-            </div>
+          <td align="left" width="50%" style="vertical-align:top; padding-bottom:40px; padding-left:130px; color:#000; text-align:left;">
+            Blora, [tanggal]<br>
+            Kepala Bidang Sosial<br><br><br><br><br>
+            <b style="text-decoration:underline;">[nama_kabid]</b><br>
+            [NIP_kabid]
           </td>
         </tr>
       </table>
@@ -208,12 +255,72 @@ const CetakBeritaAcara: React.FC = () => {
       return `<tr style="font-size:11px;"><td style="border:1px solid #000; padding:6px; text-align:center;">${idx + 1}</td><td style="border:1px solid #000; padding:6px;">${p?.namaBarang || '-'}</td><td style="border:1px solid #000; padding:6px; text-align:center;">${item.jumlah}</td><td style="border:1px solid #000; padding:6px; text-align:center;">${p?.satuan || '-'}</td><td style="border:1px solid #000; padding:6px; text-align:right;">Rp ${(p?.harga || 0).toLocaleString('id-ID')}</td><td style="border:1px solid #000; padding:6px; text-align:right; font-weight:bold;">Rp ${total.toLocaleString('id-ID')}</td></tr>`;
     }).join('');
     const tableHtml = `<table style="width:100%; border-collapse:collapse; margin:10px 0;"><thead><tr style="background-color:#fff; font-size:10px; text-transform:uppercase;"><th style="border:1px solid #000; padding:8px; width:30px;">No</th><th style="border:1px solid #000; padding:8px; text-align:left;">Nama Barang</th><th style="border:1px solid #000; padding:8px; width:60px;">Jumlah</th><th style="border:1px solid #000; padding:8px; width:80px;">Satuan</th><th style="border:1px solid #000; padding:8px; text-align:right; width:100px;">Harga</th><th style="border:1px solid #000; padding:8px; text-align:right; width:120px;">Total</th></tr></thead><tbody>${tableRows}<tr style="font-weight:bold; font-size:11px;"><td colspan="5" style="border:1px solid #000; padding:8px; text-align:right;">Grand Total</td><td style="border:1px solid #000; padding:8px; text-align:right;">Rp ${grandTotal.toLocaleString('id-ID')}</td></tr></tbody></table>`;
-    html = html.replace(/\[logo_app\]/g, logoHtml).replace(/\[nama_app\]/g, settings.appName).replace(/\[subtitle_app\]/g, settings.appSubtitle).replace(/\[nama_gudang\]/g, settings.warehouseName).replace(/\[nama_admin\]/g, settings.adminName).replace(/\[id_transaksi\]/g, tx.id.split('-')[0].toUpperCase()).replace(/\[tahun\]/g, dateObj.getFullYear().toString()).replace(/\[penerima\]/g, tx.penerima).replace(/\[alamat\]/g, tx.alamat || '-').replace(/\[tanggal_panjang\]/g, datePanjang).replace(/\[tabel_barang\]/g, tableHtml);
-    
-    const isTemplateMissing = docType === 'BA' ? !settings.baTemplate : !settings.sppbTemplate;
-    if (isTemplateMissing) {
-      html = html.replace(/\[nama_pihak_kesatu\]/g, "NURKHOLIS, S.Kep, MM.").replace(/\[jabatan_pihak_kesatu\]/g, "Plt. Kepala Bidang Sosial Dinsos PPPA Kab. Blora").replace(/\[nip_pihak_kesatu\]/g, "19680328 198803 1 004");
-    }
+    const kabidNama = settings.kabidNama || "NURKHOLIS, S.Kep, MM.";
+    const kabidNip = settings.kabidNip || "19680328 198803 1 004";
+    const kabidJabatan = settings.kabidJabatan || "Plt. Kepala Bidang Sosial Dinsos PPPA Kab. Blora";
+    const kabidInstansi = settings.kabidInstansi || "Dinas Sosial Pemberdayaan Perempuan dan Perlindungan Anak Kabupaten Blora";
+
+    const petugasNama = settings.petugasNama || "Budi Santoso, A.Md.";
+    const petugasNip = settings.petugasNip || "19850102 201001 1 003";
+    const petugasJabatan = settings.petugasJabatan || "Staf Seksi Logistik Kebencanaan";
+    const petugasInstansi = settings.petugasInstansi || "Dinas Sosial Pemberdayaan Perempuan dan Perlindungan Anak Kabupaten Blora";
+    const petugasNoSk = settings.petugasNoSk || "-";
+    const petugasTanggalSk = settings.petugasTanggalSk ? formatIndoDate(settings.petugasTanggalSk) : "-";
+    const petugasTentangSk = settings.petugasTentangSk || "-";
+    const petugasNamaSk = settings.petugasNamaSk || "Keputusan Kepala Dinas Sosial Pemberdayaan Perempuan dan Perlindungan Anak Kabupaten Blora";
+
+    const dateHariTanggalTahun = formatHariTanggalTahunIndo(tx.tanggal);
+
+    html = html
+      .replace(/\[logo_app\]/g, logoHtml)
+      .replace(/\[nama_app\]/g, settings.appName || '')
+      .replace(/\[subtitle_app\]/g, settings.appSubtitle || '')
+      .replace(/\[nama_gudang\]/g, settings.warehouseName || '')
+      .replace(/\[nama_admin\]/g, settings.adminName || '')
+      .replace(/\[id_transaksi\]/g, tx.id.split('-')[0].toUpperCase())
+      .replace(/\[tahun\]/g, dateObj.getFullYear().toString())
+      .replace(/\[penerima\]/g, tx.penerima)
+      .replace(/\[Nama_penerima\]/g, tx.penerima)
+      .replace(/\[nama_penerima\]/g, tx.penerima)
+      .replace(/\[alamat\]/g, tx.alamat || '-')
+      .replace(/\[Alamat_penerima\]/g, tx.alamat || '-')
+      .replace(/\[alamat_penerima\]/g, tx.alamat || '-')
+      .replace(/\[tanggal_panjang\]/g, datePanjang)
+      .replace(/\[tanggal\]/g, datePanjang)
+      .replace(/\[hari_tanggal_tahun\]/g, dateHariTanggalTahun)
+      .replace(/\[tabel_barang\]/g, tableHtml)
+      .replace(/\[table_barang\]/g, tableHtml)
+      .replace(/\[table barang\]/g, tableHtml)
+      .replace(/\[nama_pihak_kesatu\]/g, kabidNama)
+      .replace(/\[nama_kabid\]/g, kabidNama)
+      .replace(/\[Nama_kabid\]/g, kabidNama)
+      .replace(/\[Nama_Kabid\]/g, kabidNama)
+      .replace(/\[nip_pihak_kesatu\]/g, kabidNip)
+      .replace(/\[nip_kabid\]/g, kabidNip)
+      .replace(/\[NIP_kabid\]/g, kabidNip)
+      .replace(/\[jabatan_pihak_kesatu\]/g, kabidJabatan)
+      .replace(/\[jabatan_kabid\]/g, kabidJabatan)
+      .replace(/\[Jabatan_kabid\]/g, kabidJabatan)
+      .replace(/\[instansi_pihak_kesatu\]/g, kabidInstansi)
+      .replace(/\[instansi_kabid\]/g, kabidInstansi)
+      .replace(/\[Instansi_kabid\]/g, kabidInstansi)
+      .replace(/\[nama_petugas_logistik\]/g, petugasNama)
+      .replace(/\[nip_petugas_logistik\]/g, petugasNip)
+      .replace(/\[jabatan_petugas_logistik\]/g, petugasJabatan)
+      .replace(/\[instansi_petugas_logistik\]/g, petugasInstansi)
+      .replace(/\[nama_petugaslogistik\]/g, petugasNama)
+      .replace(/\[Nama_petugaslogistik\]/g, petugasNama)
+      .replace(/\[NIP_petugaslogistik\]/g, petugasNip)
+      .replace(/\[NIP_ petugaslogistik\]/g, petugasNip)
+      .replace(/\[Jabatan_petugaslogistik\]/g, petugasJabatan)
+      .replace(/\[Jabatan_ petugaslogistik\]/g, petugasJabatan)
+      .replace(/\[Instansi_petugaslogistik\]/g, petugasInstansi)
+      .replace(/\[Instansi_ petugaslogistik\]/g, petugasInstansi)
+      .replace(/\[No_SK dan Tanggal_SK\]/g, `${petugasNamaSk} Nomor ${petugasNoSk} Tanggal ${petugasTanggalSk} tentang ${petugasTentangSk}`)
+      .replace(/\[no_sk_petugas\]/g, petugasNoSk)
+      .replace(/\[tanggal_sk_petugas\]/g, petugasTanggalSk)
+      .replace(/\[tentang_sk_petugas\]/g, petugasTentangSk)
+      .replace(/\[nama_sk_petugas\]/g, petugasNamaSk);
     
     if (forPdf) return `<div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; background: white; margin: 0; padding: 0;"><div style="width: 170mm; min-height: 240mm; font-family: 'Arial', sans-serif;">${html}</div></div>`;
     return html;
@@ -333,11 +440,34 @@ const CetakBeritaAcara: React.FC = () => {
             </div>
             <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
                <div className="w-full md:w-64 bg-slate-50 dark:bg-white/5 border-r dark:border-white/5 p-6 space-y-4 overflow-y-auto shrink-0 scrollbar-hide">
-                  <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Placeholder Data:</p>
-                  <div className="grid grid-cols-2 md:grid-cols-1 gap-2">
-                    {['logo_app', 'penerima', 'alamat', 'tanggal_panjang', 'id_transaksi', 'tabel_barang', 'tahun'].map(tag => (
-                      <button key={tag} onClick={() => insertPlaceholder(tag)} className="text-left px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios text-[9px] font-bold hover:border-ios-blue-light dark:text-slate-300 transition-all uppercase">[{tag}]</button>
-                    ))}
+                  <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide text-center pb-2 border-b dark:border-white/5">Placeholder Data:</p>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[8px] font-black text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-widest mb-1.5">🔑 Dokumen Dasar</p>
+                      <div className="grid grid-cols-2 md:grid-cols-1 gap-1.5">
+                        {['logo_app', 'penerima', 'Nama_penerima', 'alamat', 'Alamat_penerima', 'tanggal_panjang', 'tanggal', 'hari_tanggal_tahun', 'id_transaksi', 'table barang', 'tabel_barang', 'tahun'].map(tag => (
+                          <button key={tag} onClick={() => insertPlaceholder(tag)} className="text-left px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios text-[8px] font-bold hover:border-ios-blue-light dark:text-slate-300 transition-all uppercase truncate">[{tag}]</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[8px] font-black text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-widest mb-1.5">👔 KABID SOSIAL</p>
+                      <div className="grid grid-cols-2 md:grid-cols-1 gap-1.5">
+                        {['nama_kabid', 'NIP_kabid', 'Jabatan_kabid', 'Instansi_kabid', 'nama_pihak_kesatu', 'nip_pihak_kesatu', 'jabatan_pihak_kesatu', 'instansi_pihak_kesatu'].map(tag => (
+                          <button key={tag} onClick={() => insertPlaceholder(tag)} className="text-left px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios text-[8px] font-bold hover:border-ios-blue-light dark:text-slate-300 transition-all uppercase truncate">[{tag}]</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1.5">📦 PETUGAS LOGISTIK</p>
+                      <div className="grid grid-cols-2 md:grid-cols-1 gap-1.5">
+                        {['nama_petugas_logistik', 'nip_petugas_logistik', 'jabatan_petugas_logistik', 'instansi_petugas_logistik', 'nama_petugaslogistik', 'NIP_petugaslogistik', 'NIP_ petugaslogistik', 'Jabatan_ petugaslogistik', 'Instansi_ petugaslogistik', 'No_SK dan Tanggal_SK', 'nama_sk_petugas', 'no_sk_petugas', 'tanggal_sk_petugas', 'tentang_sk_petugas'].map(tag => (
+                          <button key={tag} onClick={() => insertPlaceholder(tag)} className="text-left px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios text-[8px] font-bold hover:border-ios-blue-light dark:text-slate-300 transition-all uppercase truncate font-mono">[{tag}]</button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                </div>
                <div className="flex-1 bg-slate-100 dark:bg-black overflow-auto p-4 sm:p-8 scrollbar-hide flex justify-center">
@@ -350,21 +480,37 @@ const CetakBeritaAcara: React.FC = () => {
                   </div>
                </div>
             </div>
-            <div className="p-6 border-t dark:border-white/5 flex justify-end gap-3 bg-ios-secondary-light dark:bg-ios-secondary-dark shrink-0">
-              <button onClick={() => setIsEditorOpen(false)} className="px-6 py-2 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">Batal</button>
+            <div className="p-6 border-t dark:border-white/5 flex justify-between items-center bg-ios-secondary-light dark:bg-ios-secondary-dark shrink-0">
               <button 
-                onClick={() => { 
-                  if (editingDocType === 'BA') {
-                    setSettings({ ...settings, baTemplate: currentTemplate });
-                  } else {
-                    setSettings({ ...settings, sppbTemplate: currentTemplate });
+                onClick={() => {
+                  if (window.confirm("Apakah Anda yakin ingin menyetel ulang template ini ke standar default? Semua penyesuaian kustom Anda untuk tipe ini akan dikembalikan ke pengaturan awal.")) {
+                    const defaultTmp = editingDocType === 'BA' ? defaultBA : defaultSPPB;
+                    setCurrentTemplate(defaultTmp);
+                    if (editorRef.current) {
+                      editorRef.current.innerHTML = defaultTmp;
+                    }
                   }
-                  setIsEditorOpen(false); 
-                }} 
-                className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-10 py-2 rounded-ios font-bold text-[10px] uppercase tracking-wide"
+                }}
+                className="px-4 py-2 border border-rose-500/30 dark:border-rose-500/20 text-rose-500 hover:bg-rose-500/10 font-bold rounded-ios uppercase text-[9px] tracking-wider transition-colors"
               >
-                Simpan Template {editingDocType}
+                Reset Default
               </button>
+              <div className="flex gap-3">
+                <button onClick={() => setIsEditorOpen(false)} className="px-6 py-2 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">Batal</button>
+                <button 
+                  onClick={() => { 
+                    if (editingDocType === 'BA') {
+                      setSettings({ ...settings, baTemplate: currentTemplate });
+                    } else {
+                      setSettings({ ...settings, sppbTemplate: currentTemplate });
+                    }
+                    setIsEditorOpen(false); 
+                  }} 
+                  className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-10 py-2 rounded-ios font-bold text-[10px] uppercase tracking-wide"
+                >
+                  Simpan Template {editingDocType}
+                </button>
+              </div>
             </div>
           </div>
         </div>

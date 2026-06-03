@@ -16,18 +16,108 @@ import {
 } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { settings, setSettings, isCloudConnected } = useInventory();
+  const { settings, setSettings, isCloudConnected, user, logout } = useInventory();
   const [isTesting, setIsTesting] = useState(false);
 
   const sanitizeInput = (val: string) => val.replace(/['"]+/g, '').trim();
 
+  const compressImage = (base64Str: string, format: string = 'image/png', maxWidth = 180, maxHeight = 180): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          let result = '';
+          const isJpeg = format === 'image/jpeg' || format === 'image/jpg';
+          
+          if (isJpeg) {
+            result = canvas.toDataURL('image/jpeg', 0.7);
+          } else {
+            // PNG or other format. Let's try to export as PNG.
+            result = canvas.toDataURL('image/png');
+            // If the PNG representation is extremely large (e.g. over 100KB), 
+            // compress it to high-performance JPEG with 0.6 quality to keep Firestore happy.
+            if (result.length > 100000) {
+              result = canvas.toDataURL('image/jpeg', 0.6);
+            }
+          }
+
+          // Double check: if it is still larger than 150KB, aggressively compress via low-res Jpeg.
+          if (result.length > 150000) {
+            const miniCanvas = document.createElement('canvas');
+            miniCanvas.width = 100;
+            miniCanvas.height = Math.round((height * 100) / width);
+            const mCtx = miniCanvas.getContext('2d');
+            if (mCtx) {
+              mCtx.drawImage(img, 0, 0, miniCanvas.width, miniCanvas.height);
+              result = miniCanvas.toDataURL('image/jpeg', 0.5);
+            }
+          }
+          
+          resolve(result);
+        } else {
+          // No canvas context, ensure we don't save a massive original file.
+          if (base64Str.length > 150000) {
+            resolve('');
+          } else {
+            resolve(base64Str);
+          }
+        }
+      };
+      img.onerror = () => {
+        if (base64Str.length > 150000) {
+          resolve('');
+        } else {
+          resolve(base64Str);
+        }
+      };
+    });
+  };
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'appLogo') => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) return alert("Ukuran file terlalu besar! Maksimal 2MB.");
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSettings({ ...settings, [field]: reader.result as string });
+        const rawBase64 = reader.result as string;
+        // Limit max dimensions to 180 for efficient loading and printing copy clarity
+        compressImage(rawBase64, file.type, 180, 180)
+          .then((compressed) => {
+            if (compressed) {
+              setSettings({ ...settings, [field]: compressed });
+            } else {
+              alert('Gagal mengompresi gambar. Silakan gunakan tipe file gambar standar yang lebih kecil.');
+            }
+          })
+          .catch((err) => {
+            console.error('Error compressing image:', err);
+            if (rawBase64.length < 150000) {
+              setSettings({ ...settings, [field]: rawBase64 });
+            } else {
+              alert('Ukuran berkas gambar terlalu besar untuk disimpan. Silakan gunakan berkas dengan resolusi lebih kecil.');
+            }
+          });
       };
       reader.readAsDataURL(file);
     }
@@ -110,14 +200,14 @@ const Profile: React.FC = () => {
               )}
            </div>
 
-           <div className="flex-1 space-y-6 w-full">
+            <div className="flex-1 space-y-6 w-full">
               <div className="space-y-1">
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Aplikasi</label>
-                <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-900 dark:text-slate-100 outline-none text-xl shadow-sm" value={settings.appName} onChange={(e) => setSettings({ ...settings, appName: e.target.value })} />
+                <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-900 dark:text-slate-100 outline-none text-xl shadow-sm" value={settings.appName || ''} onChange={(e) => setSettings({ ...settings, appName: e.target.value })} />
               </div>
               <div className="space-y-1">
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Slogan</label>
-                <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-600 dark:text-slate-400 outline-none text-sm shadow-sm" value={settings.appSubtitle} onChange={(e) => setSettings({ ...settings, appSubtitle: e.target.value })} />
+                <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-600 dark:text-slate-400 outline-none text-sm shadow-sm" value={settings.appSubtitle || ''} onChange={(e) => setSettings({ ...settings, appSubtitle: e.target.value })} />
               </div>
            </div>
         </div>
@@ -130,12 +220,80 @@ const Profile: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <div className="space-y-1">
               <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1"><User size={14}/> Nama Admin</label>
-              <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.adminName} onChange={(e) => setSettings({ ...settings, adminName: e.target.value })} />
+              <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.adminName || ''} onChange={(e) => setSettings({ ...settings, adminName: e.target.value })} />
            </div>
            <div className="space-y-1">
               <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1"><Warehouse size={14}/> Lokasi Gudang</label>
-              <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.warehouseName} onChange={(e) => setSettings({ ...settings, warehouseName: e.target.value })} />
+              <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.warehouseName || ''} onChange={(e) => setSettings({ ...settings, warehouseName: e.target.value })} />
            </div>
+        </div>
+
+        {/* Kepala Bidang Sosial */}
+        <div className="pt-6 border-t dark:border-white/5 space-y-6">
+          <div className="border-l-4 border-ios-blue-light dark:border-ios-blue-dark pl-4">
+            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">1. Kepala Bidang Sosial (Pihak Kesatu Berita Acara)</h4>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">Informasi Kepala Bidang yang akan dicetak pada Berita Acara Serah Terima (BAST).</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Kepala Bidang</label>
+              <input type="text" placeholder="NURKHOLIS, S.Kep, MM." className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidNama || ''} onChange={(e) => setSettings({ ...settings, kabidNama: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">NIP Kepala Bidang</label>
+              <input type="text" placeholder="19680328 198803 1 004" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidNip || ''} onChange={(e) => setSettings({ ...settings, kabidNip: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Jabatan Kepala Bidang</label>
+              <input type="text" placeholder="Plt. Kepala Bidang Sosial" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidJabatan || ''} onChange={(e) => setSettings({ ...settings, kabidJabatan: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Instansi Kepala Bidang</label>
+              <input type="text" placeholder="Dinsos PPPA Kab. Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidInstansi || ''} onChange={(e) => setSettings({ ...settings, kabidInstansi: e.target.value })} />
+            </div>
+          </div>
+        </div>
+
+        {/* Petugas Logistik */}
+        <div className="pt-6 border-t dark:border-white/5 space-y-6">
+          <div className="border-l-4 border-emerald-500 pl-4">
+            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">2. Petugas Logistik (SPPB)</h4>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">Informasi Petugas Logistik yang akan dicetak pada Surat Perintah Pengeluaran Barang (SPPB).</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Petugas Logistik</label>
+              <input type="text" placeholder="Budi Santoso, A.Md." className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNama || ''} onChange={(e) => setSettings({ ...settings, petugasNama: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">NIP Petugas Logistik</label>
+              <input type="text" placeholder="19850102 201001 1 003" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNip || ''} onChange={(e) => setSettings({ ...settings, petugasNip: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Jabatan Petugas Logistik</label>
+              <input type="text" placeholder="Staf Seksi Logistik Kebencanaan" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasJabatan || ''} onChange={(e) => setSettings({ ...settings, petugasJabatan: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Instansi Petugas Logistik</label>
+              <input type="text" placeholder="Dinsos PPPA Kab. Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasInstansi || ''} onChange={(e) => setSettings({ ...settings, petugasInstansi: e.target.value })} />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama SK (Dasar Hukum SPPB)</label>
+              <input type="text" placeholder="Keputusan Kepala Dinas Sosial Pemberdayaan Perempuan dan Perlindungan Anak Kabupaten Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNamaSk || ''} onChange={(e) => setSettings({ ...settings, petugasNamaSk: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">No SK Petugas Logistik</label>
+              <input type="text" placeholder="800/123/2026" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNoSk || ''} onChange={(e) => setSettings({ ...settings, petugasNoSk: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Tanggal SK Petugas Logistik</label>
+              <input type="date" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.petugasTanggalSk || ''} onChange={(e) => setSettings({ ...settings, petugasTanggalSk: e.target.value })} />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Tentang SK Petugas Logistik</label>
+              <input type="text" placeholder="Penunjukan Petugas Pengelola Barang Persediaan Bidang Sosial" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasTentangSk || ''} onChange={(e) => setSettings({ ...settings, petugasTentangSk: e.target.value })} />
+            </div>
+          </div>
         </div>
 
         <div className="pt-6 border-t dark:border-white/5 flex justify-end">
@@ -145,37 +303,48 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
+      {/* Realtime Cloud Status (Logged In User) */}
       <div className="bg-slate-900 dark:bg-ios-secondary-dark text-white p-8 md:p-12 rounded-ios-lg shadow-2xl relative overflow-hidden group border dark:border-white/10">
+         {/* Decorative background blur */}
+         <div className="absolute right-0 top-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-orange-500/20 transition-all duration-700" />
+         
          <div className="relative z-10 space-y-8">
             <div className="flex items-center gap-5">
-               <div className="p-4 bg-orange-500 rounded-ios shadow-xl"><Cloud size={28}/></div>
+               <div className="p-4 bg-orange-500 rounded-ios shadow-xl shrink-0"><Cloud size={28}/></div>
                <div>
-                  <h3 className="text-2xl font-bold tracking-tight">Realtime Cloud Sync</h3>
-                  <p className="text-orange-200 dark:text-orange-400/60 text-xs font-semibold italic">Sinkronisasi data antar perangkat secara otomatis.</p>
+                  <h3 className="text-2xl font-bold tracking-tight">Koneksi Cloud & Realtime Sync</h3>
+                  <p className="text-orange-200 dark:text-orange-400/60 text-xs font-semibold italic">Aplikasi terintegrasi secara aman dengan arsitektur Cloud Firebase.</p>
                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide ml-1">Firebase API Key</label>
-                  <input type="password" placeholder="AIzaSyA..." className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.fbApiKey || ''} onChange={(e) => setSettings({ ...settings, fbApiKey: sanitizeInput(e.target.value) })} />
-               </div>
-               <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide ml-1">Firebase Project ID</label>
-                  <input type="text" placeholder="my-project-id" className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.fbProjectId || ''} onChange={(e) => setSettings({ ...settings, fbProjectId: sanitizeInput(e.target.value) })} />
-               </div>
-               <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide ml-1">Firebase Storage Bucket</label>
-                  <input type="text" placeholder="my-project.firebasestorage.app" className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.fbStorageBucket || ''} onChange={(e) => setSettings({ ...settings, fbStorageBucket: sanitizeInput(e.target.value) })} />
-               </div>
-            </div>
+            {user ? (
+              <div className="bg-white/5 backdrop-blur-md rounded-ios-lg p-6 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || "User"} className="w-16 h-16 rounded-full border-2 border-orange-500 object-cover shadow-lg" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/50 flex items-center justify-center font-bold text-xl text-orange-400">{user.displayName?.[0] || 'U'}</div>
+                  )}
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-emerald-500 text-white uppercase mb-1">TERKONEKSI</span>
+                    <h4 className="font-black text-lg text-white leading-snug">{user.displayName}</h4>
+                    <p className="text-xs text-slate-400 font-medium font-mono">{user.email}</p>
+                  </div>
+                </div>
 
-            <div className="flex gap-4 w-full md:w-auto justify-end">
-               <button onClick={testConnection} disabled={isTesting} className="flex items-center justify-center gap-3 bg-white dark:bg-ios-blue-dark text-slate-900 dark:text-white px-10 py-3 rounded-ios font-bold text-xs transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 shadow-sm">
-                 {isTesting ? <RefreshCw className="animate-spin" size={18}/> : <ShieldCheck size={18}/>}
-                 {isTesting ? 'MENGHUBUNGKAN...' : 'AKTIFKAN CLOUD SYNC'}
-               </button>
-            </div>
+                <button 
+                  onClick={() => { if (confirm("Apakah Anda yakin ingin keluar?")) logout(); }}
+                  className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-8 rounded-ios text-xs whitespace-nowrap active:scale-95 transition-all shadow-md shadow-rose-500/10 cursor-pointer"
+                >
+                  Keluar Akun
+                </button>
+              </div>
+            ) : (
+              <div className="bg-rose-500/10 p-6 rounded-ios-lg border border-rose-500/20 text-center space-y-3">
+                <p className="text-sm text-rose-300 font-bold">Koneksi Cloud belum terautentikasi.</p>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">Silakan muat kembali aplikasi dan lakukan login menggunakan akun Google Anda untuk mengaktifkan sinkronisasi otomatis.</p>
+              </div>
+            )}
          </div>
       </div>
 

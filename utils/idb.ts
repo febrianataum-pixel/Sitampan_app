@@ -55,3 +55,45 @@ export const deleteFileFromIDB = async (id: string): Promise<void> => {
     request.onerror = () => reject(request.error);
   });
 };
+
+export const saveStateToIDB = async (key: string, data: any): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('SITAMPAN_STATE_CACHE', 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('states')) {
+        db.createObjectStore('states');
+      }
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('states', 'readwrite');
+      const store = tx.objectStore('states');
+      store.put(data, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getStateFromIDB = async (key: string): Promise<any | null> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('SITAMPAN_STATE_CACHE', 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('states')) {
+        db.createObjectStore('states');
+      }
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('states', 'readonly');
+      const store = tx.objectStore('states');
+      const getReq = store.get(key);
+      getReq.onsuccess = () => resolve(getReq.result || null);
+      getReq.onerror = () => reject(getReq.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+};

@@ -269,12 +269,18 @@ const RekapIndikator: React.FC = () => {
     const columns = [
       { header: 'Nama Barang', dataKey: 'namaBarang' },
       { header: 'Kategori', dataKey: 'kategori' },
-      { 
-        header: filters.tipeTransaksi === 'Masuk' ? 'Masuk' : filters.tipeTransaksi === 'Keluar' ? 'Keluar' : filters.tipeTransaksi === 'Stock' ? 'Stok' : 'Total Vol', 
-        dataKey: 'volume',
-        align: 'center' as const,
-        format: (v: any) => v.toLocaleString('id-ID')
-      },
+      ...(filters.tipeTransaksi === 'Semua' ? [
+        { header: 'Masuk', dataKey: 'jumlahMasuk', align: 'center' as const, format: (v: any) => (v || 0).toLocaleString('id-ID') },
+        { header: 'Keluar', dataKey: 'jumlahKeluar', align: 'center' as const, format: (v: any) => (v || 0).toLocaleString('id-ID') },
+        { header: 'Sisa', dataKey: 'stok', align: 'center' as const, format: (v: any) => (v || 0).toLocaleString('id-ID') }
+      ] : [
+        { 
+          header: filters.tipeTransaksi === 'Masuk' ? 'Masuk' : filters.tipeTransaksi === 'Keluar' ? 'Keluar' : 'Stok', 
+          dataKey: 'volume',
+          align: 'center' as const,
+          format: (v: any) => v.toLocaleString('id-ID')
+        }
+      ]),
       { 
         header: 'Harga Satuan', 
         dataKey: 'harga', 
@@ -615,11 +621,18 @@ const RekapIndikator: React.FC = () => {
             <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest border-b dark:border-white/5">
               <tr>
                 <th className="px-6 py-4">Nama Barang</th>
-                <th className="px-6 py-4 text-center">
-                  {filters.tipeTransaksi === 'Masuk' ? 'Masuk' : 
-                   filters.tipeTransaksi === 'Keluar' ? 'Keluar' : 
-                   filters.tipeTransaksi === 'Stock' ? 'Stok' : 'Total Vol'}
-                </th>
+                {filters.tipeTransaksi === 'Semua' ? (
+                  <>
+                    <th className="px-6 py-4 text-center">Masuk</th>
+                    <th className="px-6 py-4 text-center">Keluar</th>
+                    <th className="px-6 py-4 text-center">Sisa</th>
+                  </>
+                ) : (
+                  <th className="px-6 py-4 text-center">
+                    {filters.tipeTransaksi === 'Masuk' ? 'Masuk' : 
+                     filters.tipeTransaksi === 'Keluar' ? 'Keluar' : 'Stok'}
+                  </th>
+                )}
                 <th className="px-6 py-4 text-right">Harga Satuan</th>
                 <th className="px-6 py-4 text-right">Total Nominal</th>
               </tr>
@@ -628,7 +641,7 @@ const RekapIndikator: React.FC = () => {
               {Object.entries(groupedRecapData).map(([category, items]: [string, any[]]) => (
                 <React.Fragment key={category}>
                   <tr className="bg-slate-100/50 dark:bg-white/5">
-                    <td colSpan={4} className="px-6 py-2">
+                    <td colSpan={filters.tipeTransaksi === 'Semua' ? 6 : 4} className="px-6 py-2">
                       <span className="text-[10px] font-black text-ios-blue-light uppercase tracking-widest">{category}</span>
                     </td>
                   </tr>
@@ -649,12 +662,35 @@ const RekapIndikator: React.FC = () => {
                             <span className="text-[10px] text-slate-400 font-mono uppercase">{item.productId.slice(0, 8)}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex flex-col items-center">
-                            <span className="text-sm font-black text-slate-900 dark:text-white">{volume.toLocaleString('id-ID')}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
-                          </div>
-                        </td>
+                        {filters.tipeTransaksi === 'Semua' ? (
+                          <>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex flex-col items-center">
+                                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">+{item.jumlahMasuk.toLocaleString('id-ID')}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex flex-col items-center">
+                                <span className="text-sm font-black text-rose-600 dark:text-rose-400">-{item.jumlahKeluar.toLocaleString('id-ID')}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex flex-col items-center">
+                                <span className="text-sm font-black text-ios-blue-light">{item.stok.toLocaleString('id-ID')}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="text-sm font-black text-slate-900 dark:text-white">{volume.toLocaleString('id-ID')}</span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">{item.satuan}</span>
+                            </div>
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-right text-sm font-medium text-slate-600 dark:text-slate-400">
                           {formatCurrency(item.harga)}
                         </td>
@@ -668,7 +704,7 @@ const RekapIndikator: React.FC = () => {
               ))}
               {itemRecapData.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-slate-400 italic font-medium">
+                  <td colSpan={filters.tipeTransaksi === 'Semua' ? 6 : 4} className="px-6 py-10 text-center text-slate-400 italic font-medium">
                     Tidak ada data barang yang sesuai dengan filter.
                   </td>
                 </tr>
