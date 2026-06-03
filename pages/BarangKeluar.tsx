@@ -25,7 +25,7 @@ import {
   FileText,
   TrendingUp
 } from 'lucide-react';
-import { OutboundTransaction, OutboundItem, formatIndoDate, Product } from '../types';
+import { OutboundTransaction, OutboundItem, formatIndoDate, Product, MONTHS } from '../types';
 import { generateReportPDF } from '../services/pdfService';
 
 type SortKey = 'tanggal' | 'penerima' | 'alamat';
@@ -41,6 +41,9 @@ const BarangKeluar: React.FC = () => {
   
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
+
+  const [filterMonth, setFilterMonth] = useState<string>('All');
+  const [filterDisaster, setFilterDisaster] = useState<string>('All');
 
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({
     key: 'tanggal',
@@ -211,7 +214,20 @@ const BarangKeluar: React.FC = () => {
     return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-blue-500" /> : <ChevronDown size={12} className="text-blue-500" />;
   };
 
-  const sortedOutbound = [...outbound].sort((a, b) => {
+  const filteredOutbound = outbound.filter(tx => {
+    if (filterMonth !== 'All') {
+      const txDate = new Date(tx.tanggal);
+      if (isNaN(txDate.getTime())) return false;
+      const txMonthIndex = txDate.getMonth();
+      if (txMonthIndex.toString() !== filterMonth) return false;
+    }
+    if (filterDisaster !== 'All') {
+      if (tx.jenisBencana !== filterDisaster) return false;
+    }
+    return true;
+  });
+
+  const sortedOutbound = [...filteredOutbound].sort((a, b) => {
     const key = sortConfig.key;
     const dir = sortConfig.direction === 'asc' ? 1 : -1;
     if (key === 'tanggal') return (new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()) * dir;
@@ -291,7 +307,7 @@ const BarangKeluar: React.FC = () => {
       </div>
 
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden theme-transition">
-        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-ios">
               <TrendingUp size={20} />
@@ -300,6 +316,51 @@ const BarangKeluar: React.FC = () => {
               <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Grand Total Distribusi</p>
               <p className="text-xl font-black text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</p>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Filter Bulan */}
+            <div className="flex-1 lg:flex-initial min-w-[140px]">
+              <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bulan</label>
+              <select
+                className="w-full text-xs font-bold bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+              >
+                <option value="All">Semua Bulan</option>
+                {MONTHS.map((label, idx) => (
+                  <option key={idx} value={idx.toString()}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter Bencana */}
+            <div className="flex-1 lg:flex-initial min-w-[170px]">
+              <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bencana</label>
+              <select
+                className="w-full text-xs font-bold bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                value={filterDisaster}
+                onChange={(e) => setFilterDisaster(e.target.value)}
+              >
+                <option value="All">Semua Bencana</option>
+                <option value="Bencana Alam">Bencana Alam</option>
+                <option value="Bencana Non Alam">Bencana Non Alam</option>
+                <option value="Bencana Sosial">Bencana Sosial</option>
+              </select>
+            </div>
+
+            {/* Clear Filters Button */}
+            {(filterMonth !== 'All' || filterDisaster !== 'All') && (
+              <div className="self-end pb-0.5">
+                <button
+                  type="button"
+                  onClick={() => { setFilterMonth('All'); setFilterDisaster('All'); }}
+                  className="px-3 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-100 transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 border border-red-100 dark:border-red-900/30"
+                >
+                  <X size={12} /> Reset
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div className="overflow-x-auto scrollbar-hide">

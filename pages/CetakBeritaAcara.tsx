@@ -74,6 +74,8 @@ const CetakBeritaAcara: React.FC = () => {
   const editorRef = useRef<HTMLDivElement>(null);
   const printAreaRef = useRef<HTMLDivElement>(null);
 
+  const [filterMonth, setFilterMonth] = useState<string>('All');
+
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({
     key: 'tanggal',
     direction: 'desc'
@@ -221,7 +223,17 @@ const CetakBeritaAcara: React.FC = () => {
     return sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
   };
 
-  const sortedOutbound = [...outbound].sort((a, b) => {
+  const filteredOutbound = outbound.filter(tx => {
+    if (filterMonth !== 'All') {
+      const txDate = new Date(tx.tanggal);
+      if (isNaN(txDate.getTime())) return false;
+      const txMonthIndex = txDate.getMonth();
+      return txMonthIndex.toString() === filterMonth;
+    }
+    return true;
+  });
+
+  const sortedOutbound = [...filteredOutbound].sort((a, b) => {
     const key = sortConfig.key;
     const dir = sortConfig.direction === 'asc' ? 1 : -1;
     if (key === 'tanggal') return (new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()) * dir;
@@ -470,6 +482,35 @@ const CetakBeritaAcara: React.FC = () => {
       </div>
 
       <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
+        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            Daftar Berita Acara & SPPB
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Filter Bulan */}
+            <div className="flex-1 sm:flex-initial min-w-[160px]">
+              <select
+                className="w-full text-xs font-bold bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+              >
+                <option value="All">Semua Bulan</option>
+                {MONTHS.map((label, idx) => (
+                  <option key={idx} value={idx.toString()}>{label}</option>
+                ))}
+              </select>
+            </div>
+            {filterMonth !== 'All' && (
+              <button
+                type="button"
+                onClick={() => setFilterMonth('All')}
+                className="px-3 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-100 transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 border border-red-100 dark:border-red-900/30"
+              >
+                <X size={12} /> Reset
+              </button>
+            )}
+          </div>
+        </div>
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full text-left text-sm min-w-[700px]">
             <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] border-b dark:border-white/5 uppercase tracking-wide">
