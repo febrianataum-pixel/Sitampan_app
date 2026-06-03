@@ -223,15 +223,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-ios-secondary-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 flex items-center justify-around px-2 py-2 pb-8 z-50 no-print theme-transition shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
-          {menuItems.filter(item => ['Dashboard', 'Keluar', 'Indikator', 'Dokumen', 'Profil'].includes(item.name)).map((item) => (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-ios-secondary-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 flex items-center justify-around px-1 py-2 pb-8 z-50 no-print theme-transition shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
+          {menuItems.filter(item => ['Dashboard', 'Keluar', 'Berita Acara', 'Indikator', 'Dokumen', 'Profil'].includes(item.name)).map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }: any) => `flex flex-col items-center gap-1 px-2 py-1 transition-all ${isActive ? 'text-ios-blue-light dark:text-ios-blue-dark' : 'text-slate-400'}`}
+              className={({ isActive }: any) => `flex flex-col items-center gap-1 px-1 py-1 transition-all ${isActive ? 'text-ios-blue-light dark:text-ios-blue-dark' : 'text-slate-400'}`}
             >
               <div className="shrink-0 scale-90">{item.icon}</div>
-              <span className="text-[8px] font-black uppercase tracking-tighter">{item.name}</span>
+              <span className="text-[8px] font-black uppercase tracking-tighter text-center scale-95">{item.name}</span>
             </NavLink>
           ))}
         </nav>
@@ -417,10 +417,12 @@ const App: React.FC = () => {
   const inboundRef = useRef(inbound);
   const outboundRef = useRef(outbound);
   const documentsRef = useRef(documents);
+  const settingsRef = useRef(settings);
   useEffect(() => { productsRef.current = products; }, [products]);
   useEffect(() => { inboundRef.current = inbound; }, [inbound]);
   useEffect(() => { outboundRef.current = outbound; }, [outbound]);
   useEffect(() => { documentsRef.current = documents; }, [documents]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   const isRemoteChange = useRef(false);
 
@@ -540,6 +542,38 @@ const App: React.FC = () => {
         unsubs.push(syncCol('inbound', inboundRef, setInboundState));
         unsubs.push(syncCol('outbound', outboundRef, setOutboundState));
         unsubs.push(syncCol('documents', documentsRef, setDocumentsState));
+
+        // Sync global app settings / profile branding document
+        const unsubSettings = onSnapshot(doc(db, 'config', 'app_settings'), (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setSettingsState(prev => {
+              const updated = { ...prev, ...data };
+              try {
+                localStorage.setItem('inv_settings', JSON.stringify(updated));
+              } catch (e) {
+                console.warn('localStorage quota exceeded for settings', e);
+              }
+              if (updated.theme) {
+                document.documentElement.classList.toggle('dark', updated.theme === 'dark');
+              }
+              return updated;
+            });
+          } else {
+            // Configuration doesn't exist yet on project db, write the default configuration
+            const { fbApiKey, fbProjectId, fbAppId, ...syncable } = settingsRef.current;
+            setDoc(doc(db, 'config', 'app_settings'), syncable).catch(err => {
+              console.error("Failed to rescue configurations to cloud db:", err);
+            });
+          }
+        }, (err) => {
+          try {
+            handleFirestoreError(err, OperationType.GET, 'config/app_settings');
+          } catch (handledError) {
+            console.error("Handled permissions error for config/app_settings:", handledError);
+          }
+        });
+        unsubs.push(unsubSettings);
       } catch (e: any) { 
         setSyncError(e.message); 
       }

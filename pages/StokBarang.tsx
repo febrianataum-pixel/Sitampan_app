@@ -92,7 +92,7 @@ const StokBarang: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[700px]">
             <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wide border-b dark:border-white/5">
               <tr>
                 <th className="px-6 py-3">Kode</th>

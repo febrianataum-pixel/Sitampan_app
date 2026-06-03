@@ -197,7 +197,7 @@ const BarangMasuk: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[850px]">
             <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b dark:border-white/5">
               <tr>
                 <th className="px-6 py-3">Tanggal</th>
@@ -222,7 +222,7 @@ const BarangMasuk: React.FC = () => {
                     <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">+{i.jumlah}</td>
                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {total.toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4">
-                      <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleOpenModal(i)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios"><Edit2 size={16} /></button>
                         <button onClick={() => { if(confirm('Hapus transaksi?')) setInbound(inbound.filter(it => it.id !== i.id)) }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios"><Trash2 size={16} /></button>
                       </div>

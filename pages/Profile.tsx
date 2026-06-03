@@ -297,7 +297,7 @@ const Profile: React.FC = () => {
         </div>
 
         <div className="pt-6 border-t dark:border-white/5 flex justify-end">
-           <button onClick={() => { localStorage.setItem('inv_settings', JSON.stringify(settings)); alert('Profil & Branding disimpan!'); window.location.reload(); }} className="w-full sm:w-auto flex items-center justify-center gap-3 text-white px-12 py-3 rounded-ios font-bold shadow-sm text-xs" style={{ backgroundColor: settings.themeColor }}>
+           <button onClick={async () => { await setSettings(settings); alert('Profil & Branding disimpan!'); }} className="w-full sm:w-auto flex items-center justify-center gap-3 text-white px-12 py-3 rounded-ios font-bold shadow-sm text-xs" style={{ backgroundColor: settings.themeColor }}>
              <Save size={18}/> Simpan Profil & Branding
            </button>
         </div>

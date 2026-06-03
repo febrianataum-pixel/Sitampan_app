@@ -139,6 +139,38 @@
         "fileUrl",
         "fileName"
       ]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Konfigurasi dan branding aplikasi",
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string"
+        },
+        "appSubtitle": {
+          "type": "string"
+        },
+        "logo": {
+          "type": "string"
+        },
+        "appLogo": {
+          "type": "string"
+        },
+        "themeColor": {
+          "type": "string"
+        },
+        "adminName": {
+          "type": "string"
+        },
+        "warehouseName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "appName",
+        "themeColor"
+      ]
     }
   },
   "firestore": {
@@ -157,6 +189,10 @@
     "documents/{id}": {
       "schema": "ArchiveDocument",
       "description": "Arsip dokumen digital logistik"
+    },
+    "config/{id}": {
+      "schema": "AppSettings",
+      "description": "Arsip konfigurasi global sistem"
     }
   }
 }

@@ -300,7 +300,7 @@ const LaporanBlora: React.FC = () => {
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[800px]">
             <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
               <tr>
                 <th className="px-6 py-4">Jenis Barang</th>

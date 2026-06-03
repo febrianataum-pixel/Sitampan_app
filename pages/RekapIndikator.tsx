@@ -617,7 +617,7 @@ const RekapIndikator: React.FC = () => {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[900px]">
             <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest border-b dark:border-white/5">
               <tr>
                 <th className="px-6 py-4">Nama Barang</th>
