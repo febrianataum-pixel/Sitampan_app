@@ -134,7 +134,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
 
-  const menuItems = [
+  const isSpecialUser = user?.email === 'febrianataum@gmail.com';
+
+  const allMenuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
     { name: 'Database', path: '/dashboard/database', icon: <Database size={20} /> },
     { name: 'Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={20} /> },
@@ -147,6 +149,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Indikator', path: '/dashboard/rekap-indikator', icon: <PieChart size={20} /> },
     { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
   ];
+
+  const menuItems = isSpecialUser
+    ? allMenuItems
+    : allMenuItems.filter(item => ['Dashboard', 'Laporan', 'Stok', 'Rekap', 'Indikator'].includes(item.name));
 
   return (
     <div className="flex h-screen overflow-hidden bg-ios-bg-light dark:bg-ios-bg-dark theme-transition">
@@ -693,16 +699,17 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/database" element={<DatabaseBarang />} />
-            <Route path="/dashboard/masuk" element={<BarangMasuk />} />
-            <Route path="/dashboard/keluar" element={<BarangKeluar />} />
-            <Route path="/dashboard/berita-acara" element={<CetakBeritaAcara />} />
+            <Route path="/dashboard/database" element={user?.email === 'febrianataum@gmail.com' ? <DatabaseBarang /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/masuk" element={user?.email === 'febrianataum@gmail.com' ? <BarangMasuk /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/keluar" element={user?.email === 'febrianataum@gmail.com' ? <BarangKeluar /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/berita-acara" element={user?.email === 'febrianataum@gmail.com' ? <CetakBeritaAcara /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/stok" element={<StokBarang />} />
             <Route path="/dashboard/laporan-blora" element={<LaporanBlora />} />
-            <Route path="/dashboard/dokumen" element={<Dokumen />} />
+            <Route path="/dashboard/dokumen" element={user?.email === 'febrianataum@gmail.com' ? <Dokumen /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/rekap" element={<RekapBulanan />} />
             <Route path="/dashboard/rekap-indikator" element={<RekapIndikator />} />
-            <Route path="/dashboard/profile" element={<Profile />} />
+            <Route path="/dashboard/profile" element={user?.email === 'febrianataum@gmail.com' ? <Profile /> : <Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>
       </HashRouter>
