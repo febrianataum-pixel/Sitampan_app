@@ -136,7 +136,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
 
-  const isSpecialUser = user?.email === 'febrianataum@gmail.com';
+  const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
 
   const allMenuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
@@ -862,6 +862,8 @@ const App: React.FC = () => {
     return <LoginGate loginWithGoogle={loginWithGoogle} appName={settings.appName} appSubtitle={settings.appSubtitle} appLogo={settings.appLogo} />;
   }
 
+  const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
+
   return (
     <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle }}>
       <HashRouter>
@@ -869,16 +871,16 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/database" element={user?.email === 'febrianataum@gmail.com' ? <DatabaseBarang /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/masuk" element={user?.email === 'febrianataum@gmail.com' ? <BarangMasuk /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/keluar" element={user?.email === 'febrianataum@gmail.com' ? <BarangKeluar /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/berita-acara" element={user?.email === 'febrianataum@gmail.com' ? <CetakBeritaAcara /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/database" element={isSpecialUser ? <DatabaseBarang /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/masuk" element={isSpecialUser ? <BarangMasuk /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/keluar" element={isSpecialUser ? <BarangKeluar /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/berita-acara" element={isSpecialUser ? <CetakBeritaAcara /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/stok" element={<StokBarang />} />
             <Route path="/dashboard/laporan-blora" element={<LaporanBlora />} />
-            <Route path="/dashboard/dokumen" element={user?.email === 'febrianataum@gmail.com' ? <Dokumen /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/dokumen" element={isSpecialUser ? <Dokumen /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/rekap" element={<RekapBulanan />} />
             <Route path="/dashboard/rekap-indikator" element={<RekapIndikator />} />
-            <Route path="/dashboard/profile" element={user?.email === 'febrianataum@gmail.com' ? <Profile /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/profile" element={isSpecialUser ? <Profile /> : <Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>
