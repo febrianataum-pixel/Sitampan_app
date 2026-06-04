@@ -19,13 +19,15 @@ import {
   Sun,
   Moon,
   ShieldAlert,
-  CloudUpload
+  CloudUpload,
+  Mail,
+  Lock
 } from 'lucide-react';
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import firebaseConfig from './firebase-applet-config.json';
 
 import Dashboard from './pages/Dashboard';
@@ -276,15 +278,76 @@ interface LoginGateProps {
 const LoginGate: React.FC<LoginGateProps> = ({ loginWithGoogle, appName, appSubtitle, appLogo }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  // Custom Email/Password Authentication States
+  const [useEmail, setUseEmail] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
 
-  const handleLogin = async () => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
       await loginWithGoogle();
     } catch (e: any) {
       console.error(e);
-      setErrorMsg("Gagal melakukan login dengan Google. Pastikan integrasi Firebase Auth telah diaktifkan.");
+      setErrorMsg("Gagal login Google. Untuk aplikasi HP (APK), silakan klik tombol 'Masuk dengan Email' di bawah.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setErrorMsg("Email dan password wajib diisi.");
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMsg("Password minimal harus 6 karakter.");
+      return;
+    }
+    if (isSignUp && !displayName) {
+      setErrorMsg("Nama Lengkap wajib diisi untuk pendaftaran.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      if (isSignUp) {
+        // Sign Up Flow
+        const newUserCredential = await createUserWithEmailAndPassword(auth, email, password);
+        if (newUserCredential.user) {
+          await updateProfile(newUserCredential.user, { displayName });
+          // Force a state update
+          window.location.reload();
+        }
+      } else {
+        // Sign In Flow
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error: any) {
+      console.error(error);
+      let msg = "Terjadi kesalahan saat otentikasi.";
+      if (error.code === 'auth/user-not-found') {
+        msg = "Email belum terdaftar. Silakan pilih tab 'Daftar Baru' di bawah.";
+      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        msg = "Password salah atau kredensial tidak sesuai. Silakan coba lagi.";
+      } else if (error.code === 'auth/invalid-email') {
+        msg = "Format email tidak valid.";
+      } else if (error.code === 'auth/email-already-in-use') {
+        msg = "Email sudah digunakan oleh akun lain. Silakan langsung login.";
+      } else if (error.code === 'auth/weak-password') {
+        msg = "Password terlalu lemah (minimal 6 karakter).";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        msg = "Provider 'Email/Password' belum aktif di Firebase Console. Harap aktifkan menu Authentication > Sign-in method > Email/Password.";
+      } else {
+        msg = `${error.message}. Pastikan provider 'Email/Password' sudah diaktifkan di Firebase Console Anda.`;
+      }
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -296,54 +359,161 @@ const LoginGate: React.FC<LoginGateProps> = ({ loginWithGoogle, appName, appSubt
       <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-blue-500/10 blur-[100px]" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-emerald-500/10 blur-[100px]" />
 
-      <div className="w-full max-w-md p-8 md:p-10 mx-4 bg-slate-800/60 backdrop-blur-xl rounded-ios-lg border border-white/10 shadow-2xl space-y-8 text-center relative z-10">
+      <div className="w-full max-w-md p-8 md:p-10 mx-4 bg-slate-800/60 backdrop-blur-xl rounded-ios-lg border border-white/10 shadow-2xl space-y-6 text-center relative z-10">
         <div className="space-y-3">
-          <div className="w-20 h-20 bg-blue-600/10 rounded-3xl mx-auto flex items-center justify-center border border-blue-500/20 shadow-inner">
+          <div className="w-16 h-16 bg-blue-600/10 rounded-3xl mx-auto flex items-center justify-center border border-blue-500/20 shadow-inner">
             {appLogo ? (
-              <img src={appLogo} alt={appName} className="w-12 h-12 object-contain font-bold" />
+              <img src={appLogo} alt={appName} className="w-10 h-10 object-contain font-bold" />
             ) : (
-              <Package size={36} className="text-blue-400" />
+              <Package size={30} className="text-blue-400" />
             )}
           </div>
-          <h2 className="text-3xl font-black tracking-tight text-white uppercase">{appName}</h2>
-          <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase italic max-w-xs mx-auto">
+          <h2 className="text-2xl font-black tracking-tight text-white uppercase">{appName}</h2>
+          <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase italic max-w-xs mx-auto leading-normal">
             {appSubtitle || "SISTEM TANGGAP PEMANTAUAN LOGISTIK KEBENCANAAN"}
           </p>
         </div>
 
         <div className="w-full h-px bg-white/5" />
 
-        <div className="space-y-4">
-          <p className="text-sm font-medium text-slate-300">
-            Silakan masuk dengan Akun Google resmi Anda untuk mengakses sistem logistik.
-          </p>
+        {/* Auth Method Selector Tabs */}
+        <div className="grid grid-cols-2 p-1 bg-slate-900/80 rounded-ios border border-white/5 gap-1">
+          <button
+            onClick={() => { setUseEmail(false); setErrorMsg(null); }}
+            className={`py-2 text-xs font-black uppercase tracking-wider rounded-ios transition-all cursor-pointer ${!useEmail ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            Google Sign-In
+          </button>
+          <button
+            onClick={() => { setUseEmail(true); setErrorMsg(null); }}
+            className={`py-2 text-xs font-black uppercase tracking-wider rounded-ios transition-all cursor-pointer ${useEmail ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            Email & Password
+          </button>
+        </div>
 
+        <div className="space-y-4 text-left">
           {errorMsg && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold rounded-ios animate-pulse">
+            <div className="p-3 bg-red-500/15 border border-red-500/20 text-red-400 text-xs font-bold rounded-ios animate-pulse text-center leading-relaxed">
               {errorMsg}
             </div>
           )}
 
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-900 py-3.5 px-6 rounded-ios font-bold shadow-lg shadow-white/5 active:scale-[0.98] transition-all disabled:opacity-50 text-sm cursor-pointer"
-          >
-            {loading ? (
-              <svg className="animate-spin h-5 w-5 text-slate-900" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.87-2.6-2.87-4.53-5.84-4.53z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-              </svg>
-            )}
-            {loading ? "Menghubungkan..." : "Masuk dengan Google"}
-          </button>
+          {!useEmail ? (
+            <div className="space-y-4">
+              <p className="text-xs font-medium text-slate-300 text-center">
+                Silakan masuk dengan Akun Google resmi Anda untuk mengakses sistem logistik. (Gunakan browser biasa)
+              </p>
+
+              <button
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-900 py-3 px-6 rounded-ios font-bold shadow-lg shadow-white/5 active:scale-[0.98] transition-all disabled:opacity-50 text-xs uppercase tracking-wider cursor-pointer mt-2"
+              >
+                {loading ? (
+                  <svg className="animate-spin h-4 w-4 text-slate-900" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.87-2.6-2.87-4.53-5.84-4.53z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                  </svg>
+                )}
+                {loading ? "Menghubungkan..." : "Masuk dengan Google"}
+              </button>
+
+              <div className="bg-blue-950/40 border border-blue-500/20 p-2.5 rounded-ios text-[10px] text-blue-300 space-y-1 mt-4">
+                <p className="font-bold uppercase tracking-wider">💡 Pengguna HP Android / APK:</p>
+                <p className="leading-relaxed">
+                  Jika Anda membuka via APK dan login Google ditolak (disallowed_useragent), silakan klik menu <b>"Email & Password"</b> di atas untuk mendaftarkan akun atau masuk dengan mudah.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleEmailAuth} className="space-y-4">
+              <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">
+                {isSignUp ? "Pendaftaran Akun Baru" : "Masuk Ke Akun"}
+              </div>
+
+              {isSignUp && (
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-black tracking-wider text-slate-400">Nama Lengkap</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Admin Blora"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      className="w-full bg-slate-900 border border-white/10 rounded-ios py-2.5 px-3 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none placeholder:text-slate-600 font-bold"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black tracking-wider text-slate-400">Alamat Email (Gmail Anda)</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 pointer-events-none">
+                    <Mail size={14} />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    placeholder="nama@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-900 border border-white/10 rounded-ios py-2.5 pl-9 pr-3 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none placeholder:text-slate-600 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black tracking-wider text-slate-400">Password</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 pointer-events-none">
+                    <Lock size={14} />
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Min. 6 karakter"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-900 border border-white/10 rounded-ios py-2.5 pl-9 pr-3 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none placeholder:text-slate-600 font-bold"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-ios text-xs uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer mt-2"
+              >
+                {loading ? (
+                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : null}
+                {isSignUp ? "Daftar Akun Baru" : "Masuk dengan Email"}
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(null); }}
+                  className="text-[10px] font-bold uppercase tracking-wider text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  {isSignUp ? "Sudah punya akun? Masuk disini" : "Belum punya akun? Daftar gratis disini"}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         <div className="text-[10px] text-slate-500 font-medium tracking-tight mt-6">
