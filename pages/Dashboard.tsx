@@ -30,7 +30,7 @@ const Dashboard: React.FC = () => {
     const totalKeluar = outbound.reduce((acc, tx) => 
       acc + tx.items.reduce((sum, item) => sum + item.jumlah, 0), 0
     );
-    const barangKosong = products.filter(p => calculateStock(p.id) <= 0).length;
+    const totalSisaBarang = products.reduce((acc, p) => acc + calculateStock(p.id), 0);
 
     const totalMasukRp = inbound.reduce((acc, i) => {
       const p = products.find(prod => prod.id === i.productId);
@@ -47,10 +47,10 @@ const Dashboard: React.FC = () => {
     const totalStokRp = products.reduce((acc, p) => acc + (calculateStock(p.id) * p.harga), 0);
 
     return [
-      { label: 'Jenis Logistik', value: jenisLogistik, subValue: `Rp ${totalStokRp.toLocaleString('id-ID')}`, icon: <Package size={18}/>, color: 'blue' },
+      { label: 'Jenis Logistik', value: jenisLogistik, subValue: 'Varian Terdaftar', icon: <Package size={18}/>, color: 'blue' },
       { label: 'Total Unit Masuk', value: totalMasuk, subValue: `Rp ${totalMasukRp.toLocaleString('id-ID')}`, icon: <ArrowDownCircle size={18}/>, color: 'emerald' },
       { label: 'Total Unit Keluar', value: totalKeluar, subValue: `Rp ${totalKeluarRp.toLocaleString('id-ID')}`, icon: <ArrowUpCircle size={18}/>, color: 'orange' },
-      { label: 'Barang Kosong', value: barangKosong, subValue: 'Peringatan Stok', icon: <AlertOctagon size={18}/>, color: 'red' },
+      { label: 'Saldo Akhir', value: totalSisaBarang, subValue: `Rp ${totalStokRp.toLocaleString('id-ID')}`, icon: <TrendingUp size={18}/>, color: 'indigo' },
     ];
   }, [products, inbound, outbound, calculateStock]);
 

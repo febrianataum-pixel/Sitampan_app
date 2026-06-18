@@ -10,7 +10,10 @@ import {
   ChevronRight,
   Filter,
   ArrowDownCircle,
-  ArrowUpCircle
+  ArrowUpCircle,
+  X,
+  User,
+  Clock
 } from 'lucide-react';
 import { MONTHS, formatIndoDate } from '../types';
 import { exportToCSV } from '../services/csvService';
@@ -21,6 +24,10 @@ const LaporanBlora: React.FC = () => {
   const [reportType, setReportType] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  
+  // State for selected product details for sebaran modal
+  const [selectedProductDetails, setSelectedProductDetails] = useState<{ id: string; name: string; code: string; unit: string; price: number } | null>(null);
+  const [modalTab, setModalTab] = useState<'current' | 'all'>('current');
 
   // Filter data berdasarkan periode yang dipilih
   const filteredInbound = useMemo(() => {
@@ -80,6 +87,48 @@ const LaporanBlora: React.FC = () => {
     .filter(item => item.jumlahMasuk > 0 || item.jumlahKeluar > 0 || item.sisaBarang > 0)
     .sort((a, b) => a.namaBarang.localeCompare(b.namaBarang));
   }, [products, filteredInbound, filteredOutbound, calculateStock]);
+
+  // Sebaran pada periode terpilih (aktif)
+  const productDistributionPeriod = useMemo(() => {
+    if (!selectedProductDetails) return [];
+    return filteredOutbound
+      .filter(tx => tx.items.some(item => item.productId === selectedProductDetails.id))
+      .map(tx => {
+        const matchItem = tx.items.find(item => item.productId === selectedProductDetails.id);
+        return {
+          id: tx.id,
+          penerima: tx.penerima,
+          tanggal: tx.tanggal,
+          alamat: tx.alamat,
+          jumlah: matchItem ? matchItem.jumlah : 0,
+          jenisBencana: tx.jenisBencana || '',
+          subJenisBencana: tx.subJenisBencana || '',
+          keterangan: tx.keteranganBencana || ''
+        };
+      })
+      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+  }, [selectedProductDetails, filteredOutbound]);
+
+  // Semua histori pengeluaran barang ini (tanpa filter tanggal)
+  const productDistributionAllTime = useMemo(() => {
+    if (!selectedProductDetails) return [];
+    return outbound
+      .filter(tx => tx.items.some(item => item.productId === selectedProductDetails.id))
+      .map(tx => {
+        const matchItem = tx.items.find(item => item.productId === selectedProductDetails.id);
+        return {
+          id: tx.id,
+          penerima: tx.penerima,
+          tanggal: tx.tanggal,
+          alamat: tx.alamat,
+          jumlah: matchItem ? matchItem.jumlah : 0,
+          jenisBencana: tx.jenisBencana || '',
+          subJenisBencana: tx.subJenisBencana || '',
+          keterangan: tx.keteranganBencana || ''
+        };
+      })
+      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+  }, [selectedProductDetails, outbound]);
 
   const totalInbound = summaryItems.reduce((acc, curr) => acc + curr.jumlahMasuk, 0);
   const totalOutbound = summaryItems.reduce((acc, curr) => acc + curr.jumlahKeluar, 0);
@@ -313,9 +362,22 @@ const LaporanBlora: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {summaryItems.length > 0 ? summaryItems.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-slate-800 dark:text-slate-200">{item.namaBarang}</p>
-                    <p className="text-[10px] text-slate-500 font-mono uppercase">{item.kodeBarang}</p>
+                  <td 
+                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-colors group/cell"
+                    onClick={() => setSelectedProductDetails({ id: item.id, name: item.namaBarang, code: item.kodeBarang, unit: item.satuan, price: item.hargaSatuan })}
+                    title="Klik untuk melihat sebaran distribusi barang ini"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="space-y-0.5">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 group-hover/cell:text-ios-blue-light dark:group-hover/cell:text-blue-400 transition-colors flex items-center gap-2">
+                          {item.namaBarang}
+                          <span className="text-[9px] bg-ios-blue-light/10 dark:bg-blue-500/10 text-ios-blue-light dark:text-blue-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider scale-90 group-hover/cell:scale-100 opacity-60 group-hover/cell:opacity-100 transition-all">
+                            Sebaran ➔
+                          </span>
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-mono uppercase">{item.kodeBarang}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
@@ -368,6 +430,187 @@ const LaporanBlora: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Sebaran Distribution Modal */}
+      {selectedProductDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-ios-lg shadow-2xl border border-slate-200 dark:border-white/10 w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col scale-in animate-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-white/5 flex items-start justify-between bg-slate-50 dark:bg-slate-900/50">
+              <div className="space-y-1">
+                <span className="text-[10px] bg-ios-blue-light/10 dark:bg-blue-500/10 text-ios-blue-light dark:text-blue-400 font-black px-2.5 py-1 rounded uppercase tracking-wider">
+                  Sebaran Penyaluran Logistik
+                </span>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white leading-tight mt-1">
+                  {selectedProductDetails.name}
+                </h3>
+                <p className="text-xs font-mono text-slate-500 uppercase">
+                  ID SKU: {selectedProductDetails.code}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedProductDetails(null)}
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Quick stats & Tab Selector */}
+            <div className="px-6 pt-5 pb-2 bg-slate-50/50 dark:bg-slate-900/30 space-y-4">
+              {/* Tabs */}
+              <div className="flex p-0.5 bg-slate-100 dark:bg-white/5 rounded-ios border border-slate-200 dark:border-white/5 gap-1">
+                <button
+                  onClick={() => setModalTab('current')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-ios transition-all cursor-pointer ${
+                    modalTab === 'current' 
+                      ? 'bg-white dark:bg-ios-secondary-dark shadow-sm text-ios-blue-light dark:text-ios-blue-dark' 
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                  }`}
+                >
+                  Periode Terpilih ({productDistributionPeriod.length})
+                </button>
+                <button
+                  onClick={() => setModalTab('all')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-ios transition-all cursor-pointer ${
+                    modalTab === 'all' 
+                      ? 'bg-white dark:bg-ios-secondary-dark shadow-sm text-ios-blue-light dark:text-ios-blue-dark' 
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                  }`}
+                >
+                  Semua Riwayat ({productDistributionAllTime.length})
+                </button>
+              </div>
+
+              {/* Total Distributed Information Counter */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-rose-500/10 border border-rose-500/20 p-3.5 rounded-ios text-left">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
+                    Total Disalurkan ({modalTab === 'current' ? 'Periode Ini' : 'Semua'})
+                  </p>
+                  <p className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+                    {(modalTab === 'current' ? productDistributionPeriod : productDistributionAllTime)
+                      .reduce((sum, d) => sum + d.jumlah, 0)
+                      .toLocaleString('id-ID')}{' '}
+                    <span className="text-xs font-medium uppercase text-slate-500">
+                      {selectedProductDetails.unit}
+                    </span>
+                  </p>
+                </div>
+                <div className="bg-ios-blue-light/10 border border-blue-500/20 p-3.5 rounded-ios text-left">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-ios-blue-light dark:text-blue-400">
+                    Stok Akhir Saat Ini
+                  </p>
+                  <p className="text-xl font-bold text-ios-blue-light dark:text-blue-400 mt-1">
+                    {calculateStock(selectedProductDetails.id).toLocaleString('id-ID')}{' '}
+                    <span className="text-xs font-medium uppercase text-slate-500">
+                      {selectedProductDetails.unit}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* List / Timeline Content */}
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+              {/* Active data list */}
+              {(modalTab === 'current' ? productDistributionPeriod : productDistributionAllTime).length > 0 ? (
+                <div className="border-l-2 border-dashed border-slate-205 dark:border-slate-800 ml-4 pl-6 relative space-y-6 py-2">
+                  {(modalTab === 'current' ? productDistributionPeriod : productDistributionAllTime).map((dist) => (
+                    <div key={dist.id} className="relative group/item">
+                      {/* Timeline Dot Icon */}
+                      <span className="absolute -left-[35px] top-1.5 flex h-6.5 w-6.5 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm ring-4 ring-white dark:ring-slate-900">
+                        <MapPin size={12} />
+                      </span>
+
+                      {/* Card Content */}
+                      <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-ios border border-slate-200 dark:border-white/5 space-y-3 transition-colors hover:border-rose-500/30 group-hover/item:bg-white dark:group-hover/item:bg-slate-850">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-2.5">
+                          <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                            <Clock size={12} />
+                            <span>{formatIndoDate(dist.tanggal)}</span>
+                          </div>
+                          {dist.jenisBencana && (
+                            <span className="text-[9px] bg-red-500/10 text-red-500 font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                              {dist.jenisBencana} {dist.subJenisBencana && `(${dist.subJenisBencana})`}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                          {/* SIAPA */}
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                              <User size={10} /> Penerima (Siapa)
+                            </span>
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 pl-3 border-l-2 border-ios-blue-light/30">
+                              {dist.penerima}
+                            </p>
+                          </div>
+
+                          {/* JUMLAH */}
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                              <Package size={10} /> Jumlah Disalurkan
+                            </span>
+                            <p className="text-sm font-black text-rose-600 dark:text-rose-400 pl-3 border-l-2 border-rose-500/30">
+                              {dist.jumlah.toLocaleString('id-ID')}{' '}
+                              <span className="text-[10px] font-medium uppercase text-slate-500">
+                                {selectedProductDetails.unit}
+                              </span>
+                            </p>
+                          </div>
+
+                          {/* DIMANA */}
+                          <div className="space-y-1 sm:col-span-2">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                              <MapPin size={10} /> Alamat Penyaluran (Dimana)
+                            </span>
+                            <p className="text-xs text-slate-700 dark:text-slate-300 pl-3 border-l-2 border-amber-500/30 leading-relaxed font-semibold">
+                              {dist.alamat || 'Alamat tidak diinput (pembagian umum gawat darurat)'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {dist.keterangan && dist.keterangan !== '-' && (
+                          <div className="p-2.5 bg-slate-100 dark:bg-white/5 rounded text-[10px] text-slate-500 italic mt-2.5 leading-normal">
+                            <b>Keterangan Bencana:</b> {dist.keterangan}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center opacity-40">
+                  <Package size={48} className="mb-3 text-slate-400" />
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">
+                    Tidak Ada Sebaran Distribusi
+                  </p>
+                  <p className="text-[10px] mt-1 max-w-xs leading-normal">
+                    {modalTab === 'current' 
+                      ? 'Tidak ditemukan pencatatan barang keluar untuk jenis barang ini pada periode terpilih.' 
+                      : 'Belum ada riwayat transaksi barang keluar sama sekali untuk jenis barang ini.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-white/5 flex justify-end">
+              <button 
+                onClick={() => setSelectedProductDetails(null)}
+                className="w-full sm:w-auto bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white px-6 py-2 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm text-center"
+              >
+                Tutup Sebaran
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
