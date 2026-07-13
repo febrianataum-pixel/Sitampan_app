@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch, getDoc, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import firebaseConfig from './firebase-applet-config.json';
@@ -118,6 +118,8 @@ interface InventoryContextType {
   user: User | null;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  userPermissions: any;
+  hasPermission: (menuKey: string, actionKey?: 'view' | 'add' | 'edit' | 'delete') => boolean;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -130,7 +132,7 @@ export const useInventory = () => {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout } = useInventory();
+  const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout, userPermissions } = useInventory();
   const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
 
@@ -139,22 +141,28 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
 
   const allMenuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-    { name: 'Database', path: '/dashboard/database', icon: <Database size={20} /> },
-    { name: 'Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={20} /> },
-    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={20} /> },
-    { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={20} /> },
-    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={20} /> },
-    { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={20} /> },
-    { name: 'Dokumen', path: '/dashboard/dokumen', icon: <Package size={20} /> },
-    { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={20} /> },
-    { name: 'Indikator', path: '/dashboard/rekap-indikator', icon: <PieChart size={20} /> },
-    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} /> },
+    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} />, key: 'dashboard' },
+    { name: 'Database', path: '/dashboard/database', icon: <Database size={20} />, key: 'database' },
+    { name: 'Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={20} />, key: 'masuk' },
+    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={20} />, key: 'keluar' },
+    { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={20} />, key: 'berita_acara' },
+    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={20} />, key: 'stok' },
+    { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={20} />, key: 'laporan' },
+    { name: 'Dokumen', path: '/dashboard/dokumen', icon: <Package size={20} />, key: 'dokumen' },
+    { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={20} />, key: 'rekap' },
+    { name: 'Indikator', path: '/dashboard/rekap-indikator', icon: <PieChart size={20} />, key: 'indikator' },
+    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} />, key: 'profile' },
   ];
 
-  const menuItems = isSpecialUser
-    ? allMenuItems
-    : allMenuItems.filter(item => ['Dashboard', 'Laporan', 'Stok', 'Rekap', 'Indikator'].includes(item.name));
+  const menuItems = allMenuItems.filter(item => {
+    if (isSpecialUser) return true;
+    if (item.key === 'profile') return true; // Profil selalu bisa diakses untuk melihat koneksi cloud dan logout
+    if (userPermissions && userPermissions[item.key]) {
+      return !!userPermissions[item.key].view;
+    }
+    // Fallback default menu jika belum tersinkron
+    return ['Dashboard', 'Laporan', 'Stok', 'Rekap', 'Indikator'].includes(item.name);
+  });
 
   return (
     <div className="flex h-screen overflow-hidden bg-ios-bg-light dark:bg-ios-bg-dark theme-transition">
@@ -602,6 +610,56 @@ const App: React.FC = () => {
 
   const isRemoteChange = useRef(false);
 
+  const [userPermissions, setUserPermissions] = useState<any>(null);
+
+  // Helper function to check custom user permissions
+  const hasPermission = (menuKey: string, actionKey: 'view' | 'add' | 'edit' | 'delete' = 'view') => {
+    const isPrimaryAdmin = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
+    if (isPrimaryAdmin) return true;
+    if (userPermissions && userPermissions[menuKey]) {
+      return !!userPermissions[menuKey][actionKey];
+    }
+    // Fallbacks for default menus
+    if (actionKey === 'view' && ['dashboard', 'stok', 'laporan', 'rekap', 'indikator'].includes(menuKey)) {
+      return true;
+    }
+    return false;
+  };
+
+  // Monitor real-time custom user permissions
+  useEffect(() => {
+    if (!user) {
+      setUserPermissions(null);
+      return;
+    }
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsub = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setUserPermissions(docSnap.data().permissions || null);
+      } else {
+        const isPrimaryAdmin = user.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
+        if (isPrimaryAdmin) {
+          setUserPermissions({
+            dashboard: { view: true },
+            database: { view: true, add: true, edit: true, delete: true },
+            masuk: { view: true, add: true, edit: true, delete: true },
+            keluar: { view: true, add: true, edit: true, delete: true },
+            berita_acara: { view: true, add: true, edit: true, delete: true },
+            stok: { view: true },
+            laporan: { view: true },
+            dokumen: { view: true, add: true, edit: true, delete: true },
+            rekap: { view: true },
+            indikator: { view: true },
+            profile: { view: true, edit: true }
+          });
+        }
+      }
+    }, (err) => {
+      console.error("Gagal mendengarkan izin pengguna:", err);
+    });
+    return () => unsub();
+  }, [user]);
+
   // Authentication state watcher
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -621,6 +679,68 @@ const App: React.FC = () => {
           }
           return updated;
         });
+
+        // Register user or update lastLogin in Firestore
+        // Search by email to support matching pre-seeded/pre-registered user profiles
+        const q = query(collection(db, 'users'), where('email', '==', u.email || ''));
+        getDocs(q).then((querySnap) => {
+          let existingData: any = null;
+          let tempDocId: string | null = null;
+
+          if (!querySnap.empty) {
+            // Found existing user entry by email
+            const docSnap = querySnap.docs[0];
+            existingData = docSnap.data();
+            tempDocId = docSnap.id;
+          }
+
+          const userRef = doc(db, 'users', u.uid);
+
+          const defaultPermissions = {
+            dashboard: { view: true },
+            database: { view: false, add: false, edit: false, delete: false },
+            masuk: { view: false, add: false, edit: false, delete: false },
+            keluar: { view: false, add: false, edit: false, delete: false },
+            berita_acara: { view: false, add: false, edit: false, delete: false },
+            stok: { view: true },
+            laporan: { view: true },
+            dokumen: { view: false, add: false, edit: false, delete: false },
+            rekap: { view: true },
+            indikator: { view: true },
+            profile: { view: false, edit: false }
+          };
+          
+          const isPrimaryAdmin = u.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(u.email);
+          const adminPermissions = {
+            dashboard: { view: true },
+            database: { view: true, add: true, edit: true, delete: true },
+            masuk: { view: true, add: true, edit: true, delete: true },
+            keluar: { view: true, add: true, edit: true, delete: true },
+            berita_acara: { view: true, add: true, edit: true, delete: true },
+            stok: { view: true },
+            laporan: { view: true },
+            dokumen: { view: true, add: true, edit: true, delete: true },
+            rekap: { view: true },
+            indikator: { view: true },
+            profile: { view: true, edit: true }
+          };
+
+          const dataToSet = {
+            uid: u.uid,
+            email: u.email || '',
+            displayName: u.displayName || existingData?.displayName || 'No Name',
+            photoURL: u.photoURL || existingData?.photoURL || '',
+            lastLogin: new Date().toISOString(),
+            permissions: existingData?.permissions || (isPrimaryAdmin ? adminPermissions : defaultPermissions)
+          };
+
+          setDoc(userRef, dataToSet, { merge: true }).then(() => {
+            // If the existing document had a temporary document ID, delete it to keep database pristine
+            if (tempDocId && tempDocId !== u.uid) {
+              deleteDoc(doc(db, 'users', tempDocId)).catch(err => console.error("Error deleting temp user doc:", err));
+            }
+          }).catch(err => console.error("Error setting user document:", err));
+        }).catch(err => console.error("Error finding user by email:", err));
       }
     });
     return () => unsub();
@@ -865,22 +985,22 @@ const App: React.FC = () => {
   const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
 
   return (
-    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle }}>
+    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle, userPermissions, hasPermission }}>
       <HashRouter>
         <Layout>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/database" element={isSpecialUser ? <DatabaseBarang /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/masuk" element={isSpecialUser ? <BarangMasuk /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/keluar" element={isSpecialUser ? <BarangKeluar /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/berita-acara" element={isSpecialUser ? <CetakBeritaAcara /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/stok" element={<StokBarang />} />
-            <Route path="/dashboard/laporan-blora" element={<LaporanBlora />} />
-            <Route path="/dashboard/dokumen" element={isSpecialUser ? <Dokumen /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/rekap" element={<RekapBulanan />} />
-            <Route path="/dashboard/rekap-indikator" element={<RekapIndikator />} />
-            <Route path="/dashboard/profile" element={isSpecialUser ? <Profile /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={hasPermission('dashboard', 'view') ? <Dashboard /> : <Navigate to="/dashboard/profile" replace />} />
+            <Route path="/dashboard/database" element={hasPermission('database', 'view') ? <DatabaseBarang /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/masuk" element={hasPermission('masuk', 'view') ? <BarangMasuk /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/keluar" element={hasPermission('keluar', 'view') ? <BarangKeluar /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/berita-acara" element={hasPermission('berita_acara', 'view') ? <CetakBeritaAcara /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/stok" element={hasPermission('stok', 'view') ? <StokBarang /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/laporan-blora" element={hasPermission('laporan', 'view') ? <LaporanBlora /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/dokumen" element={hasPermission('dokumen', 'view') ? <Dokumen /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/rekap" element={hasPermission('rekap', 'view') ? <RekapBulanan /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/rekap-indikator" element={hasPermission('indikator', 'view') ? <RekapIndikator /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/profile" element={<Profile />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>

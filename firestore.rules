@@ -12,32 +12,60 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
     }
 
     // Products collection rules
     match /products/{id} {
-      allow read, write: if isSignedIn() && isValidId(id);
+      allow get: if isSignedIn() && isValidId(id);
+      allow list: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(id);
     }
 
     // Inbound transactions collection rules
     match /inbound/{id} {
-      allow read, write: if isSignedIn() && isValidId(id);
+      allow get: if isSignedIn() && isValidId(id);
+      allow list: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(id);
     }
 
     // Outbound transactions collection rules
     match /outbound/{id} {
-      allow read, write: if isSignedIn() && isValidId(id);
+      allow get: if isSignedIn() && isValidId(id);
+      allow list: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(id);
     }
 
     // Documents collection rules
     match /documents/{id} {
-      allow read, write: if isSignedIn() && isValidId(id);
+      allow get: if isSignedIn() && isValidId(id);
+      allow list: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(id);
     }
 
     // Config & AppSettings collection rules
     match /config/{id} {
-      allow read, write: if isSignedIn() && isValidId(id);
+      allow get: if isSignedIn() && isValidId(id);
+      allow list: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(id);
+    }
+
+    // Users collection rules
+    match /users/{id} {
+      allow get: if isSignedIn() && isValidId(id) && (
+        request.auth.uid == id ||
+        request.auth.token.email == 'febrianataum@gmail.com' ||
+        request.auth.token.email == 'febridesain19@gmail.com'
+      );
+      allow list: if isSignedIn() && (
+        request.auth.token.email == 'febrianataum@gmail.com' ||
+        request.auth.token.email == 'febridesain19@gmail.com'
+      );
+      allow write: if isSignedIn() && isValidId(id) && (
+        request.auth.uid == id ||
+        request.auth.token.email == 'febrianataum@gmail.com' ||
+        request.auth.token.email == 'febridesain19@gmail.com'
+      );
     }
   }
 }

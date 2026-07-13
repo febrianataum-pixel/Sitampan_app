@@ -31,7 +31,7 @@ import { generateReportPDF } from '../services/pdfService';
 type SortKey = 'tanggal' | 'penerima' | 'alamat';
 
 const BarangKeluar: React.FC = () => {
-  const { products, outbound, setOutbound, calculateStock, settings } = useInventory();
+  const { products, outbound, setOutbound, calculateStock, settings, hasPermission } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -300,9 +300,11 @@ const BarangKeluar: React.FC = () => {
           <button onClick={handleExportPDF} className="flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 px-5 py-2 rounded-ios font-bold shadow-sm hover:bg-red-100 transition-all active:scale-95 text-xs">
             <FileText size={18} /> Export PDF
           </button>
-          <button onClick={() => handleOpenModal()} className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
-            <Plus size={18} /> Transaksi Baru
-          </button>
+          {hasPermission('keluar', 'add') && (
+            <button onClick={() => handleOpenModal()} className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
+              <Plus size={18} /> Transaksi Baru
+            </button>
+          )}
         </div>
       </div>
 
@@ -433,11 +435,19 @@ const BarangKeluar: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-1">
-                        <button onClick={() => { setUploadingTxId(o.id); setIsUploadModalOpen(true); }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all"><Camera size={16}/></button>
+                        {hasPermission('keluar', 'edit') && (
+                          <button onClick={() => { setUploadingTxId(o.id); setIsUploadModalOpen(true); }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all"><Camera size={16}/></button>
+                        )}
                         <button onClick={() => setViewingTx(o)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-ios transition-all"><Eye size={16}/></button>
-                        <button onClick={() => handleOpenModal(o, true)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-ios transition-all"><Copy size={16}/></button>
-                        <button onClick={() => handleOpenModal(o)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all"><Edit2 size={16}/></button>
-                        <button onClick={() => handleDeleteTx(o.id)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios transition-all"><Trash2 size={16}/></button>
+                        {hasPermission('keluar', 'add') && (
+                          <button onClick={() => handleOpenModal(o, true)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-ios transition-all"><Copy size={16}/></button>
+                        )}
+                        {hasPermission('keluar', 'edit') && (
+                          <button onClick={() => handleOpenModal(o)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all"><Edit2 size={16}/></button>
+                        )}
+                        {hasPermission('keluar', 'delete') && (
+                          <button onClick={() => handleDeleteTx(o.id)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios transition-all"><Trash2 size={16}/></button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -7,7 +7,7 @@ import { exportToExcel, parseExcel } from '../services/excelService';
 import { generateReportPDF } from '../services/pdfService';
 
 const BarangMasuk: React.FC = () => {
-  const { products, inbound, setInbound, settings } = useInventory();
+  const { products, inbound, setInbound, settings, hasPermission } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<InboundEntry | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,19 +158,23 @@ const BarangMasuk: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Log penerimaan stok barang ke gudang.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
-            <Plus size={18} /> Tambah Data
-          </button>
+          {hasPermission('masuk', 'add') && (
+            <button onClick={() => handleOpenModal()} className="flex items-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
+              <Plus size={18} /> Tambah Data
+            </button>
+          )}
           <button onClick={handleExportPDF} className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 px-4 py-2 rounded-ios font-bold text-xs shadow-sm hover:bg-red-100 transition-all">
             <FileText size={18} /> Export PDF
           </button>
           <button onClick={handleExportExcel} className="flex items-center gap-2 bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-ios font-bold text-xs shadow-sm hover:bg-slate-50 transition-all">
             <Download size={18} className="text-emerald-500" /> Excel
           </button>
-          <label className="flex items-center gap-2 bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-ios font-bold text-xs shadow-sm cursor-pointer hover:bg-slate-50 transition-all">
-            <Upload size={18} className="text-ios-blue-light" /> Import
-            <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
-          </label>
+          {hasPermission('masuk', 'add') && (
+            <label className="flex items-center gap-2 bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-ios font-bold text-xs shadow-sm cursor-pointer hover:bg-slate-50 transition-all">
+              <Upload size={18} className="text-ios-blue-light" /> Import
+              <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
+            </label>
+          )}
         </div>
       </div>
 
@@ -223,8 +227,12 @@ const BarangMasuk: React.FC = () => {
                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {total.toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleOpenModal(i)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios"><Edit2 size={16} /></button>
-                        <button onClick={() => { if(confirm('Hapus transaksi?')) setInbound(inbound.filter(it => it.id !== i.id)) }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios"><Trash2 size={16} /></button>
+                        {hasPermission('masuk', 'edit') && (
+                          <button onClick={() => handleOpenModal(i)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios"><Edit2 size={16} /></button>
+                        )}
+                        {hasPermission('masuk', 'delete') && (
+                          <button onClick={() => { if(confirm('Hapus transaksi?')) setInbound(inbound.filter(it => it.id !== i.id)) }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios"><Trash2 size={16} /></button>
+                        )}
                       </div>
                     </td>
                   </tr>

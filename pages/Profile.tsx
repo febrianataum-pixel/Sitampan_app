@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
-import { useInventory } from '../App';
+import React, { useState, useEffect } from 'react';
+import { useInventory, db } from '../App';
+import { collection, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
   Save, 
   Image as ImageIcon, 
@@ -12,12 +13,235 @@ import {
   Trash2,
   Camera,
   Smartphone,
-  Info
+  Info,
+  Users,
+  Search,
+  Check,
+  Lock,
+  Settings,
+  ShieldAlert,
+  Plus
 } from 'lucide-react';
 
+const PERMISSION_MODULES = [
+  { key: 'dashboard', name: 'Dashboard Utama', actions: ['view'] },
+  { key: 'database', name: 'Database Barang', actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'masuk', name: 'Barang Masuk', actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'keluar', name: 'Barang Keluar', actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'berita_acara', name: 'Berita Acara (BAST)', actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'stok', name: 'Stok Barang', actions: ['view'] },
+  { key: 'laporan', name: 'Peta Sebaran Laporan', actions: ['view'] },
+  { key: 'dokumen', name: 'Arsip Dokumen', actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'rekap', name: 'Rekap Bulanan', actions: ['view'] },
+  { key: 'indikator', name: 'Rekap Indikator', actions: ['view'] },
+  { key: 'profile', name: 'Profil & Branding', actions: ['view', 'edit'] }
+];
+
 const Profile: React.FC = () => {
-  const { settings, setSettings, isCloudConnected, user, logout } = useInventory();
+  const { settings, setSettings, isCloudConnected, user, logout, userPermissions, hasPermission } = useInventory();
   const [isTesting, setIsTesting] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'branding' | 'otoritas' | 'koneksi'>('koneksi');
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [userPermissionsForm, setUserPermissionsForm] = useState<any>({});
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+
+  // States for adding user manually
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+
+  const isPrimaryAdmin = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
+  const canEditBranding = isPrimaryAdmin || (userPermissions?.profile?.edit);
+
+  const fetchUsers = async () => {
+    if (!isPrimaryAdmin) return;
+    setIsLoadingUsers(true);
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      let list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Auto-seed known active emails from authentication if they are not in Firestore
+      const knownEmails = [
+        { email: 'febrianataum@gmail.com', name: 'Febrian Ataum', uid: 'lNM5eFeec8O7AmmOKfOKEVsUpQP2' },
+        { email: 'febridesain19@gmail.com', name: 'Febri Desain', uid: 'PBcOMizdQbTJpTiwt7wNMNE2v5s1' },
+        { email: 'brianrasta46@gmail.com', name: 'Brian Rasta', uid: 'temp_brianrasta46' },
+        { email: 'dinsosp3a.bla@gmail.com', name: 'Dinsos P3A Blora', uid: 'temp_dinsosp3a_bla' },
+        { email: 'bidangsosialblora@gmail.com', name: 'Bidang Sosial Blora', uid: 'temp_bidangsosialblora' }
+      ];
+
+      for (const item of knownEmails) {
+        const alreadyExists = list.some((u: any) => u.email?.toLowerCase() === item.email.toLowerCase());
+        if (!alreadyExists) {
+          const docId = item.uid;
+          const defaultPermissions = {
+            dashboard: { view: true },
+            database: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
+            masuk: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
+            keluar: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
+            berita_acara: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
+            stok: { view: true },
+            laporan: { view: true },
+            dokumen: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
+            rekap: { view: true },
+            indikator: { view: true },
+            profile: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com', edit: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' }
+          };
+
+          const newUserDoc = {
+            uid: docId,
+            email: item.email,
+            displayName: item.name,
+            photoURL: '',
+            lastLogin: '',
+            permissions: defaultPermissions
+          };
+
+          await setDoc(doc(db, 'users', docId), newUserDoc);
+          list.push({ id: docId, ...newUserDoc });
+        }
+      }
+
+      setUsersList(list);
+    } catch (err) {
+      console.error("Gagal mengambil data user:", err);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const handleAddNewUser = async () => {
+    if (!newUserEmail || !newUserName) {
+      alert("Email dan Nama Lengkap wajib diisi!");
+      return;
+    }
+    const cleanEmail = newUserEmail.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) {
+      alert("Format email tidak valid!");
+      return;
+    }
+
+    const alreadyExists = usersList.some(u => u.email?.toLowerCase() === cleanEmail);
+    if (alreadyExists) {
+      alert("User dengan email ini sudah terdaftar!");
+      return;
+    }
+
+    try {
+      const docId = 'temp_' + cleanEmail.replace(/[@.]/g, '_');
+      const defaultPermissions = {
+        dashboard: { view: true },
+        database: { view: false, add: false, edit: false, delete: false },
+        masuk: { view: false, add: false, edit: false, delete: false },
+        keluar: { view: false, add: false, edit: false, delete: false },
+        berita_acara: { view: false, add: false, edit: false, delete: false },
+        stok: { view: true },
+        laporan: { view: true },
+        dokumen: { view: false, add: false, edit: false, delete: false },
+        rekap: { view: true },
+        indikator: { view: true },
+        profile: { view: false, edit: false }
+      };
+
+      const newUserDoc = {
+        uid: docId,
+        email: cleanEmail,
+        displayName: newUserName,
+        photoURL: '',
+        lastLogin: '',
+        permissions: defaultPermissions
+      };
+
+      await setDoc(doc(db, 'users', docId), newUserDoc);
+      alert(`User ${newUserName} berhasil ditambahkan! Anda sekarang dapat mengatur hak aksesnya.`);
+      
+      setUsersList(prev => [...prev, { id: docId, ...newUserDoc }]);
+      setIsAddingUser(false);
+      setNewUserEmail('');
+      setNewUserName('');
+    } catch (err) {
+      console.error("Gagal menambahkan user:", err);
+      alert("Terjadi kesalahan saat menyimpan user baru.");
+    }
+  };
+
+  const handleDeleteUser = async (u: any) => {
+    if (!isPrimaryAdmin) return;
+    if (u.email === 'febrianataum@gmail.com' || u.email === 'febridesain19@gmail.com') {
+      alert("Tidak dapat menghapus Admin Utama!");
+      return;
+    }
+    if (!confirm(`Apakah Anda yakin ingin menghapus user ${u.displayName || u.email}?`)) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'users', u.uid));
+      alert(`User ${u.displayName || u.email} berhasil dihapus.`);
+      setUsersList(prev => prev.filter(item => item.uid !== u.uid));
+      if (selectedUser?.uid === u.uid) {
+        setSelectedUser(null);
+      }
+    } catch (err) {
+      console.error("Gagal menghapus user:", err);
+      alert("Terjadi kesalahan saat menghapus user.");
+    }
+  };
+
+  useEffect(() => {
+    if (isPrimaryAdmin) {
+      fetchUsers();
+      setActiveTab('branding'); // Admin starts on Branding
+    } else {
+      setActiveTab('koneksi'); // Normal user starts on Koneksi Akun
+    }
+  }, [user]);
+
+  const handleSelectUser = (u: any) => {
+    setSelectedUser(u);
+    // Initialize permissions form state with defaults
+    const permissions = u.permissions || {};
+    const defaultForm: any = {};
+    PERMISSION_MODULES.forEach(mod => {
+      defaultForm[mod.key] = {};
+      mod.actions.forEach(act => {
+        defaultForm[mod.key][act] = permissions[mod.key]?.[act] || false;
+      });
+    });
+    setUserPermissionsForm(defaultForm);
+  };
+
+  const handleTogglePermission = (modKey: string, action: string) => {
+    setUserPermissionsForm((prev: any) => ({
+      ...prev,
+      [modKey]: {
+        ...prev[modKey],
+        [action]: !prev[modKey]?.[action]
+      }
+    }));
+  };
+
+  const handleSaveUserPermissions = async () => {
+    if (!selectedUser || isSavingPermissions) return;
+    setIsSavingPermissions(true);
+    try {
+      const userRef = doc(db, 'users', selectedUser.uid);
+      await updateDoc(userRef, { permissions: userPermissionsForm });
+      alert(`Otoritas hak akses untuk ${selectedUser.displayName || selectedUser.email} berhasil diperbarui!`);
+      
+      // Update local state list
+      setUsersList(prev => prev.map(u => u.uid === selectedUser.uid ? { ...u, permissions: userPermissionsForm } : u));
+      setSelectedUser(prev => prev ? { ...prev, permissions: userPermissionsForm } : null);
+    } catch (err) {
+      console.error("Gagal memperbarui otoritas:", err);
+      alert("Terjadi kesalahan saat menyimpan data otoritas.");
+    } finally {
+      setIsSavingPermissions(false);
+    }
+  };
 
   const sanitizeInput = (val: string) => val.replace(/['"]+/g, '').trim();
 
@@ -144,256 +368,544 @@ const Profile: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-500 pb-20">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/5 pb-4">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Profil & Branding</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Kustomisasi identitas aplikasi untuk instansi Anda.</p>
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Profil Pengguna</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Informasi akun, kustomisasi identitas, dan otoritas hak akses.</p>
         </div>
-      </div>
-
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-8 md:p-12 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 space-y-10 theme-transition">
         
-        {/* Logo Branding (Sidebar/Header) */}
-        <div className="flex flex-col md:flex-row items-center gap-10 border-b dark:border-white/5 pb-10">
-           <div className="relative group text-center space-y-2">
-              <label className="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Logo Instansi (Internal)</label>
-              <div className="w-32 h-32 rounded-ios bg-slate-100 dark:bg-white/5 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 relative overflow-hidden shadow-inner transition-all group-hover:border-ios-blue-light mx-auto">
-                {settings.logo ? (
-                  <img src={settings.logo} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <div className="flex flex-col items-center text-slate-400 dark:text-slate-600">
-                    <ImageIcon size={32} />
-                    <span className="text-[7px] font-bold uppercase mt-1">Logo</span>
-                  </div>
-                )}
-                <label className="absolute inset-0 bg-black/60 dark:bg-black/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[9px] font-bold cursor-pointer backdrop-blur-sm">
-                  <Camera size={20} className="mb-1" />
-                  UPLOAD
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'logo')} />
-                </label>
-              </div>
-              {settings.logo && (
-                <button onClick={() => removeLogo('logo')} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 active:scale-90"><Trash2 size={12} /></button>
-              )}
-           </div>
-
-           {/* LOGO APLIKASI / SPLASH SCREEN */}
-           <div className="relative group text-center space-y-2">
-              <label className="block text-[9px] font-bold text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-wide mb-2 flex items-center gap-1 justify-center"><Smartphone size={10}/> Logo Aplikasi (Splash Screen)</label>
-              <div className="w-32 h-32 rounded-ios bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 flex flex-col items-center justify-center border-2 border-dashed border-ios-blue-light/20 dark:border-ios-blue-dark/20 relative overflow-hidden shadow-inner transition-all group-hover:border-ios-blue-light mx-auto">
-                {settings.appLogo ? (
-                  <img src={settings.appLogo} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
-                ) : (
-                  <div className="flex flex-col items-center text-ios-blue-light/40 dark:text-ios-blue-dark/40">
-                    <Smartphone size={32} />
-                    <span className="text-[7px] font-bold uppercase mt-1">Splash Logo</span>
-                  </div>
-                )}
-                <label className="absolute inset-0 bg-ios-blue-light/60 dark:bg-ios-blue-dark/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[9px] font-bold cursor-pointer backdrop-blur-sm">
-                  <Camera size={20} className="mb-1" />
-                  UPLOAD LOGO
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'appLogo')} />
-                </label>
-              </div>
-              {settings.appLogo && (
-                <button onClick={() => removeLogo('appLogo')} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 active:scale-90"><Trash2 size={12} /></button>
-              )}
-           </div>
-
-            <div className="flex-1 space-y-6 w-full">
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Aplikasi</label>
-                <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-900 dark:text-slate-100 outline-none text-xl shadow-sm" value={settings.appName || ''} onChange={(e) => setSettings({ ...settings, appName: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Slogan</label>
-                <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-600 dark:text-slate-400 outline-none text-sm shadow-sm" value={settings.appSubtitle || ''} onChange={(e) => setSettings({ ...settings, appSubtitle: e.target.value })} />
-              </div>
-           </div>
-        </div>
-
-        <div className="bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 p-4 rounded-ios border border-ios-blue-light/20 dark:border-ios-blue-dark/20 flex gap-3">
-          <Info className="text-ios-blue-light dark:text-ios-blue-dark shrink-0" size={20}/>
-          <p className="text-[10px] text-ios-blue-light dark:text-ios-blue-dark font-medium"><b>Logo Aplikasi (Splash Screen)</b> digunakan pada animasi pembuka saat aplikasi pertama kali dimuat di perangkat dan juga akan muncul sebagai ikon pada tab browser (favicon). Gunakan gambar transparan format PNG untuk hasil terbaik.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="space-y-1">
-              <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1"><User size={14}/> Nama Admin</label>
-              <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.adminName || ''} onChange={(e) => setSettings({ ...settings, adminName: e.target.value })} />
-           </div>
-           <div className="space-y-1">
-              <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1"><Warehouse size={14}/> Lokasi Gudang</label>
-              <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.warehouseName || ''} onChange={(e) => setSettings({ ...settings, warehouseName: e.target.value })} />
-           </div>
-        </div>
-
-        {/* Kepala Bidang Sosial */}
-        <div className="pt-6 border-t dark:border-white/5 space-y-6">
-          <div className="border-l-4 border-ios-blue-light dark:border-ios-blue-dark pl-4">
-            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">1. Kepala Bidang Sosial (Pihak Kesatu Berita Acara)</h4>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">Informasi Kepala Bidang yang akan dicetak pada Berita Acara Serah Terima (BAST).</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Kepala Bidang</label>
-              <input type="text" placeholder="NURKHOLIS, S.Kep, MM." className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidNama || ''} onChange={(e) => setSettings({ ...settings, kabidNama: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">NIP Kepala Bidang</label>
-              <input type="text" placeholder="19680328 198803 1 004" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidNip || ''} onChange={(e) => setSettings({ ...settings, kabidNip: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Jabatan Kepala Bidang</label>
-              <input type="text" placeholder="Plt. Kepala Bidang Sosial" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidJabatan || ''} onChange={(e) => setSettings({ ...settings, kabidJabatan: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Instansi Kepala Bidang</label>
-              <input type="text" placeholder="Dinsos PPPA Kab. Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidInstansi || ''} onChange={(e) => setSettings({ ...settings, kabidInstansi: e.target.value })} />
-            </div>
-          </div>
-        </div>
-
-        {/* Petugas Logistik */}
-        <div className="pt-6 border-t dark:border-white/5 space-y-6">
-          <div className="border-l-4 border-emerald-500 pl-4">
-            <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">2. Petugas Logistik (SPPB)</h4>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">Informasi Petugas Logistik yang akan dicetak pada Surat Perintah Pengeluaran Barang (SPPB).</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Petugas Logistik</label>
-              <input type="text" placeholder="Budi Santoso, A.Md." className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNama || ''} onChange={(e) => setSettings({ ...settings, petugasNama: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">NIP Petugas Logistik</label>
-              <input type="text" placeholder="19850102 201001 1 003" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNip || ''} onChange={(e) => setSettings({ ...settings, petugasNip: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Jabatan Petugas Logistik</label>
-              <input type="text" placeholder="Staf Seksi Logistik Kebencanaan" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasJabatan || ''} onChange={(e) => setSettings({ ...settings, petugasJabatan: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Instansi Petugas Logistik</label>
-              <input type="text" placeholder="Dinsos PPPA Kab. Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasInstansi || ''} onChange={(e) => setSettings({ ...settings, petugasInstansi: e.target.value })} />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama SK (Dasar Hukum SPPB)</label>
-              <input type="text" placeholder="Keputusan Kepala Dinas Sosial Pemberdayaan Perempuan dan Perlindungan Anak Kabupaten Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNamaSk || ''} onChange={(e) => setSettings({ ...settings, petugasNamaSk: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">No SK Petugas Logistik</label>
-              <input type="text" placeholder="800/123/2026" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNoSk || ''} onChange={(e) => setSettings({ ...settings, petugasNoSk: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Tanggal SK Petugas Logistik</label>
-              <input type="date" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.petugasTanggalSk || ''} onChange={(e) => setSettings({ ...settings, petugasTanggalSk: e.target.value })} />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Tentang SK Petugas Logistik</label>
-              <input type="text" placeholder="Penunjukan Petugas Pengelola Barang Persediaan Bidang Sosial" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasTentangSk || ''} onChange={(e) => setSettings({ ...settings, petugasTentangSk: e.target.value })} />
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-6 border-t dark:border-white/5 flex justify-end">
-           <button onClick={async () => { await setSettings(settings); alert('Profil & Branding disimpan!'); }} className="w-full sm:w-auto flex items-center justify-center gap-3 text-white px-12 py-3 rounded-ios font-bold shadow-sm text-xs" style={{ backgroundColor: settings.themeColor }}>
-             <Save size={18}/> Simpan Profil & Branding
-           </button>
+        {/* Tab Buttons */}
+        <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-ios gap-1">
+          <button 
+            onClick={() => setActiveTab('koneksi')} 
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-ios transition-all ${activeTab === 'koneksi' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+          >
+            <Cloud size={14} /> Koneksi Akun
+          </button>
+          
+          {canEditBranding && (
+            <button 
+              onClick={() => setActiveTab('branding')} 
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-ios transition-all ${activeTab === 'branding' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+            >
+              <Settings size={14} /> Branding & Konfigurasi
+            </button>
+          )}
+          
+          {isPrimaryAdmin && (
+            <button 
+              onClick={() => setActiveTab('otoritas')} 
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-ios transition-all ${activeTab === 'otoritas' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+            >
+              <ShieldCheck size={14} /> Otoritas User
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Realtime Cloud Status (Logged In User) */}
-      <div className="bg-slate-900 dark:bg-ios-secondary-dark text-white p-8 md:p-12 rounded-ios-lg shadow-2xl relative overflow-hidden group border dark:border-white/10">
-         {/* Decorative background blur */}
-         <div className="absolute right-0 top-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-orange-500/20 transition-all duration-700" />
-         
-         <div className="relative z-10 space-y-8">
-            <div className="flex items-center gap-5">
-               <div className="p-4 bg-orange-500 rounded-ios shadow-xl shrink-0"><Cloud size={28}/></div>
-               <div>
-                  <h3 className="text-2xl font-bold tracking-tight">Koneksi Cloud & Realtime Sync</h3>
-                  <p className="text-orange-200 dark:text-orange-400/60 text-xs font-semibold italic">Aplikasi terintegrasi secara aman dengan arsitektur Cloud Firebase.</p>
+      {activeTab === 'branding' && canEditBranding && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-8 md:p-12 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 space-y-10 theme-transition">
+            
+            {/* Logo Branding (Sidebar/Header) */}
+            <div className="flex flex-col md:flex-row items-center gap-10 border-b dark:border-white/5 pb-10">
+               <div className="relative group text-center space-y-2">
+                  <label className="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Logo Instansi (Internal)</label>
+                  <div className="w-32 h-32 rounded-ios bg-slate-100 dark:bg-white/5 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-white/10 relative overflow-hidden shadow-inner transition-all group-hover:border-ios-blue-light mx-auto">
+                    {settings.logo ? (
+                      <img src={settings.logo} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="flex flex-col items-center text-slate-400 dark:text-slate-600">
+                        <ImageIcon size={32} />
+                        <span className="text-[7px] font-bold uppercase mt-1">Logo</span>
+                      </div>
+                    )}
+                    <label className="absolute inset-0 bg-black/60 dark:bg-black/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[9px] font-bold cursor-pointer backdrop-blur-sm">
+                      <Camera size={20} className="mb-1" />
+                      UPLOAD
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'logo')} />
+                    </label>
+                  </div>
+                  {settings.logo && (
+                    <button onClick={() => removeLogo('logo')} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 active:scale-90"><Trash2 size={12} /></button>
+                  )}
+               </div>
+
+               {/* LOGO APLIKASI / SPLASH SCREEN */}
+               <div className="relative group text-center space-y-2">
+                  <label className="block text-[9px] font-bold text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-wide mb-2 flex items-center gap-1 justify-center"><Smartphone size={10}/> Logo Aplikasi (Splash Screen)</label>
+                  <div className="w-32 h-32 rounded-ios bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 flex flex-col items-center justify-center border-2 border-dashed border-ios-blue-light/20 dark:border-ios-blue-dark/20 relative overflow-hidden shadow-inner transition-all group-hover:border-ios-blue-light mx-auto">
+                    {settings.appLogo ? (
+                      <img src={settings.appLogo} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="flex flex-col items-center text-ios-blue-light/40 dark:text-ios-blue-dark/40">
+                        <Smartphone size={32} />
+                        <span className="text-[7px] font-bold uppercase mt-1">Splash Logo</span>
+                      </div>
+                    )}
+                    <label className="absolute inset-0 bg-ios-blue-light/60 dark:bg-ios-blue-dark/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center text-white text-[9px] font-bold cursor-pointer backdrop-blur-sm">
+                      <Camera size={20} className="mb-1" />
+                      UPLOAD LOGO
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleLogoUpload(e, 'appLogo')} />
+                    </label>
+                  </div>
+                  {settings.appLogo && (
+                    <button onClick={() => removeLogo('appLogo')} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 active:scale-90"><Trash2 size={12} /></button>
+                  )}
+               </div>
+
+                <div className="flex-1 space-y-6 w-full">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Aplikasi</label>
+                    <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-900 dark:text-slate-100 outline-none text-xl shadow-sm" value={settings.appName || ''} onChange={(e) => setSettings({ ...settings, appName: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Slogan</label>
+                    <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-600 dark:text-slate-400 outline-none text-sm shadow-sm" value={settings.appSubtitle || ''} onChange={(e) => setSettings({ ...settings, appSubtitle: e.target.value })} />
+                  </div>
                </div>
             </div>
 
-            {user ? (
-              <div className="bg-white/5 backdrop-blur-md rounded-ios-lg p-6 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName || "User"} className="w-16 h-16 rounded-full border-2 border-orange-500 object-cover shadow-lg" referrerPolicy="no-referrer" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/50 flex items-center justify-center font-bold text-xl text-orange-400">{user.displayName?.[0] || 'U'}</div>
-                  )}
+            <div className="bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 p-4 rounded-ios border border-ios-blue-light/20 dark:border-ios-blue-dark/20 flex gap-3">
+              <Info className="text-ios-blue-light dark:text-ios-blue-dark shrink-0" size={20}/>
+              <p className="text-[10px] text-ios-blue-light dark:text-ios-blue-dark font-medium"><b>Logo Aplikasi (Splash Screen)</b> digunakan pada animasi pembuka saat aplikasi pertama kali dimuat di perangkat dan juga akan muncul sebagai ikon pada tab browser (favicon). Gunakan gambar transparan format PNG untuk hasil terbaik.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1"><User size={14}/> Nama Admin</label>
+                  <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.adminName || ''} onChange={(e) => setSettings({ ...settings, adminName: e.target.value })} />
+               </div>
+               <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1"><Warehouse size={14}/> Lokasi Gudang</label>
+                  <input type="text" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.warehouseName || ''} onChange={(e) => setSettings({ ...settings, warehouseName: e.target.value })} />
+               </div>
+            </div>
+
+            {/* Kepala Bidang Sosial */}
+            <div className="pt-6 border-t dark:border-white/5 space-y-6">
+              <div className="border-l-4 border-ios-blue-light dark:border-ios-blue-dark pl-4">
+                <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">1. Kepala Bidang Sosial (Pihak Kesatu Berita Acara)</h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">Informasi Kepala Bidang yang akan dicetak pada Berita Acara Serah Terima (BAST).</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Kepala Bidang</label>
+                  <input type="text" placeholder="NURKHOLIS, S.Kep, MM." className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidNama || ''} onChange={(e) => setSettings({ ...settings, kabidNama: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">NIP Kepala Bidang</label>
+                  <input type="text" placeholder="19680328 198803 1 004" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidNip || ''} onChange={(e) => setSettings({ ...settings, kabidNip: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Jabatan Kepala Bidang</label>
+                  <input type="text" placeholder="Plt. Kepala Bidang Sosial" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidJabatan || ''} onChange={(e) => setSettings({ ...settings, kabidJabatan: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Instansi Kepala Bidang</label>
+                  <input type="text" placeholder="Dinsos PPPA Kab. Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.kabidInstansi || ''} onChange={(e) => setSettings({ ...settings, kabidInstansi: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            {/* Petugas Logistik */}
+            <div className="pt-6 border-t dark:border-white/5 space-y-6">
+              <div className="border-l-4 border-emerald-500 pl-4">
+                <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">2. Petugas Logistik (SPPB)</h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">Informasi Petugas Logistik yang akan dicetak pada Surat Perintah Pengeluaran Barang (SPPB).</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama Petugas Logistik</label>
+                  <input type="text" placeholder="Budi Santoso, A.Md." className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNama || ''} onChange={(e) => setSettings({ ...settings, petugasNama: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">NIP Petugas Logistik</label>
+                  <input type="text" placeholder="19850102 201001 1 003" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNip || ''} onChange={(e) => setSettings({ ...settings, petugasNip: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Jabatan Petugas Logistik</label>
+                  <input type="text" placeholder="Staf Seksi Logistik Kebencanaan" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasJabatan || ''} onChange={(e) => setSettings({ ...settings, petugasJabatan: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Instansi Petugas Logistik</label>
+                  <input type="text" placeholder="Dinsos PPPA Kab. Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasInstansi || ''} onChange={(e) => setSettings({ ...settings, petugasInstansi: e.target.value })} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Nama SK (Dasar Hukum SPPB)</label>
+                  <input type="text" placeholder="Keputusan Kepala Dinas Sosial Pemberdayaan Perempuan dan Perlindungan Anak Kabupaten Blora" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNamaSk || ''} onChange={(e) => setSettings({ ...settings, petugasNamaSk: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">No SK Petugas Logistik</label>
+                  <input type="text" placeholder="800/123/2026" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasNoSk || ''} onChange={(e) => setSettings({ ...settings, petugasNoSk: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Tanggal SK Petugas Logistik</label>
+                  <input type="date" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm" value={settings.petugasTanggalSk || ''} onChange={(e) => setSettings({ ...settings, petugasTanggalSk: e.target.value })} />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide ml-1">Tentang SK Petugas Logistik</label>
+                  <input type="text" placeholder="Penunjukan Petugas Pengelola Barang Persediaan Bidang Sosial" className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios px-6 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-600" value={settings.petugasTentangSk || ''} onChange={(e) => setSettings({ ...settings, petugasTentangSk: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 border-t dark:border-white/5 flex justify-end">
+               <button onClick={async () => { await setSettings(settings); alert('Profil & Branding disimpan!'); }} className="w-full sm:w-auto flex items-center justify-center gap-3 text-white px-12 py-3 rounded-ios font-bold shadow-sm text-xs" style={{ backgroundColor: settings.themeColor }}>
+                 <Save size={18}/> Simpan Profil & Branding
+               </button>
+            </div>
+          </div>
+
+          {/* Google Drive Configuration */}
+          <div className="bg-emerald-900 dark:bg-ios-secondary-dark text-white p-8 md:p-12 rounded-ios-lg shadow-2xl relative overflow-hidden group border dark:border-white/10">
+             <div className="relative z-10 space-y-8">
+                <div className="flex items-center gap-5">
+                   <div className="p-4 bg-emerald-500 rounded-ios shadow-xl"><ImageIcon size={28}/></div>
+                   <div>
+                      <h3 className="text-2xl font-bold tracking-tight">Google Drive Integration</h3>
+                      <p className="text-emerald-200 dark:text-emerald-400/60 text-xs font-semibold italic">Simpan arsip PDF langsung ke Google Drive Anda.</p>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Client ID</label>
+                      <input type="password" placeholder="123456789-abc.apps.googleusercontent.com" className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleClientId || ''} onChange={(e) => setSettings({ ...settings, googleClientId: sanitizeInput(e.target.value) })} />
+                   </div>
+                   <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Client Secret</label>
+                      <input type="password" placeholder="GOCSPX-..." className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleClientSecret || ''} onChange={(e) => setSettings({ ...settings, googleClientSecret: sanitizeInput(e.target.value) })} />
+                   </div>
+                   <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Redirect URI</label>
+                      <input type="text" placeholder={suggestedRedirectUri} className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleRedirectUri || ''} onChange={(e) => setSettings({ ...settings, googleRedirectUri: sanitizeInput(e.target.value) })} />
+                      <p className="text-[8px] text-emerald-300/60 mt-1 italic">Saran: {suggestedRedirectUri}</p>
+                   </div>
+                   <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Folder ID (Opsional)</label>
+                      <input type="text" placeholder="1Y4pgcJb9..." className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleFolderId || ''} onChange={(e) => setSettings({ ...settings, googleFolderId: sanitizeInput(e.target.value) })} />
+                   </div>
+                </div>
+
+                <div className="bg-emerald-500/10 p-4 rounded-ios border border-emerald-500/20 flex gap-3">
+                  <Info className="text-emerald-400 shrink-0" size={20}/>
                   <div className="space-y-1">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-emerald-500 text-white uppercase mb-1">TERKONEKSI</span>
-                    <h4 className="font-black text-lg text-white leading-snug">{user.displayName}</h4>
-                    <p className="text-xs text-slate-400 font-medium font-mono">{user.email}</p>
+                    <p className="text-[10px] text-emerald-200 font-medium"><b>Cara Mendapatkan API Key:</b></p>
+                    <ol className="text-[9px] text-emerald-300/80 list-decimal ml-4 space-y-0.5">
+                      <li>Buka Google Cloud Console.</li>
+                      <li>Buat Project baru & Aktifkan Google Drive API.</li>
+                      <li>Di menu Credentials, buat OAuth 2.0 Client ID (Web Application).</li>
+                      <li>Tambahkan Redirect URI di atas ke daftar "Authorized redirect URIs".</li>
+                      <li>Salin Client ID & Secret ke sini.</li>
+                    </ol>
+                  </div>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'koneksi' && (
+        <div className="bg-slate-900 dark:bg-ios-secondary-dark text-white p-8 md:p-12 rounded-ios-lg shadow-2xl relative overflow-hidden group border dark:border-white/10 animate-in fade-in duration-300">
+           {/* Decorative background blur */}
+           <div className="absolute right-0 top-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-orange-500/20 transition-all duration-700" />
+           
+           <div className="relative z-10 space-y-8">
+              <div className="flex items-center gap-5">
+                 <div className="p-4 bg-orange-500 rounded-ios shadow-xl shrink-0"><Cloud size={28}/></div>
+                 <div>
+                    <h3 className="text-2xl font-bold tracking-tight">Koneksi Cloud & Realtime Sync</h3>
+                    <p className="text-orange-200 dark:text-orange-400/60 text-xs font-semibold italic">Aplikasi terintegrasi secara aman dengan arsitektur Cloud Firebase.</p>
+                 </div>
+              </div>
+
+              {user ? (
+                <div className="bg-white/5 backdrop-blur-md rounded-ios-lg p-6 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-4 w-full sm:w-auto">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt={user.displayName || "User"} className="w-16 h-16 rounded-full border-2 border-orange-500 object-cover shadow-lg" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/50 flex items-center justify-center font-bold text-xl text-orange-400">{user.displayName?.[0] || 'U'}</div>
+                    )}
+                    <div className="space-y-1">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-emerald-500 text-white uppercase mb-1">TERKONEKSI</span>
+                      <h4 className="font-black text-lg text-white leading-snug">{user.displayName}</h4>
+                      <p className="text-xs text-slate-400 font-medium font-mono">{user.email}</p>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => { if (confirm("Apakah Anda yakin ingin keluar?")) logout(); }}
+                    className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-8 rounded-ios text-xs whitespace-nowrap active:scale-95 transition-all shadow-md shadow-rose-500/10 cursor-pointer"
+                  >
+                    Keluar Akun
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-rose-500/10 p-6 rounded-ios-lg border border-rose-500/20 text-center space-y-3">
+                  <p className="text-sm text-rose-300 font-bold">Koneksi Cloud belum terautentikasi.</p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">Silakan muat kembali aplikasi dan lakukan login menggunakan akun Google Anda untuk mengaktifkan sinkronisasi otomatis.</p>
+                </div>
+              )}
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'otoritas' && isPrimaryAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-300">
+          
+          {/* User List Panel */}
+          <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col h-[600px] theme-transition">
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-ios-blue-light dark:text-ios-blue-dark" />
+                <h3 className="font-black text-sm text-slate-900 dark:text-slate-100 uppercase tracking-wider">Daftar Akun Login</h3>
+              </div>
+              <button 
+                onClick={() => setIsAddingUser(!isAddingUser)}
+                className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-ios transition-all active:scale-95 ${isAddingUser ? 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300' : 'bg-ios-blue-light/10 text-ios-blue-light dark:bg-ios-blue-dark/10 dark:text-ios-blue-dark'}`}
+                title="Tambah User Baru"
+              >
+                <Plus size={12} /> Tambah
+              </button>
+            </div>
+
+            {/* Inline Add User Form */}
+            {isAddingUser && (
+              <div className="p-4 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios mb-4 space-y-3 shrink-0 animate-in slide-in-from-top-2 duration-200">
+                <div className="space-y-1">
+                  <label className="block text-[8px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Email Pengguna</label>
+                  <input 
+                    type="email" 
+                    placeholder="contoh@gmail.com" 
+                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[8px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nama Lengkap</label>
+                  <input 
+                    type="text" 
+                    placeholder="Nama Lengkap" 
+                    className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-ios px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2 justify-end pt-1">
+                  <button 
+                    onClick={() => { setIsAddingUser(false); setNewUserEmail(''); setNewUserName(''); }}
+                    className="px-3 py-1.5 rounded-ios text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={handleAddNewUser}
+                    className="px-4 py-1.5 rounded-ios text-[10px] font-bold text-white bg-ios-blue-light dark:bg-ios-blue-dark active:scale-95 transition-all shadow-sm"
+                  >
+                    Simpan
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Search Input */}
+            <div className="relative mb-4 shrink-0">
+              <Search className="absolute left-3 top-3.5 text-slate-400 dark:text-slate-600" size={16} />
+              <input 
+                type="text" 
+                placeholder="Cari nama atau email..." 
+                className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-ios pl-10 pr-4 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none text-xs"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* List of Users */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
+              {isLoadingUsers ? (
+                <div className="flex items-center justify-center h-40">
+                  <RefreshCw className="animate-spin text-slate-400" size={24} />
+                </div>
+              ) : (
+                usersList
+                  .filter(u => u.email?.toLowerCase().includes(searchQuery.toLowerCase()) || u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(u => {
+                    const isSelected = selectedUser?.uid === u.uid;
+                    const isTemp = u.uid?.startsWith('temp_');
+                    return (
+                      <button 
+                        key={u.uid} 
+                        onClick={() => handleSelectUser(u)}
+                        className={`w-full flex items-center gap-3 p-3 rounded-ios text-left transition-all border ${isSelected ? 'bg-ios-blue-light/10 border-ios-blue-light dark:bg-ios-blue-dark/10 dark:border-ios-blue-dark' : 'bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                      >
+                        {u.photoURL ? (
+                          <img src={u.photoURL} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm border dark:border-white/10" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 ${isTemp ? 'bg-orange-500/10 text-orange-500' : 'bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400'}`}>{u.displayName?.[0] || 'U'}</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate">{u.displayName || 'No Name'}</h4>
+                            {isTemp && (
+                              <span className="shrink-0 text-[7px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded tracking-wide uppercase">Belum Login</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">{u.email}</p>
+                        </div>
+                      </button>
+                    );
+                  })
+              )}
+              {usersList.length === 0 && !isLoadingUsers && (
+                <p className="text-center text-xs text-slate-400 italic py-10">Belum ada user yang terdaftar.</p>
+              )}
+            </div>
+          </div>
+
+          {/* User Permissions Panel */}
+          <div className="md:col-span-2 bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col h-[600px] theme-transition">
+            {selectedUser ? (
+              <div className="flex flex-col h-full">
+                {/* Header of selected user */}
+                <div className="flex items-center justify-between border-b dark:border-white/5 pb-4 mb-4 shrink-0">
+                  <div className="flex items-center gap-3">
+                    {selectedUser.photoURL ? (
+                      <img src={selectedUser.photoURL} alt="" className="w-12 h-12 rounded-full object-cover border dark:border-white/10" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-500">{selectedUser.displayName?.[0] || 'U'}</div>
+                    )}
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">{selectedUser.displayName}</h3>
+                      <p className="text-xs text-slate-500 font-mono">{selectedUser.email}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Warning if trying to edit own primary admin permissions, else show Delete button */}
+                  {(selectedUser.email === 'febrianataum@gmail.com' || selectedUser.email === 'febridesain19@gmail.com') ? (
+                    <div className="flex items-center gap-1 text-[9px] font-black tracking-wider uppercase bg-orange-500/10 text-orange-500 px-2 py-1 rounded border border-orange-500/20">
+                      <Lock size={10} /> Admin Utama
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => handleDeleteUser(selectedUser)}
+                      className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-ios transition-all duration-200 active:scale-95"
+                      title="Hapus Akun"
+                    >
+                      <Trash2 size={14} /> Hapus Akun
+                    </button>
+                  )}
+                </div>
+
+                {/* Permissions Grid scrollable area */}
+                <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-hide">
+                  <div className="border-l-4 border-ios-blue-light dark:border-ios-blue-dark pl-4 py-1">
+                    <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wide">Konfigurasi Hak Akses Menu</h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Atur batasan edit, hapus, tambah, dan tampilkan data untuk masing-masing menu.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {PERMISSION_MODULES.map(mod => {
+                      const isProfileSetting = mod.key === 'profile';
+                      const isDashboardSetting = mod.key === 'dashboard';
+                      const isCurrentUserAdmin = selectedUser.email === 'febrianataum@gmail.com' || selectedUser.email === 'febridesain19@gmail.com';
+                      
+                      return (
+                        <div key={mod.key} className="p-4 bg-slate-100 dark:bg-white/5 rounded-ios border dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="min-w-[150px]">
+                            <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">{mod.name}</span>
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 block">Menu key: {mod.key}</span>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-4">
+                            {mod.actions.includes('view') && (
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input 
+                                  type="checkbox" 
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                  checked={userPermissionsForm[mod.key]?.view || false}
+                                  onChange={() => handleTogglePermission(mod.key, 'view')}
+                                  disabled={isCurrentUserAdmin && (isProfileSetting || isDashboardSetting)} // Admin cannot lock self out of Profile/Dashboard
+                                />
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">Tampilkan Data (Lihat)</span>
+                              </label>
+                            )}
+
+                            {mod.actions.includes('add') && (
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input 
+                                  type="checkbox" 
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                  checked={userPermissionsForm[mod.key]?.add || false}
+                                  onChange={() => handleTogglePermission(mod.key, 'add')}
+                                  disabled={isCurrentUserAdmin}
+                                />
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">Tambah</span>
+                              </label>
+                            )}
+
+                            {mod.actions.includes('edit') && (
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input 
+                                  type="checkbox" 
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                  checked={userPermissionsForm[mod.key]?.edit || false}
+                                  onChange={() => handleTogglePermission(mod.key, 'edit')}
+                                  disabled={isCurrentUserAdmin && isProfileSetting}
+                                />
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">Edit</span>
+                              </label>
+                            )}
+
+                            {mod.actions.includes('delete') && (
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input 
+                                  type="checkbox" 
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                                  checked={userPermissionsForm[mod.key]?.delete || false}
+                                  onChange={() => handleTogglePermission(mod.key, 'delete')}
+                                  disabled={isCurrentUserAdmin}
+                                />
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">Hapus</span>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <button 
-                  onClick={() => { if (confirm("Apakah Anda yakin ingin keluar?")) logout(); }}
-                  className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-8 rounded-ios text-xs whitespace-nowrap active:scale-95 transition-all shadow-md shadow-rose-500/10 cursor-pointer"
-                >
-                  Keluar Akun
-                </button>
+                {/* Save Button */}
+                <div className="pt-4 border-t dark:border-white/5 mt-4 shrink-0 flex justify-end gap-3">
+                  <button 
+                    onClick={handleSaveUserPermissions}
+                    disabled={isSavingPermissions}
+                    className="flex items-center gap-2 text-white font-bold text-xs px-8 py-3 rounded-ios shadow-sm bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {isSavingPermissions ? (
+                      <RefreshCw className="animate-spin" size={14} />
+                    ) : (
+                      <Save size={14} />
+                    )}
+                    Simpan Otoritas Akses
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="bg-rose-500/10 p-6 rounded-ios-lg border border-rose-500/20 text-center space-y-3">
-                <p className="text-sm text-rose-300 font-bold">Koneksi Cloud belum terautentikasi.</p>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">Silakan muat kembali aplikasi dan lakukan login menggunakan akun Google Anda untuk mengaktifkan sinkronisasi otomatis.</p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3">
+                <div className="p-4 bg-slate-100 dark:bg-white/5 rounded-full text-slate-400 dark:text-slate-600"><Lock size={32} /></div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300">Pilih User untuk Konfigurasi</h4>
+                  <p className="text-[10px] text-slate-400 max-w-xs mx-auto">Silakan pilih salah satu pengguna dari daftar di sebelah kiri untuk mengatur batas hak akses menu dan operasinya.</p>
+                </div>
               </div>
             )}
-         </div>
-      </div>
-
-      {/* Google Drive Configuration */}
-      <div className="bg-emerald-900 dark:bg-ios-secondary-dark text-white p-8 md:p-12 rounded-ios-lg shadow-2xl relative overflow-hidden group border dark:border-white/10">
-         <div className="relative z-10 space-y-8">
-            <div className="flex items-center gap-5">
-               <div className="p-4 bg-emerald-500 rounded-ios shadow-xl"><ImageIcon size={28}/></div>
-               <div>
-                  <h3 className="text-2xl font-bold tracking-tight">Google Drive Integration</h3>
-                  <p className="text-emerald-200 dark:text-emerald-400/60 text-xs font-semibold italic">Simpan arsip PDF langsung ke Google Drive Anda.</p>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Client ID</label>
-                  <input type="password" placeholder="123456789-abc.apps.googleusercontent.com" className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleClientId || ''} onChange={(e) => setSettings({ ...settings, googleClientId: sanitizeInput(e.target.value) })} />
-               </div>
-               <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Client Secret</label>
-                  <input type="password" placeholder="GOCSPX-..." className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleClientSecret || ''} onChange={(e) => setSettings({ ...settings, googleClientSecret: sanitizeInput(e.target.value) })} />
-               </div>
-               <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Redirect URI</label>
-                  <input type="text" placeholder={suggestedRedirectUri} className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleRedirectUri || ''} onChange={(e) => setSettings({ ...settings, googleRedirectUri: sanitizeInput(e.target.value) })} />
-                  <p className="text-[8px] text-emerald-300/60 mt-1 italic">Saran: {suggestedRedirectUri}</p>
-               </div>
-               <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-emerald-400 dark:text-emerald-500 uppercase tracking-wide ml-1">Folder ID (Opsional)</label>
-                  <input type="text" placeholder="1Y4pgcJb9..." className="w-full bg-white/10 dark:bg-black/20 border border-white/5 rounded-ios px-6 py-3 font-bold text-white outline-none" value={settings.googleFolderId || ''} onChange={(e) => setSettings({ ...settings, googleFolderId: sanitizeInput(e.target.value) })} />
-               </div>
-            </div>
-
-            <div className="bg-emerald-500/10 p-4 rounded-ios border border-emerald-500/20 flex gap-3">
-              <Info className="text-emerald-400 shrink-0" size={20}/>
-              <div className="space-y-1">
-                <p className="text-[10px] text-emerald-200 font-medium"><b>Cara Mendapatkan API Key:</b></p>
-                <ol className="text-[9px] text-emerald-300/80 list-decimal ml-4 space-y-0.5">
-                  <li>Buka Google Cloud Console.</li>
-                  <li>Buat Project baru & Aktifkan Google Drive API.</li>
-                  <li>Di menu Credentials, buat OAuth 2.0 Client ID (Web Application).</li>
-                  <li>Tambahkan Redirect URI di atas ke daftar "Authorized redirect URIs".</li>
-                  <li>Salin Client ID & Secret ke sini.</li>
-                </ol>
-              </div>
-            </div>
-         </div>
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

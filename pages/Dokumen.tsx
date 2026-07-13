@@ -25,7 +25,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { PDFDocument } from 'pdf-lib';
 
 const Dokumen: React.FC = () => {
-  const { documents, setDocuments, storage, settings } = useInventory();
+  const { documents, setDocuments, storage, settings, hasPermission } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<ArchiveDocument | null>(null);
   const [previewDoc, setPreviewDoc] = useState<ArchiveDocument | null>(null);
@@ -400,24 +400,26 @@ const Dokumen: React.FC = () => {
               <CloudOff size={16}/> Hubungkan Drive
             </button>
           )}
-          <button 
-            onClick={() => { 
-              setEditingDoc(null); 
-              setFormData({ 
-                title: '', 
-                category: 'Laporan', 
-                date: new Date().toISOString().split('T')[0], 
-                description: '', 
-                fileUrl: '', 
-                fileName: '',
-                storageType: 'upload'
-              }); 
-              setIsModalOpen(true); 
-            }}
-            className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 transition-all text-[10px] uppercase tracking-widest"
-          >
-            <Plus size={18}/> Tambah Dokumen
-          </button>
+          {hasPermission('dokumen', 'add') && (
+            <button 
+              onClick={() => { 
+                setEditingDoc(null); 
+                setFormData({ 
+                  title: '', 
+                  category: 'Laporan', 
+                  date: new Date().toISOString().split('T')[0], 
+                  description: '', 
+                  fileUrl: '', 
+                  fileName: '',
+                  storageType: 'upload'
+                }); 
+                setIsModalOpen(true); 
+              }}
+              className="bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+            >
+              <Plus size={18}/> Tambah Dokumen
+            </button>
+          )}
         </div>
       </div>
 
@@ -491,13 +493,15 @@ const Dokumen: React.FC = () => {
               </div>
               <div className="p-3 bg-slate-50 dark:bg-white/5 border-t dark:border-white/5 flex items-center justify-between">
                 <div className="flex gap-1">
-                  <button 
-                    onClick={() => handleEdit(doc)}
-                    className="p-2 text-ios-blue-light dark:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-colors"
-                    title="Edit Dokumen"
-                  >
-                    <Pencil size={18}/>
-                  </button>
+                  {hasPermission('dokumen', 'edit') && (
+                    <button 
+                      onClick={() => handleEdit(doc)}
+                      className="p-2 text-ios-blue-light dark:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-colors"
+                      title="Edit Dokumen"
+                    >
+                      <Pencil size={18}/>
+                    </button>
+                  )}
                   <a 
                     href={doc.fileUrl.includes('drive.google.com') ? doc.fileUrl : (doc.fileUrl === '[IDB_FILE]' ? '#' : doc.fileUrl)} 
                     download={doc.fileName}
@@ -509,13 +513,15 @@ const Dokumen: React.FC = () => {
                     {doc.fileUrl.includes('drive.google.com') ? <ExternalLink size={18}/> : <Download size={18}/>}
                   </a>
                 </div>
-                <button 
-                  onClick={() => handleDelete(doc.id)}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios transition-colors"
-                  title="Hapus"
-                >
-                  <Trash2 size={18}/>
-                </button>
+                {hasPermission('dokumen', 'delete') && (
+                  <button 
+                    onClick={() => handleDelete(doc.id)}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios transition-colors"
+                    title="Hapus"
+                  >
+                    <Trash2 size={18}/>
+                  </button>
+                )}
               </div>
             </div>
           ))}

@@ -7,7 +7,7 @@ import { exportToExcel, parseExcel } from '../services/excelService';
 import { generateReportPDF } from '../services/pdfService';
 
 const DatabaseBarang: React.FC = () => {
-  const { products, setProducts, settings } = useInventory();
+  const { products, setProducts, settings, hasPermission } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,20 +140,24 @@ const DatabaseBarang: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Pengelolaan data induk inventaris.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {selectedIds.size > 0 && (
+          {selectedIds.size > 0 && hasPermission('database', 'delete') && (
             <button onClick={handleBulkDelete} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-2 rounded-ios font-bold shadow-sm text-xs">
               <Trash2 size={14} /> Hapus ({selectedIds.size})
             </button>
           )}
-          <button onClick={() => handleOpenModal()} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
-            <Plus size={16} /> Tambah
-          </button>
+          {hasPermission('database', 'add') && (
+            <button onClick={() => handleOpenModal()} className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
+              <Plus size={16} /> Tambah
+            </button>
+          )}
           <button onClick={handleExportPDF} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-ios"><FileText size={18}/></button>
           <button onClick={handleExportExcel} className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 rounded-ios"><Download size={18}/></button>
-          <label className="p-2 bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark border border-ios-blue-light/20 dark:border-ios-blue-dark/20 rounded-ios cursor-pointer">
-            <Upload size={18} />
-            <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
-          </label>
+          {hasPermission('database', 'add') && (
+            <label className="p-2 bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark border border-ios-blue-light/20 dark:border-ios-blue-dark/20 rounded-ios cursor-pointer">
+              <Upload size={18} />
+              <input type="file" className="hidden" accept=".xlsx,.xls,.csv" onChange={handleImport} />
+            </label>
+          )}
         </div>
       </div>
 
@@ -198,8 +202,12 @@ const DatabaseBarang: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100 text-sm">Rp {p.harga.toLocaleString('id-ID')}</td>
                   <td className="px-6 py-4">
                     <div className="flex justify-center gap-1">
-                      <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark"><Edit2 size={16} /></button>
-                      <button onClick={() => { if(confirm('Hapus?')) setProducts(products.filter(it => it.id !== p.id)) }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400"><Trash2 size={16} /></button>
+                      {hasPermission('database', 'edit') && (
+                        <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark"><Edit2 size={16} /></button>
+                      )}
+                      {hasPermission('database', 'delete') && (
+                        <button onClick={() => { if(confirm('Hapus?')) setProducts(products.filter(it => it.id !== p.id)) }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400"><Trash2 size={16} /></button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -171,6 +171,35 @@
         "appName",
         "themeColor"
       ]
+    },
+    "User": {
+      "title": "User",
+      "description": "Profil pengguna dan konfigurasi otoritas akses menu",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "photoURL": {
+          "type": "string"
+        },
+        "lastLogin": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "uid",
+        "email"
+      ]
     }
   },
   "firestore": {
@@ -193,6 +222,10 @@
     "config/{id}": {
       "schema": "AppSettings",
       "description": "Arsip konfigurasi global sistem"
+    },
+    "users/{id}": {
+      "schema": "User",
+      "description": "Profil dan data otoritas hak akses pengguna"
     }
   }
 }
