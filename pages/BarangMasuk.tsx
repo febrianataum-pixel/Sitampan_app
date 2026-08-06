@@ -1,10 +1,16 @@
 
 import React, { useState } from 'react';
 import { useInventory } from '../App';
-import { Plus, Trash2, Download, Upload, Search, X, Edit2, FileText, TrendingUp } from 'lucide-react';
-import { InboundEntry, MONTHS, formatIndoDate } from '../types';
+import { Plus, Trash2, Download, Upload, Search, X, Edit2, FileText, TrendingUp, ChevronDown, Check } from 'lucide-react';
+import { InboundEntry, MONTHS, formatIndoDate, Product } from '../types';
 import { exportToExcel, parseExcel } from '../services/excelService';
 import { generateReportPDF } from '../services/pdfService';
+
+interface ItemRow {
+  id: string;
+  productId: string;
+  jumlah: number;
+}
 
 const BarangMasuk: React.FC = () => {
   const { products, inbound, setInbound, settings, hasPermission } = useInventory();
@@ -12,45 +18,114 @@ const BarangMasuk: React.FC = () => {
   const [editingEntry, setEditingEntry] = useState<InboundEntry | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [formData, setFormData] = useState({
-    productId: '',
-    jumlah: 1,
+  // General date state for modal
+  const [generalData, setGeneralData] = useState({
+    tanggal: new Date().toISOString().split('T')[0],
     bulan: MONTHS[new Date().getMonth()],
     tahun: new Date().getFullYear(),
-    tanggal: new Date().toISOString().split('T')[0]
   });
+
+  // Multiple items state for modal
+  const [items, setItems] = useState<ItemRow[]>([
+    { id: crypto.randomUUID(), productId: '', jumlah: 1 }
+  ]);
+
+  // Product search states per item row
+  const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
+  const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
+
+  // Sorted products A-Z by namaBarang
+  const sortedProducts = [...products].sort((a, b) =>
+    a.namaBarang.localeCompare(b.namaBarang, 'id', { sensitivity: 'base' })
+  );
+
+  const getFilteredProductsForRow = (rowId: string) => {
+    const q = (searchQueries[rowId] || '').toLowerCase().trim();
+    const selectedInOtherRows = items.filter(it => it.id !== rowId).map(it => it.productId);
+
+    return sortedProducts.filter(p => {
+      const matchesQuery = p.namaBarang.toLowerCase().includes(q) || p.kodeBarang.toLowerCase().includes(q);
+      const isNotUsedInOtherRow = !selectedInOtherRows.includes(p.id);
+      return matchesQuery && isNotUsedInOtherRow;
+    });
+  };
 
   const handleOpenModal = (entry?: InboundEntry) => {
     if (entry) {
       setEditingEntry(entry);
-      setFormData({
-        productId: entry.productId,
-        jumlah: entry.jumlah,
+      setGeneralData({
+        tanggal: entry.tanggal,
         bulan: entry.bulan,
-        tahun: entry.tahun,
-        tanggal: entry.tanggal
+        tahun: entry.tahun
       });
+      const p = products.find(prod => prod.id === entry.productId);
+      const rowId = entry.id;
+      setItems([{ id: rowId, productId: entry.productId, jumlah: entry.jumlah }]);
+      setSearchQueries({ [rowId]: p ? p.namaBarang : '' });
     } else {
       setEditingEntry(null);
-      setFormData({
-        productId: '',
-        jumlah: 1,
-        bulan: MONTHS[new Date().getMonth()],
-        tahun: new Date().getFullYear(),
-        tanggal: new Date().toISOString().split('T')[0]
+      const newDateStr = new Date().toISOString().split('T')[0];
+      const d = new Date(newDateStr);
+      setGeneralData({
+        tanggal: newDateStr,
+        bulan: MONTHS[d.getMonth()],
+        tahun: d.getFullYear()
       });
+      const firstRowId = crypto.randomUUID();
+      setItems([{ id: firstRowId, productId: '', jumlah: 1 }]);
+      setSearchQueries({});
     }
+    setActiveSearchId(null);
     setIsModalOpen(true);
+  };
+
+  const handleAddItemRow = () => {
+    const newId = crypto.randomUUID();
+    setItems(prev => [...prev, { id: newId, productId: '', jumlah: 1 }]);
+  };
+
+  const handleRemoveItemRow = (id: string) => {
+    if (items.length <= 1) return;
+    setItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleItemChange = (id: string, field: keyof ItemRow, value: any) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.productId) return alert('Pilih barang!');
-    if (editingEntry) {
-      setInbound(inbound.map(i => i.id === editingEntry.id ? { ...i, ...formData } : i));
-    } else {
-      setInbound([...inbound, { id: crypto.randomUUID(), ...formData }]);
+    if (items.some(i => !i.productId)) {
+      alert('Pilih semua barang terlebih dahulu!');
+      return;
     }
+    if (items.some(i => i.jumlah <= 0)) {
+      alert('Jumlah barang harus lebih dari 0!');
+      return;
+    }
+
+    if (editingEntry) {
+      const updatedEntry: InboundEntry = {
+        id: editingEntry.id,
+        productId: items[0].productId,
+        jumlah: items[0].jumlah,
+        tanggal: generalData.tanggal,
+        bulan: generalData.bulan,
+        tahun: generalData.tahun
+      };
+      setInbound(inbound.map(i => i.id === editingEntry.id ? updatedEntry : i));
+    } else {
+      const newEntries: InboundEntry[] = items.map(item => ({
+        id: crypto.randomUUID(),
+        productId: item.productId,
+        jumlah: item.jumlah,
+        tanggal: generalData.tanggal,
+        bulan: generalData.bulan,
+        tahun: generalData.tahun
+      }));
+      setInbound([...inbound, ...newEntries]);
+    }
+
     setIsModalOpen(false);
   };
 
@@ -148,6 +223,12 @@ const BarangMasuk: React.FC = () => {
   const grandTotal = filteredInbound.reduce((acc, curr) => {
     const p = products.find(prod => prod.id === curr.productId);
     return acc + ((p?.harga || 0) * curr.jumlah);
+  }, 0);
+
+  // Total amount in the modal
+  const modalTotal = items.reduce((acc, curr) => {
+    const p = products.find(prod => prod.id === curr.productId);
+    return acc + ((p?.harga || 0) * (curr.jumlah || 0));
   }, 0);
 
   return (
@@ -248,35 +329,195 @@ const BarangMasuk: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-ios-bg-light dark:bg-ios-bg-dark rounded-ios-lg w-full max-w-lg shadow-2xl animate-in zoom-in duration-300 border dark:border-white/5">
-            <div className="p-6 border-b dark:border-white/5 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{editingEntry ? 'Edit Masuk' : 'Input Barang Masuk'}</h3>
-              <button onClick={() => setIsModalOpen(false)}><X className="text-slate-400 dark:text-slate-600" /></button>
-            </div>
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+          <div className="bg-ios-bg-light dark:bg-ios-bg-dark rounded-ios-lg w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col animate-in zoom-in duration-300 border dark:border-white/5">
+            <div className="p-6 border-b dark:border-white/5 flex items-center justify-between shrink-0">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 ml-1">Pilih Barang</label>
-                <select required className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" value={formData.productId} onChange={(e) => setFormData({...formData, productId: e.target.value})}>
-                  <option value="">-- Pilih Barang --</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.namaBarang} ({p.kodeBarang})</option>)}
-                </select>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                  {editingEntry ? 'Edit Barang Masuk' : 'Input Barang Masuk'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {editingEntry ? 'Ubah detail data penerimaan barang.' : 'Tambahkan satu atau beberapa penerimaan barang sekaligus.'}
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 ml-1">Jumlah</label>
-                  <input type="number" min="1" required className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" value={formData.jumlah} onChange={(e) => setFormData({...formData, jumlah: parseInt(e.target.value) || 0})} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 ml-1">Tanggal</label>
-                  <input type="date" required className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" value={formData.tanggal} onChange={(e) => {
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 space-y-6 overflow-y-auto scrollbar-hide flex-1">
+              {/* Tanggal Input */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1 ml-1">Tanggal Masuk</label>
+                <input 
+                  type="date" 
+                  required 
+                  className="w-full bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/5 rounded-ios px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" 
+                  value={generalData.tanggal} 
+                  onChange={(e) => {
                     const d = new Date(e.target.value);
-                    setFormData({...formData, tanggal: e.target.value, bulan: MONTHS[d.getMonth()], tahun: d.getFullYear()});
-                  }} />
+                    setGeneralData({
+                      tanggal: e.target.value, 
+                      bulan: MONTHS[d.getMonth()], 
+                      tahun: d.getFullYear()
+                    });
+                  }} 
+                />
+              </div>
+
+              {/* Items List Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Daftar Barang Masuk ({items.length})
+                  </h4>
+                  {!editingEntry && (
+                    <button 
+                      type="button" 
+                      onClick={handleAddItemRow} 
+                      className="text-[10px] font-bold text-ios-blue-light dark:text-ios-blue-dark bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 px-3 py-1.5 rounded-full hover:bg-ios-blue-light/20 transition-all uppercase flex items-center gap-1 active:scale-95"
+                    >
+                      <Plus size={12} /> Tambah Barang
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {items.map((item, index) => {
+                    const selectedProduct = products.find(p => p.id === item.productId);
+                    const query = searchQueries[item.id] || '';
+                    const isSearchActive = activeSearchId === item.id;
+                    const filteredProducts = getFilteredProductsForRow(item.id);
+
+                    return (
+                      <div key={item.id} className="grid grid-cols-12 gap-3 bg-ios-secondary-light dark:bg-ios-secondary-dark p-4 rounded-ios border border-slate-200 dark:border-white/5 relative items-end">
+                        {/* Searchable Product Input */}
+                        <div className="col-span-12 md:col-span-7 relative">
+                          <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">
+                            Pilih / Cari Barang (A-Z)
+                          </label>
+                          <div className="relative">
+                            <input 
+                              type="text" 
+                              required
+                              className="w-full text-xs bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios pl-9 pr-8 py-2.5 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" 
+                              placeholder="Ketik nama atau kode barang (A-Z)..." 
+                              value={isSearchActive ? query : (selectedProduct ? `${selectedProduct.namaBarang} (${selectedProduct.kodeBarang})` : '')} 
+                              onFocus={() => {
+                                setActiveSearchId(item.id);
+                                if (!searchQueries[item.id] && selectedProduct) {
+                                  setSearchQueries({ ...searchQueries, [item.id]: selectedProduct.namaBarang });
+                                }
+                              }} 
+                              onChange={(e) => setSearchQueries({ ...searchQueries, [item.id]: e.target.value })} 
+                            />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={14} />
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" size={14} />
+                          </div>
+
+                          {/* Search Dropdown Popup */}
+                          {isSearchActive && (
+                            <>
+                              <div className="fixed inset-0 z-[110]" onClick={() => setActiveSearchId(null)}></div>
+                              <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-ios-bg-dark rounded-ios shadow-2xl border border-slate-200 dark:border-white/10 z-[120] max-h-56 overflow-y-auto scrollbar-hide py-1">
+                                {filteredProducts.length > 0 ? (
+                                  filteredProducts.map(p => (
+                                    <button 
+                                      key={p.id} 
+                                      type="button" 
+                                      className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-50 dark:border-white/5 last:border-0 flex items-center justify-between transition-colors ${item.productId === p.id ? 'bg-ios-blue-light/5 dark:bg-ios-blue-dark/10' : ''}`}
+                                      onClick={() => { 
+                                        handleItemChange(item.id, 'productId', p.id); 
+                                        setSearchQueries({ ...searchQueries, [item.id]: p.namaBarang }); 
+                                        setActiveSearchId(null); 
+                                      }}
+                                    >
+                                      <div>
+                                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{p.namaBarang}</p>
+                                        <p className="text-[9px] font-mono font-bold text-ios-blue-light dark:text-ios-blue-dark uppercase mt-0.5">
+                                          {p.kodeBarang} • {p.satuan}
+                                        </p>
+                                      </div>
+                                      <div className="text-right shrink-0 ml-2">
+                                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                          Rp {(p.harga || 0).toLocaleString('id-ID')}
+                                        </span>
+                                      </div>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400 italic">
+                                    Barang tidak ditemukan.
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Quantity Input */}
+                        <div className="col-span-8 md:col-span-3">
+                          <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">
+                            Jumlah ({selectedProduct?.satuan || 'Qty'})
+                          </label>
+                          <input 
+                            type="number" 
+                            min="1" 
+                            required 
+                            className="w-full text-xs bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios px-3 py-2.5 font-bold outline-none dark:text-slate-200 focus:ring-2 focus:ring-ios-blue-light/20 dark:focus:ring-ios-blue-dark/20" 
+                            value={item.jumlah} 
+                            onChange={(e) => handleItemChange(item.id, 'jumlah', parseInt(e.target.value) || 0)} 
+                          />
+                        </div>
+
+                        {/* Delete Button */}
+                        <div className="col-span-4 md:col-span-2 flex items-center justify-end pb-1">
+                          {!editingEntry && items.length > 1 ? (
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveItemRow(item.id)} 
+                              className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios transition-all"
+                              title="Hapus Baris"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600 px-2">
+                              Item #{index + 1}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-500 dark:text-slate-400 font-bold text-sm">Batal</button>
-                <button type="submit" className="flex-1 py-3 text-white font-bold rounded-ios shadow-sm text-sm transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>Simpan</button>
+
+              {/* Total Summary Preview */}
+              {modalTotal > 0 && (
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-3 rounded-ios flex items-center justify-between text-xs">
+                  <span className="font-bold text-emerald-800 dark:text-emerald-300">Estimasi Total Nilai Masuk:</span>
+                  <span className="font-black text-emerald-700 dark:text-emerald-400 text-sm">
+                    Rp {modalTotal.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex gap-3 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="flex-1 py-3 text-slate-500 dark:text-slate-400 font-bold text-sm hover:bg-slate-100 dark:hover:bg-white/5 rounded-ios transition-all"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 py-3 text-white font-bold rounded-ios shadow-sm text-sm transition-all active:scale-95" 
+                  style={{ backgroundColor: settings.themeColor }}
+                >
+                  Simpan Data ({items.length} Barang)
+                </button>
               </div>
             </form>
           </div>
