@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useInventory, db } from '../App';
-import { collection, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { 
   Save, 
   Image as ImageIcon, 
@@ -20,7 +20,22 @@ import {
   Lock,
   Settings,
   ShieldAlert,
-  Plus
+  Plus,
+  Database,
+  Download,
+  Upload,
+  FileDown,
+  FileUp,
+  FileCheck,
+  CheckCircle2,
+  AlertTriangle,
+  Package,
+  ArrowDownLeft,
+  ArrowUpRight,
+  FileText,
+  Boxes,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 
 const PERMISSION_MODULES = [
@@ -38,10 +53,26 @@ const PERMISSION_MODULES = [
 ];
 
 const Profile: React.FC = () => {
-  const { settings, setSettings, isCloudConnected, user, logout, userPermissions, hasPermission } = useInventory();
+  const { 
+    products, 
+    setProducts, 
+    inbound, 
+    setInbound, 
+    outbound, 
+    setOutbound, 
+    documents, 
+    setDocuments, 
+    settings, 
+    setSettings, 
+    isCloudConnected, 
+    user, 
+    logout, 
+    userPermissions, 
+    hasPermission 
+  } = useInventory();
   const [isTesting, setIsTesting] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'branding' | 'otoritas' | 'koneksi'>('koneksi');
+  const [activeTab, setActiveTab] = useState<'branding' | 'otoritas' | 'koneksi' | 'backup_restore'>('koneksi');
   const [usersList, setUsersList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
@@ -53,6 +84,21 @@ const Profile: React.FC = () => {
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
+
+  // States for Backup & Restore
+  const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [parsedBackup, setParsedBackup] = useState<any | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreSelections, setRestoreSelections] = useState({
+    products: true,
+    inbound: true,
+    outbound: true,
+    documents: true,
+    settings: true
+  });
 
   const isPrimaryAdmin = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
   const canEditBranding = isPrimaryAdmin || (userPermissions?.profile?.edit);
@@ -363,6 +409,224 @@ const Profile: React.FC = () => {
     }, 1500);
   };
 
+  // Backup Database Handler
+  const handleDownloadBackup = () => {
+    try {
+      setIsDownloadingBackup(true);
+      const backupData = {
+        app: settings.appName || "SITAMPAN",
+        system: "SITAMPAN Logistik Kebencanaan",
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        exportedBy: user?.email || "anonymous",
+        summary: {
+          totalProducts: products.length,
+          totalInbound: inbound.length,
+          totalOutbound: outbound.length,
+          totalDocuments: documents.length,
+          hasSettings: true
+        },
+        data: {
+          products: products || [],
+          inbound: inbound || [],
+          outbound: outbound || [],
+          documents: documents || [],
+          settings: settings || {}
+        }
+      };
+
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const now = new Date();
+      const dateFormatted = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+      const cleanAppName = (settings.appName || 'sitampan').toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const filename = `${cleanAppName}_backup_database_${dateFormatted}.json`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      setTimeout(() => {
+        setIsDownloadingBackup(false);
+      }, 600);
+    } catch (err) {
+      console.error("Backup error:", err);
+      alert("Gagal melakukan backup database.");
+      setIsDownloadingBackup(false);
+    }
+  };
+
+  // Process File for Restore
+  const processBackupFile = (file: File) => {
+    setRestoreError(null);
+    setRestoreSuccess(null);
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setRestoreError('Format berkas tidak valid. Harap pilih berkas cadangan dengan ekstensi .json.');
+      setParsedBackup(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const parsed = JSON.parse(text);
+
+        // Determine data payload
+        const dataPayload = parsed.data && typeof parsed.data === 'object' ? parsed.data : parsed;
+        const hasProducts = Array.isArray(dataPayload.products);
+        const hasInbound = Array.isArray(dataPayload.inbound);
+        const hasOutbound = Array.isArray(dataPayload.outbound);
+        const hasDocuments = Array.isArray(dataPayload.documents);
+        const hasSettings = typeof dataPayload.settings === 'object' && dataPayload.settings !== null;
+
+        if (!hasProducts && !hasInbound && !hasOutbound && !hasDocuments && !hasSettings) {
+          setRestoreError('File JSON ini tidak memuat struktur data cadangan SITAMPAN yang valid (tidak ditemukan data barang, transaksi, dokumen, atau pengaturan).');
+          setParsedBackup(null);
+          return;
+        }
+
+        const productsCount = hasProducts ? dataPayload.products.length : 0;
+        const inboundCount = hasInbound ? dataPayload.inbound.length : 0;
+        const outboundCount = hasOutbound ? dataPayload.outbound.length : 0;
+        const documentsCount = hasDocuments ? dataPayload.documents.length : 0;
+
+        setParsedBackup({
+          raw: parsed,
+          data: dataPayload,
+          fileName: file.name,
+          fileSize: (file.size / 1024).toFixed(1) + ' KB',
+          exportedAt: parsed.exportedAt || null,
+          exportedBy: parsed.exportedBy || null,
+          appName: parsed.app || dataPayload.settings?.appName || 'SITAMPAN',
+          counts: {
+            products: productsCount,
+            inbound: inboundCount,
+            outbound: outboundCount,
+            documents: documentsCount,
+            hasSettings
+          }
+        });
+
+        setRestoreSelections({
+          products: hasProducts && productsCount > 0,
+          inbound: hasInbound && inboundCount > 0,
+          outbound: hasOutbound && outboundCount > 0,
+          documents: hasDocuments && documentsCount > 0,
+          settings: hasSettings
+        });
+      } catch (err: any) {
+        setRestoreError('Gagal memproses file JSON. Pastikan isi berkas tidak rusak atau terpotong.');
+        setParsedBackup(null);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Execute Restore Database
+  const handleExecuteRestore = async () => {
+    if (!parsedBackup) return;
+    
+    const selectedCount = Object.values(restoreSelections).filter(Boolean).length;
+    if (selectedCount === 0) {
+      alert('Pilih setidaknya satu komponen data yang ingin dipulihkan.');
+      return;
+    }
+
+    if (!confirm(`PERINGATAN RESTORE DATABASE:\n\nData aktif pada aplikasi saat ini akan ditimpa/diperbarui dengan data dari file cadangan "${parsedBackup.fileName}".\n\nApakah Anda yakin ingin memulihkan data tersebut sekarang?`)) {
+      return;
+    }
+
+    setIsRestoring(true);
+    setRestoreError(null);
+    setRestoreSuccess(null);
+
+    try {
+      const payload = parsedBackup.data;
+      const restoredSummary: string[] = [];
+
+      // 1. Restore Products
+      if (restoreSelections.products && Array.isArray(payload.products)) {
+        setProducts(payload.products);
+        restoredSummary.push(`${payload.products.length} Master Barang`);
+        if (isCloudConnected && user) {
+          try {
+            const batch = writeBatch(db);
+            payload.products.forEach((p: any) => batch.set(doc(db, 'products', p.id), p));
+            await batch.commit();
+          } catch (e) {
+            console.error("Cloud batch product restore error:", e);
+          }
+        }
+      }
+
+      // 2. Restore Inbound
+      if (restoreSelections.inbound && Array.isArray(payload.inbound)) {
+        setInbound(payload.inbound);
+        restoredSummary.push(`${payload.inbound.length} Transaksi Masuk`);
+        if (isCloudConnected && user) {
+          try {
+            const batch = writeBatch(db);
+            payload.inbound.forEach((i: any) => batch.set(doc(db, 'inbound', i.id), i));
+            await batch.commit();
+          } catch (e) {
+            console.error("Cloud batch inbound restore error:", e);
+          }
+        }
+      }
+
+      // 3. Restore Outbound
+      if (restoreSelections.outbound && Array.isArray(payload.outbound)) {
+        setOutbound(payload.outbound);
+        restoredSummary.push(`${payload.outbound.length} Transaksi Keluar`);
+        if (isCloudConnected && user) {
+          try {
+            const batch = writeBatch(db);
+            payload.outbound.forEach((o: any) => batch.set(doc(db, 'outbound', o.id), o));
+            await batch.commit();
+          } catch (e) {
+            console.error("Cloud batch outbound restore error:", e);
+          }
+        }
+      }
+
+      // 4. Restore Documents
+      if (restoreSelections.documents && Array.isArray(payload.documents)) {
+        setDocuments(payload.documents);
+        restoredSummary.push(`${payload.documents.length} Arsip Dokumen`);
+        if (isCloudConnected && user) {
+          try {
+            const batch = writeBatch(db);
+            payload.documents.forEach((d: any) => batch.set(doc(db, 'documents', d.id), d));
+            await batch.commit();
+          } catch (e) {
+            console.error("Cloud batch document restore error:", e);
+          }
+        }
+      }
+
+      // 5. Restore Settings
+      if (restoreSelections.settings && payload.settings) {
+        await setSettings({ ...settings, ...payload.settings });
+        restoredSummary.push('Pengaturan & Profil');
+      }
+
+      setRestoreSuccess(`Pemulihan database berhasil! (${restoredSummary.join(', ')})`);
+      setParsedBackup(null);
+    } catch (err: any) {
+      console.error("Restore error:", err);
+      setRestoreError(`Gagal melakukan restore: ${err.message || 'Terjadi kesalahan sistem'}`);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   const currentOrigin = window.location.origin;
   const suggestedRedirectUri = `${currentOrigin}/api/auth/callback`;
 
@@ -371,16 +635,23 @@ const Profile: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/5 pb-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Profil Pengguna</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Informasi akun, kustomisasi identitas, dan otoritas hak akses.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Informasi akun, kustomisasi identitas, backup database, dan otoritas hak akses.</p>
         </div>
         
         {/* Tab Buttons */}
-        <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-ios gap-1">
+        <div className="flex flex-wrap bg-slate-100 dark:bg-white/5 p-1 rounded-ios gap-1">
           <button 
             onClick={() => setActiveTab('koneksi')} 
             className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-ios transition-all ${activeTab === 'koneksi' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
           >
             <Cloud size={14} /> Koneksi Akun
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('backup_restore')} 
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-ios transition-all ${activeTab === 'backup_restore' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+          >
+            <Database size={14} /> Backup & Restore
           </button>
           
           {canEditBranding && (
@@ -649,6 +920,347 @@ const Profile: React.FC = () => {
                 </div>
               )}
            </div>
+        </div>
+      )}
+
+      {/* Backup & Restore Database Tab */}
+      {activeTab === 'backup_restore' && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          {/* Header Overview Card */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-ios-secondary-dark dark:to-black text-white p-8 rounded-ios-lg shadow-xl border border-slate-700/50 dark:border-white/10 relative overflow-hidden">
+            <div className="absolute right-0 top-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3.5 bg-blue-500/20 border border-blue-400/30 rounded-ios text-blue-400 shrink-0">
+                  <Database size={30} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold tracking-tight">Manajemen Backup & Restore Database</h3>
+                  <p className="text-slate-300 dark:text-slate-400 text-xs mt-1 leading-relaxed max-w-xl">
+                    Amankan seluruh rekaman inventaris logistik kebencanaan Anda. Buat cadangan data mandiri (JSON) untuk arsip aman atau pulihkan database dari berkas backup kapan saja.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status summary pills */}
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <span className="px-3 py-1.5 bg-white/10 dark:bg-white/5 rounded-full text-[10px] font-mono font-bold text-slate-200 border border-white/10 flex items-center gap-1.5">
+                  <Package size={12} className="text-blue-400" /> {products.length} Barang
+                </span>
+                <span className="px-3 py-1.5 bg-white/10 dark:bg-white/5 rounded-full text-[10px] font-mono font-bold text-slate-200 border border-white/10 flex items-center gap-1.5">
+                  <ArrowDownLeft size={12} className="text-emerald-400" /> {inbound.length} Masuk
+                </span>
+                <span className="px-3 py-1.5 bg-white/10 dark:bg-white/5 rounded-full text-[10px] font-mono font-bold text-slate-200 border border-white/10 flex items-center gap-1.5">
+                  <ArrowUpRight size={12} className="text-amber-400" /> {outbound.length} Keluar
+                </span>
+                <span className="px-3 py-1.5 bg-white/10 dark:bg-white/5 rounded-full text-[10px] font-mono font-bold text-slate-200 border border-white/10 flex items-center gap-1.5">
+                  <FileText size={12} className="text-purple-400" /> {documents.length} Dokumen
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Success / Error notification alerts */}
+          {restoreSuccess && (
+            <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 p-4 rounded-ios flex items-start gap-3 text-emerald-900 dark:text-emerald-200 text-xs animate-in slide-in-from-top-2">
+              <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold">Restore Berhasil Dilakukan!</p>
+                <p className="text-emerald-700 dark:text-emerald-300/80 mt-0.5">{restoreSuccess}</p>
+              </div>
+              <button onClick={() => setRestoreSuccess(null)} className="text-emerald-500 hover:text-emerald-700 font-bold text-sm">✕</button>
+            </div>
+          )}
+
+          {restoreError && (
+            <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 p-4 rounded-ios flex items-start gap-3 text-rose-900 dark:text-rose-200 text-xs animate-in slide-in-from-top-2">
+              <AlertTriangle size={18} className="text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold">Gagal Melakukan Restore</p>
+                <p className="text-rose-700 dark:text-rose-300/80 mt-0.5">{restoreError}</p>
+              </div>
+              <button onClick={() => setRestoreError(null)} className="text-rose-500 hover:text-rose-700 font-bold text-sm">✕</button>
+            </div>
+          )}
+
+          {/* Two Columns: Backup Card & Restore Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* BACKUP CARD */}
+            <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 md:p-8 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col justify-between space-y-6 theme-transition">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-ios-blue-light dark:text-ios-blue-dark rounded-ios">
+                    <Download size={22} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">Backup Database (Unduh)</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Download seluruh data inventaris ke file JSON</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Menyimpan salinan lengkap seluruh data aktif ke dalam file JSON terenkripsi. Berkas ini dapat digunakan untuk mengembalikan data jika berpindah perangkat atau terjadi kehilangan data.
+                </p>
+
+                {/* What's included checklist */}
+                <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-ios space-y-2 border border-slate-100 dark:border-white/5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    Cakupan Data Cadangan:
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className="text-emerald-500" />
+                      <span>Master Barang ({products.length})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className="text-emerald-500" />
+                      <span>Barang Masuk ({inbound.length})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className="text-emerald-500" />
+                      <span>Barang Keluar ({outbound.length})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className="text-emerald-500" />
+                      <span>Arsip BAST ({documents.length})</span>
+                    </div>
+                    <div className="flex items-center gap-2 col-span-2">
+                      <Check size={14} className="text-emerald-500" />
+                      <span>Profil, Kop Surat, & Konfigurasi Instansi</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadBackup}
+                  disabled={isDownloadingBackup}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-ios text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-500/10 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {isDownloadingBackup ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Menyiapkan File Cadangan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown size={16} />
+                      <span>Download Backup Data (.JSON)</span>
+                    </>
+                  )}
+                </button>
+                <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 mt-2">
+                  Format berkas: <b>.json</b> • Kompatibel dengan semua versi SITAMPAN
+                </p>
+              </div>
+            </div>
+
+            {/* RESTORE CARD */}
+            <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 md:p-8 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col justify-between space-y-6 theme-transition">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-ios">
+                    <Upload size={22} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">Restore Database (Pulihkan)</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Unggah file backup untuk memulihkan database</p>
+                  </div>
+                </div>
+
+                {!parsedBackup ? (
+                  /* Drag and Drop Zone */
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+                    onDragLeave={() => setIsDraggingFile(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDraggingFile(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) processBackupFile(file);
+                    }}
+                    className={`border-2 border-dashed rounded-ios p-6 text-center transition-all flex flex-col items-center justify-center gap-3 cursor-pointer ${
+                      isDraggingFile 
+                        ? 'border-emerald-500 bg-emerald-500/10' 
+                        : 'border-slate-300 dark:border-white/10 hover:border-emerald-500/50 bg-slate-50 dark:bg-white/5'
+                    }`}
+                  >
+                    <div className="p-3 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full">
+                      <FileUp size={24} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Pilih berkas backup .json atau seret ke sini
+                      </p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        Maksimal ukuran 50 MB
+                      </p>
+                    </div>
+                    <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-ios text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95">
+                      <Upload size={14} /> Pilih File Cadangan
+                      <input
+                        type="file"
+                        accept=".json,application/json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) processBackupFile(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  /* Backup Preview and Selector */
+                  <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-ios border border-slate-200 dark:border-white/10 space-y-4 animate-in fade-in">
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-200 dark:border-white/5 pb-3">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <FileCheck size={16} className="text-emerald-500" />
+                          <span className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate max-w-[200px]">
+                            {parsedBackup.fileName}
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-0.5">
+                          Ukuran: {parsedBackup.fileSize} • Aplikasi: {parsedBackup.appName}
+                        </p>
+                        {parsedBackup.exportedAt && (
+                          <p className="text-[9px] text-slate-400">
+                            Waktu Ekspor: {new Date(parsedBackup.exportedAt).toLocaleString('id-ID')}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setParsedBackup(null)}
+                        className="text-[10px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1 bg-slate-200 dark:bg-white/10 rounded"
+                      >
+                        Ganti File
+                      </button>
+                    </div>
+
+                    {/* Component selection */}
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Pilih Data yang Akan Dipulihkan:
+                      </span>
+
+                      <div className="space-y-1.5 text-xs">
+                        <label className="flex items-center justify-between p-2 rounded bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 cursor-pointer hover:bg-slate-100/50">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            Master Data Barang ({parsedBackup.counts.products} data)
+                          </span>
+                          <input
+                            type="checkbox"
+                            className="rounded accent-emerald-600"
+                            checked={restoreSelections.products}
+                            onChange={(e) => setRestoreSelections({ ...restoreSelections, products: e.target.checked })}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between p-2 rounded bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 cursor-pointer hover:bg-slate-100/50">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            Transaksi Barang Masuk ({parsedBackup.counts.inbound} data)
+                          </span>
+                          <input
+                            type="checkbox"
+                            className="rounded accent-emerald-600"
+                            checked={restoreSelections.inbound}
+                            onChange={(e) => setRestoreSelections({ ...restoreSelections, inbound: e.target.checked })}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between p-2 rounded bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 cursor-pointer hover:bg-slate-100/50">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            Transaksi Barang Keluar ({parsedBackup.counts.outbound} data)
+                          </span>
+                          <input
+                            type="checkbox"
+                            className="rounded accent-emerald-600"
+                            checked={restoreSelections.outbound}
+                            onChange={(e) => setRestoreSelections({ ...restoreSelections, outbound: e.target.checked })}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between p-2 rounded bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 cursor-pointer hover:bg-slate-100/50">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            Arsip Dokumen / BAST ({parsedBackup.counts.documents} data)
+                          </span>
+                          <input
+                            type="checkbox"
+                            className="rounded accent-emerald-600"
+                            checked={restoreSelections.documents}
+                            onChange={(e) => setRestoreSelections({ ...restoreSelections, documents: e.target.checked })}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between p-2 rounded bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 cursor-pointer hover:bg-slate-100/50">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            Profil & Konfigurasi Instansi
+                          </span>
+                          <input
+                            type="checkbox"
+                            className="rounded accent-emerald-600"
+                            checked={restoreSelections.settings}
+                            onChange={(e) => setRestoreSelections({ ...restoreSelections, settings: e.target.checked })}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Warning message */}
+                    <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-700 dark:text-amber-300">
+                      <AlertTriangle size={14} className="shrink-0" />
+                      <span>Data aktif yang dipilih akan ditimpa dengan data dari file cadangan ini.</span>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setParsedBackup(null)}
+                        disabled={isRestoring}
+                        className="flex-1 py-2.5 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 text-slate-700 dark:text-slate-300 rounded-ios text-xs font-bold transition-all"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExecuteRestore}
+                        disabled={isRestoring}
+                        className="flex-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-ios text-xs font-bold transition-all shadow-md shadow-emerald-500/10 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                      >
+                        {isRestoring ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            <span>Memulihkan Database...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check size={14} />
+                            <span>Konfirmasi & Mulai Restore</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {!parsedBackup && (
+                <div className="pt-2">
+                  <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-ios text-[10px] text-slate-500 dark:text-slate-400 flex items-start gap-2">
+                    <Info size={14} className="shrink-0 text-slate-400 mt-0.5" />
+                    <span>
+                      Gunakan fitur ini saat ingin mengembalikan data setelah instalasi ulang, membersihkan browser, atau migrasi data ke komputer baru.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

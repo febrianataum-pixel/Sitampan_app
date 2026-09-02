@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useInventory } from '../App';
+import html2canvas from 'html2canvas';
 import { 
   Eye, 
   ArrowLeft, 
@@ -22,7 +23,8 @@ import {
   Download,
   ArrowUpDown,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { OutboundTransaction, MONTHS, formatIndoDate } from '../types';
 
@@ -71,6 +73,8 @@ const CetakBeritaAcara: React.FC = () => {
   const [docType, setDocType] = useState<'BA' | 'SPPB'>('BA');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloadingDoc, setIsDownloadingDoc] = useState(false);
+  const [downloadingTxId, setDownloadingTxId] = useState<string | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const printAreaRef = useRef<HTMLDivElement>(null);
 
@@ -210,55 +214,116 @@ const CetakBeritaAcara: React.FC = () => {
     setIsEditorOpen(true);
   };
 
-  const handleDownloadImages = async (tx: OutboundTransaction) => {
+  const handleDownloadDocumentationJPG = async (tx: OutboundTransaction) => {
     if (!tx.images || tx.images.length === 0) {
       alert("Tidak ada foto dokumentasi untuk transaksi ini.");
       return;
     }
 
-    const sanitizedPenerima = tx.penerima.replace(/[/\\?%*:|"<>]/g, '-').trim();
-    const sanitizedAlamat = (tx.alamat || 'Lokasi').replace(/[/\\?%*:|"<>]/g, '-').trim();
+    try {
+      setIsDownloadingDoc(true);
+      setDownloadingTxId(tx.id);
 
-    for (let i = 0; i < tx.images.length; i++) {
-      const imgSrc = tx.images[i];
-      const filename = tx.images.length > 1
-        ? `${sanitizedPenerima}_${sanitizedAlamat}_${i + 1}.jpg`
-        : `${sanitizedPenerima}_${sanitizedAlamat}.jpg`;
+      const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      const dateObjRaw = new Date(tx.tanggal);
+      const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
+      const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
 
-      try {
-        if (imgSrc.startsWith('data:')) {
-          const link = document.createElement('a');
-          link.href = imgSrc;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        } else {
-          const response = await fetch(imgSrc);
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-        }
-      } catch (err) {
-        console.error("Gagal mengunduh gambar", err);
-        const link = document.createElement('a');
-        link.href = imgSrc;
-        link.target = '_blank';
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      // Create an off-screen container matching Page 2 (Dokumentasi) layout exactly
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '794px'; // Standard A4 width in px at 96dpi
+      container.style.minHeight = '1123px'; // Standard A4 height in px at 96dpi
+      container.style.backgroundColor = '#ffffff';
+      container.style.padding = '50px 45px';
+      container.style.boxSizing = 'border-box';
+      container.style.fontFamily = "'Inter', Arial, Helvetica, sans-serif";
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.alignItems = 'center';
+      container.style.justifyContent = 'flex-start';
+      container.style.color = '#000000';
+
+      const imageCount = tx.images.length;
+      let imgMaxHeight = '420px';
+      if (imageCount === 1) {
+        imgMaxHeight = '650px';
+      } else if (imageCount === 2) {
+        imgMaxHeight = '420px';
+      } else if (imageCount >= 3) {
+        imgMaxHeight = '300px';
       }
+
+      container.innerHTML = `
+        <div style="width: 100%; text-align: center; margin-bottom: 24px;">
+          <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 14px 0; text-transform: uppercase; color: #000000; letter-spacing: 1.5px; font-family: 'Inter', Arial, sans-serif;">
+            DOKUMENTASI
+          </h2>
+          <p style="font-size: 15px; margin: 0 0 6px 0; color: #1e293b; line-height: 1.5; font-family: 'Inter', Arial, sans-serif;">
+            Penyaluran Bantuan Sosial <strong style="color: #000000; font-weight: 700;">${tx.penerima}</strong>, di <strong style="color: #000000; font-weight: 700;">${tx.alamat || '-'}</strong>
+          </p>
+          <p style="font-size: 13.5px; margin: 0; color: #475569; font-family: 'Inter', Arial, sans-serif;">
+            ${formattedDateLabel}
+          </p>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; box-sizing: border-box;">
+          ${tx.images.map((imgSrc, idx) => `
+            <div style="border: 1px solid #e2e8f0; padding: 10px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-radius: 12px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 620px;">
+              <img src="${imgSrc}" style="max-height: ${imgMaxHeight}; width: auto; max-width: 100%; object-fit: contain; border-radius: 8px; display: block;" crossOrigin="anonymous" alt="Dokumentasi ${idx + 1}" />
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      document.body.appendChild(container);
+
+      // Ensure all images are fully loaded before rendering to canvas
+      const imgElements = Array.from(container.querySelectorAll('img'));
+      await Promise.all(imgElements.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
+      // Small delay for DOM layout settling
+      await new Promise(r => setTimeout(r, 120));
+
+      const canvas = await html2canvas(container, {
+        scale: 2, // 2x high resolution
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 794
+      });
+
+      const jpgUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const sanitizedPenerima = tx.penerima.replace(/[/\\?%*:|"<>]/g, '_').trim();
+      const sanitizedTanggal = (tx.tanggal || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
+      const filename = `Dokumentasi_BAST_${sanitizedPenerima}_${sanitizedTanggal}.jpg`;
+
+      const link = document.createElement('a');
+      link.href = jpgUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      document.body.removeChild(container);
+    } catch (err) {
+      console.error("Gagal mengunduh lembar dokumentasi JPG:", err);
+      alert("Gagal mengunduh lembar dokumentasi JPG. Silakan coba lagi.");
+    } finally {
+      setIsDownloadingDoc(false);
+      setDownloadingTxId(null);
     }
   };
+
+  const handleDownloadImages = handleDownloadDocumentationJPG;
 
   const handleSort = (key: SortKey) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -509,10 +574,19 @@ const CetakBeritaAcara: React.FC = () => {
             <button onClick={handleDownloadPDF} disabled={isGenerating} className="flex-2 sm:flex-none bg-ios-blue-light dark:bg-ios-blue-dark text-white px-6 py-2.5 rounded-ios font-bold text-[10px] uppercase tracking-wide flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer">{isGenerating ? 'PROSES...' : 'UNDUH PDF A4'}</button>
             {selectedTx.images && selectedTx.images.length > 0 && (
               <button 
-                onClick={() => handleDownloadImages(selectedTx)} 
-                className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-600 active:scale-95 text-white px-4 py-2.5 rounded-ios font-bold text-[10px] uppercase tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                onClick={() => handleDownloadDocumentationJPG(selectedTx)} 
+                disabled={isDownloadingDoc}
+                className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-600 active:scale-95 text-white px-4 py-2.5 rounded-ios font-bold text-[10px] uppercase tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
               >
-                <Download size={16}/> Unduh Dokumentasi ({selectedTx.images.length})
+                {isDownloadingDoc && downloadingTxId === selectedTx.id ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> PROSES JPG...
+                  </>
+                ) : (
+                  <>
+                    <Download size={16}/> Unduh Dokumentasi ({selectedTx.images.length})
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -595,12 +669,22 @@ const CetakBeritaAcara: React.FC = () => {
                       <button onClick={() => { setDocType('SPPB'); setSelectedTx(o); }} className="text-emerald-500 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-ios text-[10px] uppercase hover:bg-emerald-500 hover:text-white transition-all cursor-pointer">SPPB</button>
                       {o.images && o.images.length > 0 ? (
                         <button 
-                          onClick={() => handleDownloadImages(o)} 
+                          onClick={() => handleDownloadDocumentationJPG(o)} 
+                          disabled={isDownloadingDoc}
                           title="Unduh Dokumentasi (JPG)"
-                          className="text-amber-500 font-bold bg-amber-500/10 px-3 py-1.5 rounded-ios text-[10px] uppercase hover:bg-amber-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                          className="text-amber-500 font-bold bg-amber-500/10 px-3 py-1.5 rounded-ios text-[10px] uppercase hover:bg-amber-500 hover:text-white transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
                         >
-                          <Download size={12} />
-                          FOTO ({o.images.length})
+                          {isDownloadingDoc && downloadingTxId === o.id ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              PROSES...
+                            </>
+                          ) : (
+                            <>
+                              <Download size={12} />
+                              FOTO ({o.images.length})
+                            </>
+                          )}
                         </button>
                       ) : (
                         <button 

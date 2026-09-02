@@ -3,10 +3,7 @@ import { createServer as createViteServer } from "vite";
 import { google } from "googleapis";
 import cors from "cors";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { Readable } from "stream";
 
 const app = express();
 const PORT = 3000;
@@ -134,7 +131,6 @@ app.post("/api/drive/upload", async (req, res) => {
 
     // Convert base64 to stream or buffer
     const buffer = Buffer.from(fileData.split(',')[1], 'base64');
-    const { Readable } = await import('stream');
     const stream = new Readable();
     stream.push(buffer);
     stream.push(null);
@@ -201,10 +197,10 @@ async function setupVite() {
       console.log("Vite middleware attached.");
     } else {
       console.log("Serving static files from dist...");
-      const distPath = path.join(__dirname, "dist");
+      const distPath = path.join(process.cwd(), "dist");
       app.use(express.static(distPath));
-      // Use regular expression to catch all paths safely in Express 5
-      app.get(/^(?!\/api).*/, (req, res) => {
+      // Use regular expression or wildcard to catch SPA fallback routes in Express 5
+      app.get("*all", (req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
     }
