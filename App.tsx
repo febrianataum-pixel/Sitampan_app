@@ -142,13 +142,13 @@ export const useInventory = () => {
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout, userPermissions } = useInventory();
+  const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout, userPermissions, hasPermission } = useInventory();
   const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
 
   useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
 
-  const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
+  const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email.toLowerCase().trim());
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -176,12 +176,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const menuItems = allMenuItems.filter(item => {
     if (isSpecialUser) return true;
-    if (item.key === 'profile') return true;
-    if (userPermissions && userPermissions[item.key]) {
-      return !!userPermissions[item.key].view;
-    }
-    return ['Dashboard', 'Laporan', 'Stok', 'Rekap', 'Indikator'].includes(item.name);
+    return hasPermission(item.key, 'view');
   });
+
+  const firstAllowedPath = isSpecialUser 
+    ? '/dashboard' 
+    : (allMenuItems.find(item => hasPermission(item.key, 'view'))?.path || '/dashboard/profile');
 
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-br from-[#dce5fb] via-[#edf2fc] to-[#d7e3fa] dark:from-[#090e1a] dark:via-[#0f172a] dark:to-[#1e1b4b] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
@@ -890,49 +890,71 @@ const App: React.FC = () => {
 
   // Helper function to check custom user permissions
   const hasPermission = (menuKey: string, actionKey: 'view' | 'add' | 'edit' | 'delete' = 'view') => {
-    const isPrimaryAdmin = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
+    const isPrimaryAdmin = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email.toLowerCase().trim());
     if (isPrimaryAdmin) return true;
-    if (userPermissions && userPermissions[menuKey]) {
+    if (userPermissions && typeof userPermissions === 'object' && userPermissions[menuKey]) {
       return !!userPermissions[menuKey][actionKey];
-    }
-    // Fallbacks for default menus
-    if (actionKey === 'view' && ['dashboard', 'stok', 'laporan', 'rekap', 'indikator'].includes(menuKey)) {
-      return true;
     }
     return false;
   };
 
   // Monitor real-time custom user permissions
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.email) {
       setUserPermissions(null);
       return;
     }
+
+    const emailClean = user.email.toLowerCase().trim();
+    const isPrimaryAdmin = ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(emailClean);
+    
+    if (isPrimaryAdmin) {
+      setUserPermissions({
+        dashboard: { view: true },
+        database: { view: true, add: true, edit: true, delete: true },
+        masuk: { view: true, add: true, edit: true, delete: true },
+        keluar: { view: true, add: true, edit: true, delete: true },
+        berita_acara: { view: true, add: true, edit: true, delete: true },
+        stok: { view: true },
+        laporan: { view: true },
+        dokumen: { view: true, add: true, edit: true, delete: true },
+        rekap: { view: true },
+        indikator: { view: true },
+        profile: { view: true, edit: true }
+      });
+      return;
+    }
+
     const userDocRef = doc(db, 'users', user.uid);
     const unsub = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setUserPermissions(docSnap.data().permissions || null);
+      if (docSnap.exists() && docSnap.data().permissions) {
+        setUserPermissions(docSnap.data().permissions);
       } else {
-        const isPrimaryAdmin = user.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
-        if (isPrimaryAdmin) {
-          setUserPermissions({
-            dashboard: { view: true },
-            database: { view: true, add: true, edit: true, delete: true },
-            masuk: { view: true, add: true, edit: true, delete: true },
-            keluar: { view: true, add: true, edit: true, delete: true },
-            berita_acara: { view: true, add: true, edit: true, delete: true },
-            stok: { view: true },
-            laporan: { view: true },
-            dokumen: { view: true, add: true, edit: true, delete: true },
-            rekap: { view: true },
-            indikator: { view: true },
-            profile: { view: true, edit: true }
-          });
-        }
+        // Fallback: check matching doc by email if UID doc is not populated yet
+        const q = query(collection(db, 'users'), where('email', '==', emailClean));
+        getDocs(q).then((querySnap) => {
+          if (!querySnap.empty) {
+            const docWithPerms = querySnap.docs.find(d => d.data().permissions);
+            if (docWithPerms && docWithPerms.data().permissions) {
+              const perms = docWithPerms.data().permissions;
+              setUserPermissions(perms);
+              // Mirror to user's UID doc
+              setDoc(userDocRef, {
+                uid: user.uid,
+                email: emailClean,
+                displayName: user.displayName || docWithPerms.data().displayName || 'User',
+                photoURL: user.photoURL || docWithPerms.data().photoURL || '',
+                lastLogin: new Date().toISOString(),
+                permissions: perms
+              }, { merge: true }).catch(err => console.warn("Failed mirroring perms to UID doc:", err));
+            }
+          }
+        }).catch(err => console.error("Error fetching permissions by email:", err));
       }
     }, (err) => {
       console.error("Gagal mendengarkan izin pengguna:", err);
     });
+
     return () => unsub();
   }, [user]);
 
@@ -958,16 +980,28 @@ const App: React.FC = () => {
 
         // Register user or update lastLogin in Firestore
         // Search by email to support matching pre-seeded/pre-registered user profiles
-        const q = query(collection(db, 'users'), where('email', '==', u.email || ''));
+        const emailClean = (u.email || '').toLowerCase().trim();
+        const isPrimaryAdmin = ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(emailClean);
+
+        const q = query(collection(db, 'users'), where('email', '==', emailClean));
         getDocs(q).then((querySnap) => {
-          let existingData: any = null;
+          let existingPermissions: any = null;
           let tempDocId: string | null = null;
+          let existingDisplayName: string | null = null;
 
           if (!querySnap.empty) {
-            // Found existing user entry by email
-            const docSnap = querySnap.docs[0];
-            existingData = docSnap.data();
-            tempDocId = docSnap.id;
+            for (const docSnap of querySnap.docs) {
+              const d = docSnap.data();
+              if (d.permissions) {
+                existingPermissions = d.permissions;
+              }
+              if (d.displayName) {
+                existingDisplayName = d.displayName;
+              }
+              if (docSnap.id.startsWith('temp_')) {
+                tempDocId = docSnap.id;
+              }
+            }
           }
 
           const userRef = doc(db, 'users', u.uid);
@@ -986,7 +1020,6 @@ const App: React.FC = () => {
             profile: { view: false, edit: false }
           };
           
-          const isPrimaryAdmin = u.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(u.email);
           const adminPermissions = {
             dashboard: { view: true },
             database: { view: true, add: true, edit: true, delete: true },
@@ -1001,13 +1034,15 @@ const App: React.FC = () => {
             profile: { view: true, edit: true }
           };
 
+          const finalPermissions = isPrimaryAdmin ? adminPermissions : (existingPermissions || defaultPermissions);
+
           const dataToSet = {
             uid: u.uid,
-            email: u.email || '',
-            displayName: u.displayName || existingData?.displayName || 'No Name',
-            photoURL: u.photoURL || existingData?.photoURL || '',
+            email: emailClean,
+            displayName: u.displayName || existingDisplayName || 'User',
+            photoURL: u.photoURL || '',
             lastLogin: new Date().toISOString(),
-            permissions: existingData?.permissions || (isPrimaryAdmin ? adminPermissions : defaultPermissions)
+            permissions: finalPermissions
           };
 
           setDoc(userRef, dataToSet, { merge: true }).then(() => {
@@ -1250,6 +1285,24 @@ const App: React.FC = () => {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
+const RestrictedAccess: React.FC<{ user: any; logout: () => void }> = ({ user, logout }) => (
+  <div className="flex flex-col items-center justify-center min-h-[70vh] p-8 text-center animate-in fade-in duration-300">
+    <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4 shadow-sm border border-amber-500/20">
+      <ShieldAlert size={32} />
+    </div>
+    <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-2">Akses Menu Terbatas</h2>
+    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-6 leading-relaxed">
+      Akun Anda (<strong>{user?.email}</strong>) saat ini belum memiliki akses ke menu yang dipilih atau sedang menunggu persetujuan otoritas dari Administrator.
+    </p>
+    <button
+      onClick={() => { if (confirm("Apakah Anda yakin ingin keluar?")) logout(); }}
+      className="flex items-center gap-2 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all active:scale-95 cursor-pointer"
+    >
+      <LogOut size={16} /> Keluar Akun
+    </button>
+  </div>
+);
+
   if (isAuthLoading) {
     return <SplashLoading appName={settings.appName} appLogo={settings.appLogo} />;
   }
@@ -1258,26 +1311,46 @@ const App: React.FC = () => {
     return <LoginGate loginWithGoogle={loginWithGoogle} appName={settings.appName} appSubtitle={settings.appSubtitle} appLogo={settings.appLogo} />;
   }
 
-  const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
+  const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email.toLowerCase().trim());
+
+  const getFirstAllowedRoute = () => {
+    if (isSpecialUser) return '/dashboard';
+    const menuOrder = [
+      { key: 'dashboard', path: '/dashboard' },
+      { key: 'database', path: '/dashboard/database' },
+      { key: 'masuk', path: '/dashboard/masuk' },
+      { key: 'keluar', path: '/dashboard/keluar' },
+      { key: 'berita_acara', path: '/dashboard/berita-acara' },
+      { key: 'stok', path: '/dashboard/stok' },
+      { key: 'laporan', path: '/dashboard/laporan-blora' },
+      { key: 'dokumen', path: '/dashboard/dokumen' },
+      { key: 'rekap', path: '/dashboard/rekap' },
+      { key: 'indikator', path: '/dashboard/rekap-indikator' },
+      { key: 'profile', path: '/dashboard/profile' },
+    ];
+    const allowed = menuOrder.find(m => hasPermission(m.key, 'view'));
+    return allowed ? allowed.path : '/dashboard/restricted';
+  };
 
   return (
     <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle, userPermissions, hasPermission }}>
       <HashRouter>
         <Layout>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={hasPermission('dashboard', 'view') ? <Dashboard /> : <Navigate to="/dashboard/profile" replace />} />
-            <Route path="/dashboard/database" element={hasPermission('database', 'view') ? <DatabaseBarang /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/masuk" element={hasPermission('masuk', 'view') ? <BarangMasuk /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/keluar" element={hasPermission('keluar', 'view') ? <BarangKeluar /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/berita-acara" element={hasPermission('berita_acara', 'view') ? <CetakBeritaAcara /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/stok" element={hasPermission('stok', 'view') ? <StokBarang /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/laporan-blora" element={hasPermission('laporan', 'view') ? <LaporanBlora /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/dokumen" element={hasPermission('dokumen', 'view') ? <Dokumen /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/rekap" element={hasPermission('rekap', 'view') ? <RekapBulanan /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/rekap-indikator" element={hasPermission('indikator', 'view') ? <RekapIndikator /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard/profile" element={<Profile />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard" element={hasPermission('dashboard', 'view') ? <Dashboard /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/database" element={hasPermission('database', 'view') ? <DatabaseBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/masuk" element={hasPermission('masuk', 'view') ? <BarangMasuk /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/keluar" element={hasPermission('keluar', 'view') ? <BarangKeluar /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/berita-acara" element={hasPermission('berita_acara', 'view') ? <CetakBeritaAcara /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/stok" element={hasPermission('stok', 'view') ? <StokBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/laporan-blora" element={hasPermission('laporan', 'view') ? <LaporanBlora /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/dokumen" element={hasPermission('dokumen', 'view') ? <Dokumen /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/rekap" element={hasPermission('rekap', 'view') ? <RekapBulanan /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/rekap-indikator" element={hasPermission('indikator', 'view') ? <RekapIndikator /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/profile" element={hasPermission('profile', 'view') ? <Profile /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+            <Route path="/dashboard/restricted" element={<RestrictedAccess user={user} logout={logout} />} />
+            <Route path="*" element={<Navigate to={getFirstAllowedRoute()} replace />} />
           </Routes>
         </Layout>
       </HashRouter>

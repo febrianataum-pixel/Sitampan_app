@@ -52,15 +52,8 @@ service cloud.firestore {
 
     // Users collection rules
     match /users/{id} {
-      allow get: if isSignedIn() && isValidId(id) && (
-        request.auth.uid == id ||
-        request.auth.token.email == 'febrianataum@gmail.com' ||
-        request.auth.token.email == 'febridesain19@gmail.com'
-      );
-      allow list: if isSignedIn() && (
-        request.auth.token.email == 'febrianataum@gmail.com' ||
-        request.auth.token.email == 'febridesain19@gmail.com'
-      );
+      allow get: if isSignedIn() && isValidId(id);
+      allow list: if isSignedIn();
       allow write: if isSignedIn() && isValidId(id) && (
         request.auth.uid == id ||
         request.auth.token.email == 'febrianataum@gmail.com' ||

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useInventory, db } from '../App';
-import { collection, getDocs, doc, updateDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { 
   Save, 
   Image as ImageIcon, 
@@ -35,7 +35,8 @@ import {
   FileText,
   Boxes,
   Layers,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 
 const PERMISSION_MODULES = [
@@ -79,6 +80,14 @@ const Profile: React.FC = () => {
   const [userPermissionsForm, setUserPermissionsForm] = useState<any>({});
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+  const [saveSuccessModal, setSaveSuccessModal] = useState<{
+    isOpen: boolean;
+    userName: string;
+    userEmail: string;
+    userPhoto?: string;
+    activeMenus: string[];
+    totalActions: number;
+  } | null>(null);
 
   // States for adding user manually
   const [isAddingUser, setIsAddingUser] = useState(false);
@@ -108,7 +117,7 @@ const Profile: React.FC = () => {
     setIsLoadingUsers(true);
     try {
       const snap = await getDocs(collection(db, 'users'));
-      let list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let list: any[] = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
 
       // Auto-seed known active emails from authentication if they are not in Firestore
       const knownEmails = [
@@ -120,26 +129,27 @@ const Profile: React.FC = () => {
       ];
 
       for (const item of knownEmails) {
-        const alreadyExists = list.some((u: any) => u.email?.toLowerCase() === item.email.toLowerCase());
+        const cleanEmail = item.email.toLowerCase().trim();
+        const alreadyExists = list.some((u: any) => (u.email || '').toLowerCase().trim() === cleanEmail);
         if (!alreadyExists) {
           const docId = item.uid;
           const defaultPermissions = {
             dashboard: { view: true },
-            database: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
-            masuk: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
-            keluar: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
-            berita_acara: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
+            database: { view: cleanEmail === 'febridesain19@gmail.com' || cleanEmail === 'febrianataum@gmail.com' },
+            masuk: { view: cleanEmail === 'febridesain19@gmail.com' || cleanEmail === 'febrianataum@gmail.com' },
+            keluar: { view: cleanEmail === 'febridesain19@gmail.com' || cleanEmail === 'febrianataum@gmail.com' },
+            berita_acara: { view: cleanEmail === 'febridesain19@gmail.com' || cleanEmail === 'febrianataum@gmail.com' },
             stok: { view: true },
             laporan: { view: true },
-            dokumen: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' },
+            dokumen: { view: cleanEmail === 'febridesain19@gmail.com' || cleanEmail === 'febrianataum@gmail.com' },
             rekap: { view: true },
             indikator: { view: true },
-            profile: { view: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com', edit: item.email === 'febridesain19@gmail.com' || item.email === 'febrianataum@gmail.com' }
+            profile: { view: cleanEmail === 'febridesain19@gmail.com' || cleanEmail === 'febrianataum@gmail.com', edit: cleanEmail === 'febridesain19@gmail.com' || cleanEmail === 'febrianataum@gmail.com' }
           };
 
           const newUserDoc = {
             uid: docId,
-            email: item.email,
+            email: cleanEmail,
             displayName: item.name,
             photoURL: '',
             lastLogin: '',
@@ -151,7 +161,40 @@ const Profile: React.FC = () => {
         }
       }
 
-      setUsersList(list);
+      // Deduplicate list by lowercase email, merging permissions and favoring real UIDs over temp_ UIDs
+      const emailMap = new Map<string, any>();
+      for (const u of list) {
+        const email = (u.email || '').toLowerCase().trim();
+        if (!email) continue;
+        if (!emailMap.has(email)) {
+          emailMap.set(email, u);
+        } else {
+          const existing = emailMap.get(email);
+          const existingIsTemp = !existing.uid || existing.uid.startsWith('temp_');
+          const currentIsTemp = !u.uid || u.uid.startsWith('temp_');
+          if (existingIsTemp && !currentIsTemp) {
+            emailMap.set(email, { 
+              ...u, 
+              permissions: u.permissions || existing.permissions 
+            });
+          } else if (u.permissions && !existing.permissions) {
+            emailMap.set(email, { 
+              ...existing, 
+              permissions: u.permissions 
+            });
+          }
+        }
+      }
+
+      const deduplicatedList = Array.from(emailMap.values());
+      setUsersList(deduplicatedList);
+
+      if (selectedUser) {
+        const found = deduplicatedList.find(u => (u.email || '').toLowerCase().trim() === (selectedUser.email || '').toLowerCase().trim());
+        if (found) {
+          handleSelectUser(found);
+        }
+      }
     } catch (err) {
       console.error("Gagal mengambil data user:", err);
     } finally {
@@ -170,14 +213,14 @@ const Profile: React.FC = () => {
       return;
     }
 
-    const alreadyExists = usersList.some(u => u.email?.toLowerCase() === cleanEmail);
+    const alreadyExists = usersList.some(u => (u.email || '').toLowerCase().trim() === cleanEmail);
     if (alreadyExists) {
       alert("User dengan email ini sudah terdaftar!");
       return;
     }
 
     try {
-      const docId = 'temp_' + cleanEmail.replace(/[@.]/g, '_');
+      const docId = 'temp_' + cleanEmail.replace(/[^a-zA-Z0-9_-]/g, '_');
       const defaultPermissions = {
         dashboard: { view: true },
         database: { view: false, add: false, edit: false, delete: false },
@@ -195,7 +238,7 @@ const Profile: React.FC = () => {
       const newUserDoc = {
         uid: docId,
         email: cleanEmail,
-        displayName: newUserName,
+        displayName: newUserName.trim(),
         photoURL: '',
         lastLogin: '',
         permissions: defaultPermissions
@@ -204,7 +247,9 @@ const Profile: React.FC = () => {
       await setDoc(doc(db, 'users', docId), newUserDoc);
       alert(`User ${newUserName} berhasil ditambahkan! Anda sekarang dapat mengatur hak aksesnya.`);
       
-      setUsersList(prev => [...prev, { id: docId, ...newUserDoc }]);
+      const createdItem = { id: docId, ...newUserDoc };
+      setUsersList(prev => [...prev, createdItem]);
+      handleSelectUser(createdItem);
       setIsAddingUser(false);
       setNewUserEmail('');
       setNewUserName('');
@@ -216,7 +261,8 @@ const Profile: React.FC = () => {
 
   const handleDeleteUser = async (u: any) => {
     if (!isPrimaryAdmin) return;
-    if (u.email === 'febrianataum@gmail.com' || u.email === 'febridesain19@gmail.com') {
+    const cleanEmail = (u.email || '').toLowerCase().trim();
+    if (cleanEmail === 'febrianataum@gmail.com' || cleanEmail === 'febridesain19@gmail.com') {
       alert("Tidak dapat menghapus Admin Utama!");
       return;
     }
@@ -225,10 +271,25 @@ const Profile: React.FC = () => {
     }
 
     try {
-      await deleteDoc(doc(db, 'users', u.uid));
+      if (u.uid) await deleteDoc(doc(db, 'users', u.uid));
+      if (u.id && u.id !== u.uid) await deleteDoc(doc(db, 'users', u.id));
+
+      // Also clean up any other matching email documents
+      if (cleanEmail) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', cleanEmail));
+          const snap = await getDocs(q);
+          for (const d of snap.docs) {
+            await deleteDoc(doc(db, 'users', d.id));
+          }
+        } catch (e) {
+          console.warn("Delete secondary docs error:", e);
+        }
+      }
+
       alert(`User ${u.displayName || u.email} berhasil dihapus.`);
-      setUsersList(prev => prev.filter(item => item.uid !== u.uid));
-      if (selectedUser?.uid === u.uid) {
+      setUsersList(prev => prev.filter(item => (item.email || '').toLowerCase().trim() !== cleanEmail));
+      if ((selectedUser?.email || '').toLowerCase().trim() === cleanEmail) {
         setSelectedUser(null);
       }
     } catch (err) {
@@ -254,7 +315,7 @@ const Profile: React.FC = () => {
     PERMISSION_MODULES.forEach(mod => {
       defaultForm[mod.key] = {};
       mod.actions.forEach(act => {
-        defaultForm[mod.key][act] = permissions[mod.key]?.[act] || false;
+        defaultForm[mod.key][act] = Boolean(permissions[mod.key]?.[act]);
       });
     });
     setUserPermissionsForm(defaultForm);
@@ -270,17 +331,107 @@ const Profile: React.FC = () => {
     }));
   };
 
+  const handleSelectAllPermissions = () => {
+    const updated: any = {};
+    PERMISSION_MODULES.forEach(mod => {
+      updated[mod.key] = {};
+      mod.actions.forEach(act => {
+        updated[mod.key][act] = true;
+      });
+    });
+    setUserPermissionsForm(updated);
+  };
+
+  const handleSelectViewOnly = () => {
+    const updated: any = {};
+    PERMISSION_MODULES.forEach(mod => {
+      updated[mod.key] = {};
+      mod.actions.forEach(act => {
+        updated[mod.key][act] = act === 'view';
+      });
+    });
+    setUserPermissionsForm(updated);
+  };
+
+  const handleClearAllPermissions = () => {
+    const isCurrentUserAdmin = selectedUser?.email === 'febrianataum@gmail.com' || selectedUser?.email === 'febridesain19@gmail.com';
+    const updated: any = {};
+    PERMISSION_MODULES.forEach(mod => {
+      updated[mod.key] = {};
+      mod.actions.forEach(act => {
+        if (isCurrentUserAdmin && (mod.key === 'profile' || mod.key === 'dashboard') && act === 'view') {
+          updated[mod.key][act] = true;
+        } else {
+          updated[mod.key][act] = false;
+        }
+      });
+    });
+    setUserPermissionsForm(updated);
+  };
+
   const handleSaveUserPermissions = async () => {
     if (!selectedUser || isSavingPermissions) return;
     setIsSavingPermissions(true);
     try {
-      const userRef = doc(db, 'users', selectedUser.uid);
-      await updateDoc(userRef, { permissions: userPermissionsForm });
-      alert(`Otoritas hak akses untuk ${selectedUser.displayName || selectedUser.email} berhasil diperbarui!`);
-      
+      const email = (selectedUser.email || '').toLowerCase().trim();
+      const primaryDocId = selectedUser.uid || selectedUser.id;
+
+      // 1. Update primary document
+      if (primaryDocId) {
+        await setDoc(doc(db, 'users', primaryDocId), {
+          permissions: userPermissionsForm,
+          email: email,
+          displayName: selectedUser.displayName || 'User'
+        }, { merge: true });
+      }
+
+      // 2. Also search and update all matching email documents
+      if (email) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', email));
+          const snap = await getDocs(q);
+          for (const d of snap.docs) {
+            if (d.id !== primaryDocId) {
+              await setDoc(doc(db, 'users', d.id), {
+                permissions: userPermissionsForm
+              }, { merge: true });
+            }
+          }
+        } catch (e) {
+          console.warn("Secondary email docs sync warning:", e);
+        }
+      }
+
+      // Compute active menus and granted actions summary for popup
+      const activeMenuList: string[] = [];
+      let totalActionsCount = 0;
+      PERMISSION_MODULES.forEach(mod => {
+        const modPerms = userPermissionsForm[mod.key];
+        if (modPerms?.view) {
+          const grantedActions: string[] = [];
+          if (modPerms.view) grantedActions.push('Lihat');
+          if (modPerms.add) grantedActions.push('Tambah');
+          if (modPerms.edit) grantedActions.push('Edit');
+          if (modPerms.delete) grantedActions.push('Hapus');
+          totalActionsCount += grantedActions.length;
+          activeMenuList.push(`${mod.name} (${grantedActions.join(', ')})`);
+        }
+      });
+
       // Update local state list
-      setUsersList(prev => prev.map(u => u.uid === selectedUser.uid ? { ...u, permissions: userPermissionsForm } : u));
-      setSelectedUser(prev => prev ? { ...prev, permissions: userPermissionsForm } : null);
+      const updatedUser = { ...selectedUser, permissions: userPermissionsForm };
+      setUsersList(prev => prev.map(u => (u.email || '').toLowerCase().trim() === email ? updatedUser : u));
+      setSelectedUser(updatedUser);
+
+      // Trigger beautiful confirmation popup
+      setSaveSuccessModal({
+        isOpen: true,
+        userName: selectedUser.displayName || 'User',
+        userEmail: email,
+        userPhoto: selectedUser.photoURL,
+        activeMenus: activeMenuList,
+        totalActions: totalActionsCount
+      });
     } catch (err) {
       console.error("Gagal memperbarui otoritas:", err);
       alert("Terjadi kesalahan saat menyimpan data otoritas.");
@@ -631,7 +782,7 @@ const Profile: React.FC = () => {
   const suggestedRedirectUri = `${currentOrigin}/api/auth/callback`;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-500 pb-20">
+    <div className="w-full max-w-6xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/5 pb-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Profil Pengguna</h2>
@@ -1265,10 +1416,10 @@ const Profile: React.FC = () => {
       )}
 
       {activeTab === 'otoritas' && isPrimaryAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-in fade-in duration-300">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-300">
           
           {/* User List Panel */}
-          <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col h-[600px] theme-transition">
+          <div className="lg:col-span-4 bg-ios-secondary-light dark:bg-ios-secondary-dark p-5 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col h-[650px] theme-transition">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <div className="flex items-center gap-2">
                 <Users size={18} className="text-ios-blue-light dark:text-ios-blue-dark" />
@@ -1343,15 +1494,18 @@ const Profile: React.FC = () => {
                 </div>
               ) : (
                 usersList
-                  .filter(u => u.email?.toLowerCase().includes(searchQuery.toLowerCase()) || u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .filter(u => (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) || (u.displayName || '').toLowerCase().includes(searchQuery.toLowerCase()))
                   .map(u => {
-                    const isSelected = selectedUser?.uid === u.uid;
+                    const isSelected = selectedUser && (selectedUser.uid === u.uid || (selectedUser.email && u.email && selectedUser.email.toLowerCase() === u.email.toLowerCase()));
                     const isTemp = u.uid?.startsWith('temp_');
+                    const isPrimary = u.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(u.email.toLowerCase().trim());
+                    const activeMenuCount = Object.values(u.permissions || {}).filter((p: any) => p?.view).length;
+
                     return (
                       <button 
-                        key={u.uid} 
+                        key={u.uid || u.id} 
                         onClick={() => handleSelectUser(u)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-ios text-left transition-all border ${isSelected ? 'bg-ios-blue-light/10 border-ios-blue-light dark:bg-ios-blue-dark/10 dark:border-ios-blue-dark' : 'bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}
+                        className={`w-full flex items-center gap-3 p-3 rounded-ios text-left transition-all border cursor-pointer ${isSelected ? 'bg-ios-blue-light/10 border-ios-blue-light dark:bg-ios-blue-dark/10 dark:border-ios-blue-dark shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-white/5'}`}
                       >
                         {u.photoURL ? (
                           <img src={u.photoURL} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm border dark:border-white/10" referrerPolicy="no-referrer" />
@@ -1361,11 +1515,18 @@ const Profile: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1">
                             <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate">{u.displayName || 'No Name'}</h4>
-                            {isTemp && (
+                            {isPrimary ? (
+                              <span className="shrink-0 text-[7px] font-black text-blue-600 bg-blue-500/10 px-1 py-0.5 rounded tracking-wide uppercase">Admin</span>
+                            ) : isTemp ? (
                               <span className="shrink-0 text-[7px] font-black text-orange-500 bg-orange-500/10 px-1 py-0.5 rounded tracking-wide uppercase">Belum Login</span>
-                            )}
+                            ) : null}
                           </div>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">{u.email}</p>
+                          <div className="mt-1 flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-white/10 px-1.5 py-0.5 rounded">
+                              {activeMenuCount} menu aktif
+                            </span>
+                          </div>
                         </div>
                       </button>
                     );
@@ -1378,7 +1539,7 @@ const Profile: React.FC = () => {
           </div>
 
           {/* User Permissions Panel */}
-          <div className="md:col-span-2 bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col h-[600px] theme-transition">
+          <div className="lg:col-span-8 bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 flex flex-col h-[650px] theme-transition">
             {selectedUser ? (
               <div className="flex flex-col h-full">
                 {/* Header of selected user */}
@@ -1403,7 +1564,7 @@ const Profile: React.FC = () => {
                   ) : (
                     <button 
                       onClick={() => handleDeleteUser(selectedUser)}
-                      className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-ios transition-all duration-200 active:scale-95"
+                      className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-ios transition-all duration-200 active:scale-95 cursor-pointer"
                       title="Hapus Akun"
                     >
                       <Trash2 size={14} /> Hapus Akun
@@ -1411,12 +1572,39 @@ const Profile: React.FC = () => {
                   )}
                 </div>
 
-                {/* Permissions Grid scrollable area */}
-                <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-hide">
-                  <div className="border-l-4 border-ios-blue-light dark:border-ios-blue-dark pl-4 py-1">
+                {/* Quick actions and header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 shrink-0">
+                  <div className="border-l-4 border-ios-blue-light dark:border-ios-blue-dark pl-3 py-0.5">
                     <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wide">Konfigurasi Hak Akses Menu</h4>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Atur batasan edit, hapus, tambah, dan tampilkan data untuk masing-masing menu.</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Centang menu & aksi yang diizinkan untuk pengguna ini.</p>
                   </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllPermissions}
+                      className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-2.5 py-1 rounded-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      Pilih Semua
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSelectViewOnly}
+                      className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      Hanya Lihat
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearAllPermissions}
+                      className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 px-2.5 py-1 rounded-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      Kosongkan
+                    </button>
+                  </div>
+                </div>
+
+                {/* Permissions Grid scrollable area */}
+                <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-hide">
 
                   <div className="space-y-3">
                     {PERMISSION_MODULES.map(mod => {
@@ -1515,6 +1703,114 @@ const Profile: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Popup Modal Konfirmasi Berhasil Simpan Otoritas Akses */}
+      {saveSuccessModal?.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setSaveSuccessModal(null)}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 dark:border-white/10 p-6 md:p-8 animate-in zoom-in-95 duration-200 relative overflow-hidden text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Tombol Tutup X di Kanan Atas */}
+            <button 
+              type="button"
+              onClick={() => setSaveSuccessModal(null)}
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+              title="Tutup Modal"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Ikon Sukses */}
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30 shadow-lg shadow-emerald-500/10">
+              <CheckCircle2 size={36} className="stroke-[2.5]" />
+            </div>
+
+            {/* Judul & Deskripsi */}
+            <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              Otoritas Akses Berhasil Disimpan!
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-sm mx-auto leading-relaxed">
+              Hak akses menu dan tindakan pengguna telah diperbarui dan langsung disinkronkan ke sistem realtime.
+            </p>
+
+            {/* Info Kartu Pengguna */}
+            <div className="mt-5 p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 flex items-center gap-3 text-left">
+              {saveSuccessModal.userPhoto ? (
+                <img 
+                  src={saveSuccessModal.userPhoto} 
+                  alt="" 
+                  className="w-11 h-11 rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-sm shrink-0" 
+                  referrerPolicy="no-referrer" 
+                />
+              ) : (
+                <div className="w-11 h-11 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0 border border-emerald-500/20">
+                  {saveSuccessModal.userName?.[0] || 'U'}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                    {saveSuccessModal.userName}
+                  </h4>
+                  <span className="inline-flex items-center gap-1 text-[8px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Tersinkron
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                  {saveSuccessModal.userEmail}
+                </p>
+              </div>
+            </div>
+
+            {/* Rincian Menu yang Aktif */}
+            <div className="mt-4 space-y-2 text-left">
+              <div className="flex items-center justify-between text-xs px-1">
+                <span className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">
+                  Menu & Tindakan Diizinkan
+                </span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-[11px]">
+                  {saveSuccessModal.activeMenus.length} Menu Aktif ({saveSuccessModal.totalActions} Izin)
+                </span>
+              </div>
+
+              <div className="max-h-44 overflow-y-auto space-y-1 p-3 rounded-2xl bg-slate-100/70 dark:bg-black/20 border border-slate-200/60 dark:border-white/5 scrollbar-hide">
+                {saveSuccessModal.activeMenus.length > 0 ? (
+                  saveSuccessModal.activeMenus.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      className="flex items-start gap-2 text-slate-700 dark:text-slate-300 py-1 border-b border-slate-200/40 dark:border-white/5 last:border-b-0"
+                    >
+                      <Check size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+                      <span className="text-[11px] leading-tight font-semibold">{item}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-400 dark:text-slate-500 text-[11px] italic text-center py-2">
+                    Semua menu dinonaktifkan (Pengguna tidak dapat melihat menu).
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Tombol Aksi Selesai */}
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setSaveSuccessModal(null)}
+                className="w-full py-3 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Check size={16} />
+                Selesai & Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
