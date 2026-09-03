@@ -264,13 +264,10 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 pb-24 md:pb-10">
       
-      {/* PWA Mobile Standing Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      {/* Standing Header */}
+      <div className="hidden md:flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="md:hidden p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/20">
-              <Smartphone size={16}/>
-            </div>
             <h2 className="text-2xl md:text-4xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">
               Monitoring Realtime
             </h2>
@@ -753,30 +750,6 @@ const Dashboard: React.FC = () => {
              </div>
           </div>
         )}
-      </div>
-
-      {/* FOOTER DASHBOARD */}
-      <div className="bg-slate-900 dark:bg-ios-secondary-dark p-8 md:p-10 rounded-ios-lg text-white shadow-lg relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-white/10 transition-all duration-1000"></div>
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="space-y-3 text-center md:text-left">
-            <div className="flex items-center gap-3 justify-center md:justify-start">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-              <h4 className="text-xl md:text-2xl font-bold tracking-tight">Sistem Monitoring Terpadu</h4>
-            </div>
-            <p className="text-xs opacity-60 font-medium max-w-sm mx-auto md:mx-0 leading-relaxed text-slate-300">
-              Sinkronisasi data dilakukan secara otomatis. Laporan divalidasi oleh petugas gudang pada {new Date().toLocaleTimeString('id-ID')} WIB.
-            </p>
-          </div>
-          <div className="flex gap-4">
-             <div className="bg-white/10 px-6 py-4 rounded-ios-lg backdrop-blur-2xl border border-white/10 text-center min-w-[140px]">
-                <p className="text-[9px] font-bold uppercase opacity-60 mb-1 tracking-widest">Total Sisa Unit</p>
-                <p className="text-3xl font-bold">
-                  {stockAvailabilityData.reduce((acc, curr) => acc + curr.stock, 0).toLocaleString('id-ID')}
-                </p>
-             </div>
-          </div>
-        </div>
       </div>
 
       {/* MODAL KECAMATAN */}

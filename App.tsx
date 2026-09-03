@@ -140,13 +140,10 @@ export const useInventory = () => {
 };
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout, userPermissions, hasPermission } = useInventory();
   const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
-
-  useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
 
   const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email.toLowerCase().trim());
 
@@ -161,23 +158,28 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const firstName = user?.displayName ? user.displayName.split(' ')[0] : (settings.adminName ? settings.adminName.split(' ')[0] : 'Admin');
 
   const allMenuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={21} />, key: 'dashboard' },
-    { name: 'Database', path: '/dashboard/database', icon: <Database size={21} />, key: 'database' },
-    { name: 'Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={21} />, key: 'masuk' },
-    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={21} />, key: 'keluar' },
-    { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={21} />, key: 'berita_acara' },
-    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={21} />, key: 'stok' },
-    { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={21} />, key: 'laporan' },
-    { name: 'Dokumen', path: '/dashboard/dokumen', icon: <Package size={21} />, key: 'dokumen' },
-    { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={21} />, key: 'rekap' },
-    { name: 'Indikator', path: '/dashboard/rekap-indikator', icon: <PieChart size={21} />, key: 'indikator' },
-    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={21} />, key: 'profile' },
+    { name: 'Dashboard', fullName: 'Dashboard Monitoring', path: '/dashboard', icon: <LayoutDashboard size={21} />, key: 'dashboard' },
+    { name: 'Database', fullName: 'Database Barang', path: '/dashboard/database', icon: <Database size={21} />, key: 'database' },
+    { name: 'Masuk', fullName: 'Barang Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={21} />, key: 'masuk' },
+    { name: 'Keluar', fullName: 'Barang Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={21} />, key: 'keluar' },
+    { name: 'Berita Acara', fullName: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={21} />, key: 'berita_acara' },
+    { name: 'Stok', fullName: 'Stok Barang', path: '/dashboard/stok', icon: <BarChart3 size={21} />, key: 'stok' },
+    { name: 'Laporan', fullName: 'Laporan Logistik', path: '/dashboard/laporan-blora', icon: <FileText size={21} />, key: 'laporan' },
+    { name: 'Dokumen', fullName: 'Dokumen & Lampiran', path: '/dashboard/dokumen', icon: <Package size={21} />, key: 'dokumen' },
+    { name: 'Rekap', fullName: 'Rekapitulasi Bulanan', path: '/dashboard/rekap', icon: <CalendarDays size={21} />, key: 'rekap' },
+    { name: 'Indikator', fullName: 'Indikator Kinerja', path: '/dashboard/rekap-indikator', icon: <PieChart size={21} />, key: 'indikator' },
+    { name: 'Profil', fullName: 'Profil Pengguna', path: '/dashboard/profile', icon: <UserCircle size={21} />, key: 'profile' },
   ];
 
   const menuItems = allMenuItems.filter(item => {
     if (isSpecialUser) return true;
     return hasPermission(item.key, 'view');
   });
+
+  const currentMenuItem = allMenuItems.find(item => 
+    location.pathname === item.path || 
+    (item.path !== '/dashboard' && location.pathname.startsWith(item.path))
+  ) || (location.pathname === '/' || location.pathname === '/dashboard' ? allMenuItems[0] : null) || allMenuItems[0];
 
   const firstAllowedPath = isSpecialUser 
     ? '/dashboard' 
@@ -186,62 +188,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-br from-[#dce5fb] via-[#edf2fc] to-[#d7e3fa] dark:from-[#090e1a] dark:via-[#0f172a] dark:to-[#1e1b4b] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       
-      {/* Mobile Drawer Backdrop */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-40 md:hidden animate-in fade-in duration-300"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Mobile Slide-out Drawer */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl shadow-2xl p-6 flex flex-col justify-between transition-transform duration-300 md:hidden ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-                {settings.logo ? (
-                  <img src={settings.logo} className="w-7 h-7 rounded-xl object-cover" referrerPolicy="no-referrer" alt="Logo" />
-                ) : (
-                  <Sparkles size={20} />
-                )}
-              </div>
-              <div>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">{settings.appName}</h3>
-                <p className="text-[10px] text-slate-400 font-medium">Logistik Kebencanaan</p>
-              </div>
-            </div>
-            <button onClick={() => setIsSidebarOpen(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/5">
-              <X size={20} />
-            </button>
-          </div>
-
-          <nav className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
-            {menuItems.map((item) => (
-              <NavLink 
-                key={item.path} 
-                to={item.path} 
-                onClick={() => setIsSidebarOpen(false)}
-                className={({ isActive }: any) => `flex items-center gap-3.5 px-4 py-3 rounded-2xl font-semibold text-xs transition-all ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'}`}
-              >
-                <div className="shrink-0">{item.icon}</div>
-                <span>{item.name}</span>
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-
-        {user && (
-          <button 
-            onClick={() => { if (confirm("Apakah Anda yakin ingin keluar?")) logout(); }} 
-            className="flex items-center gap-3 px-4 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-2xl font-bold text-xs transition-all cursor-pointer"
-          >
-            <LogOut size={18} className="shrink-0" />
-            <span>Keluar Akun</span>
-          </button>
-        )}
-      </aside>
-
       {/* Desktop Floating Pill Sidebar Rail (Expandable) */}
       <aside className={`hidden md:flex flex-col items-center justify-between my-5 ml-5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[32px] py-4 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] border border-white/90 dark:border-white/10 shrink-0 z-40 transition-all duration-300 ease-in-out ${
         isSidebarExpanded ? 'w-60 px-3' : 'w-[72px] px-0'
@@ -370,32 +316,38 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <header className="px-4 md:px-8 pt-4 md:pt-5 pb-2 shrink-0 z-30 no-print">
           <div className="flex items-center justify-between gap-4">
             
-            {/* Left: Greeting & App Title */}
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setIsSidebarOpen(true)} 
-                className="md:hidden p-2.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/80 dark:border-white/10 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-white transition-all"
-              >
-                <Menu size={20} />
-              </button>
+            {/* Mobile Header: Disisi atas langsung ke nama menunya */}
+            <div className="flex md:hidden items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+                {currentMenuItem?.icon ? React.cloneElement(currentMenuItem.icon as React.ReactElement, { size: 18 }) : <Package size={18} />}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate">
+                  {currentMenuItem?.fullName || currentMenuItem?.name || 'Dashboard'}
+                </h1>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold truncate uppercase tracking-wider">
+                  {settings.appName || 'Logistik Kebencanaan'}
+                </p>
+              </div>
+            </div>
 
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:flex w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 items-center justify-center text-white shadow-md shadow-blue-500/20">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="8" cy="8" r="5" fill="currentColor" fillOpacity="0.9" />
-                    <circle cx="16" cy="8" r="5" fill="currentColor" fillOpacity="0.7" />
-                    <circle cx="8" cy="16" r="5" fill="currentColor" fillOpacity="0.7" />
-                    <circle cx="16" cy="16" r="5" fill="currentColor" fillOpacity="0.9" />
-                  </svg>
-                </div>
-                <div>
-                  <h1 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-                    {getGreeting()}, <span className="text-blue-600 dark:text-blue-400">{firstName}</span>
-                  </h1>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                    Sistem Tanggap Logistik Kebencanaan
-                  </p>
-                </div>
+            {/* Desktop Header: Greeting & Brand */}
+            <div className="hidden md:flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="5" fill="currentColor" fillOpacity="0.9" />
+                  <circle cx="16" cy="8" r="5" fill="currentColor" fillOpacity="0.7" />
+                  <circle cx="8" cy="16" r="5" fill="currentColor" fillOpacity="0.7" />
+                  <circle cx="16" cy="16" r="5" fill="currentColor" fillOpacity="0.9" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                  {getGreeting()}, <span className="text-blue-600 dark:text-blue-400">{firstName}</span>
+                </h1>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  Sistem Tanggap Logistik Kebencanaan
+                </p>
               </div>
             </div>
 
@@ -470,22 +422,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
         </main>
 
-        {/* Mobile Floating Bottom Pill Navigation Bar */}
-        <nav className="md:hidden fixed bottom-4 left-4 right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-full shadow-2xl border border-white/80 dark:border-white/10 px-3 py-2 flex items-center justify-around z-40 no-print shadow-slate-900/10">
-          {menuItems.filter(item => ['Dashboard', 'Masuk', 'Keluar', 'Berita Acara', 'Profil'].includes(item.name)).map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }: any) => `flex flex-col items-center gap-0.5 px-3 py-1 rounded-full transition-all ${
-                isActive 
-                  ? 'text-blue-600 dark:text-blue-400 font-bold scale-105' 
-                  : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              <div className="shrink-0 scale-90">{item.icon}</div>
-              <span className="text-[9px] font-bold tracking-tight">{item.name}</span>
-            </NavLink>
-          ))}
+        {/* Mobile Bottom Navigation Bar - Menampung Semua Menu Terotorisasi */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-t border-slate-200/80 dark:border-white/10 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] py-1.5 px-2 safe-area-pb no-print">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide max-w-full px-1 py-0.5">
+            {menuItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }: any) => `flex flex-col items-center justify-center min-w-[56px] sm:min-w-[62px] px-2 py-1.5 rounded-2xl transition-all duration-200 shrink-0 select-none ${
+                  isActive 
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.03] font-black' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold'
+                }`}
+              >
+                <div className="shrink-0">{React.cloneElement(item.icon as React.ReactElement, { size: 18 })}</div>
+                <span className="text-[9px] font-bold tracking-tight mt-0.5 whitespace-nowrap">{item.name}</span>
+              </NavLink>
+            ))}
+          </div>
         </nav>
 
       </div>
