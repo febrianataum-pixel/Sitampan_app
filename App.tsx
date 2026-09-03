@@ -21,7 +21,16 @@ import {
   ShieldAlert,
   CloudUpload,
   Mail,
-  Lock
+  Lock,
+  Boxes,
+  Layers,
+  Send,
+  ScrollText,
+  Archive,
+  Bell,
+  LogOut,
+  Sparkles,
+  LayoutGrid
 } from 'lucide-react';
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
@@ -132,6 +141,7 @@ export const useInventory = () => {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout, userPermissions } = useInventory();
   const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
@@ -140,117 +150,344 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email);
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 4 && hour < 11) return 'Selamat pagi';
+    if (hour >= 11 && hour < 15) return 'Selamat siang';
+    if (hour >= 15 && hour < 18) return 'Selamat sore';
+    return 'Selamat malam';
+  };
+
+  const firstName = user?.displayName ? user.displayName.split(' ')[0] : (settings.adminName ? settings.adminName.split(' ')[0] : 'Admin');
+
   const allMenuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} />, key: 'dashboard' },
-    { name: 'Database', path: '/dashboard/database', icon: <Database size={20} />, key: 'database' },
-    { name: 'Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={20} />, key: 'masuk' },
-    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={20} />, key: 'keluar' },
-    { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={20} />, key: 'berita_acara' },
-    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={20} />, key: 'stok' },
-    { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={20} />, key: 'laporan' },
-    { name: 'Dokumen', path: '/dashboard/dokumen', icon: <Package size={20} />, key: 'dokumen' },
-    { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={20} />, key: 'rekap' },
-    { name: 'Indikator', path: '/dashboard/rekap-indikator', icon: <PieChart size={20} />, key: 'indikator' },
-    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={20} />, key: 'profile' },
+    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={21} />, key: 'dashboard' },
+    { name: 'Database', path: '/dashboard/database', icon: <Database size={21} />, key: 'database' },
+    { name: 'Masuk', path: '/dashboard/masuk', icon: <ArrowDownCircle size={21} />, key: 'masuk' },
+    { name: 'Keluar', path: '/dashboard/keluar', icon: <ArrowUpCircle size={21} />, key: 'keluar' },
+    { name: 'Berita Acara', path: '/dashboard/berita-acara', icon: <FileText size={21} />, key: 'berita_acara' },
+    { name: 'Stok', path: '/dashboard/stok', icon: <BarChart3 size={21} />, key: 'stok' },
+    { name: 'Laporan', path: '/dashboard/laporan-blora', icon: <FileText size={21} />, key: 'laporan' },
+    { name: 'Dokumen', path: '/dashboard/dokumen', icon: <Package size={21} />, key: 'dokumen' },
+    { name: 'Rekap', path: '/dashboard/rekap', icon: <CalendarDays size={21} />, key: 'rekap' },
+    { name: 'Indikator', path: '/dashboard/rekap-indikator', icon: <PieChart size={21} />, key: 'indikator' },
+    { name: 'Profil', path: '/dashboard/profile', icon: <UserCircle size={21} />, key: 'profile' },
   ];
 
   const menuItems = allMenuItems.filter(item => {
     if (isSpecialUser) return true;
-    if (item.key === 'profile') return true; // Profil selalu bisa diakses untuk melihat koneksi cloud dan logout
+    if (item.key === 'profile') return true;
     if (userPermissions && userPermissions[item.key]) {
       return !!userPermissions[item.key].view;
     }
-    // Fallback default menu jika belum tersinkron
     return ['Dashboard', 'Laporan', 'Stok', 'Rekap', 'Indikator'].includes(item.name);
   });
 
   return (
-    <div className="flex h-screen overflow-hidden bg-ios-bg-light dark:bg-ios-bg-dark theme-transition">
-      {/* Sidebar Backdrop for Mobile */}
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-[#dce5fb] via-[#edf2fc] to-[#d7e3fa] dark:from-[#090e1a] dark:via-[#0f172a] dark:to-[#1e1b4b] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+      
+      {/* Mobile Drawer Backdrop */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-300"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-40 md:hidden animate-in fade-in duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
-      <aside className={`fixed md:relative z-40 h-full bg-ios-secondary-light dark:bg-ios-secondary-dark transition-all duration-300 flex flex-col no-print shadow-sm border-r border-slate-200 dark:border-white/5 ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-full md:translate-x-0'} md:flex`}>
-        <div className="p-6 flex items-center gap-3 h-20 overflow-hidden shrink-0">
-          <div className="shrink-0">{settings.logo ? <img src={settings.logo} className="w-8 h-8 rounded-ios object-cover" referrerPolicy="no-referrer" /> : <Package className="text-ios-blue-light dark:text-ios-blue-dark" size={28} />}</div>
-          <div className={`flex flex-col truncate transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}><span className="font-bold text-lg leading-tight truncate text-slate-900 dark:text-white">{settings.appName}</span></div>
+      {/* Mobile Slide-out Drawer */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl shadow-2xl p-6 flex flex-col justify-between transition-transform duration-300 md:hidden ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                {settings.logo ? (
+                  <img src={settings.logo} className="w-7 h-7 rounded-xl object-cover" referrerPolicy="no-referrer" alt="Logo" />
+                ) : (
+                  <Sparkles size={20} />
+                )}
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">{settings.appName}</h3>
+                <p className="text-[10px] text-slate-400 font-medium">Logistik Kebencanaan</p>
+              </div>
+            </div>
+            <button onClick={() => setIsSidebarOpen(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/5">
+              <X size={20} />
+            </button>
+          </div>
+
+          <nav className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+            {menuItems.map((item) => (
+              <NavLink 
+                key={item.path} 
+                to={item.path} 
+                onClick={() => setIsSidebarOpen(false)}
+                className={({ isActive }: any) => `flex items-center gap-3.5 px-4 py-3 rounded-2xl font-semibold text-xs transition-all ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'}`}
+              >
+                <div className="shrink-0">{item.icon}</div>
+                <span>{item.name}</span>
+              </NavLink>
+            ))}
+          </nav>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-hide">
-          {menuItems.map((item) => (
-            <NavLink key={item.path} to={item.path} className={({ isActive }: any) => `flex items-center gap-3 p-3 rounded-ios transition-all ${isActive ? 'text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`} style={({ isActive }: any) => isActive ? { backgroundColor: settings.themeColor } : {}}>
-              <div className="shrink-0">{item.icon}</div>
-              <span className={`font-bold text-sm transition-all duration-300 ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden'}`}>{item.name}</span>
-            </NavLink>
-          ))}
-        </nav>
+
         {user && (
           <button 
             onClick={() => { if (confirm("Apakah Anda yakin ingin keluar?")) logout(); }} 
-            className="flex items-center gap-3 p-3 mx-3 my-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/10 rounded-ios transition-all cursor-pointer font-bold text-sm shrink-0"
+            className="flex items-center gap-3 px-4 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-2xl font-bold text-xs transition-all cursor-pointer"
           >
-            <UserCircle size={20} className="shrink-0 text-rose-500" />
-            <span className={`transition-all duration-300 truncate font-bold text-rose-500 ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden'}`}>Keluar Akun</span>
+            <LogOut size={18} className="shrink-0" />
+            <span>Keluar Akun</span>
           </button>
         )}
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden md:flex p-4 hover:bg-slate-100 dark:hover:bg-white/5 justify-center text-slate-400 border-t border-slate-200 dark:border-white/5">{isSidebarOpen ? <X size={20} /> : <Menu size={20} />}</button>
       </aside>
 
+      {/* Desktop Floating Pill Sidebar Rail (Expandable) */}
+      <aside className={`hidden md:flex flex-col items-center justify-between my-5 ml-5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[32px] py-4 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] border border-white/90 dark:border-white/10 shrink-0 z-40 transition-all duration-300 ease-in-out ${
+        isSidebarExpanded ? 'w-60 px-3' : 'w-[72px] px-0'
+      }`}>
+        {/* Top: Logo & Menu Items List */}
+        <div className="flex flex-col items-center gap-4 w-full">
+          {/* Top Logo / Brand Icon & Name */}
+          <NavLink 
+            to="/dashboard" 
+            className={`flex items-center transition-all hover:scale-105 active:scale-95 group relative ${
+              isSidebarExpanded ? 'w-full gap-3 px-3 py-1.5 justify-start' : 'w-12 h-12 justify-center rounded-2xl'
+            }`}
+          >
+            {settings.logo ? (
+              <img src={settings.logo} className="w-9 h-9 rounded-xl object-cover shadow-sm shrink-0" referrerPolicy="no-referrer" alt="Logo" />
+            ) : (
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-500/30 shrink-0">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="5" fill="currentColor" fillOpacity="0.9" />
+                  <circle cx="16" cy="8" r="5" fill="currentColor" fillOpacity="0.7" />
+                  <circle cx="8" cy="16" r="5" fill="currentColor" fillOpacity="0.7" />
+                  <circle cx="16" cy="16" r="5" fill="currentColor" fillOpacity="0.9" />
+                </svg>
+              </div>
+            )}
+            {isSidebarExpanded ? (
+              <div className="flex flex-col min-w-0 overflow-hidden animate-in fade-in duration-200">
+                <h2 className="font-extrabold text-sm text-slate-900 dark:text-white leading-tight truncate">{settings.appName}</h2>
+                <p className="text-[10px] text-slate-400 font-medium truncate">Logistik Kebencanaan</p>
+              </div>
+            ) : (
+              <span className="absolute left-16 px-2.5 py-1 bg-slate-900/90 dark:bg-white text-white dark:text-slate-900 text-[11px] font-semibold rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                {settings.appName}
+              </span>
+            )}
+          </NavLink>
+
+          <div className={`h-[1px] bg-slate-200/60 dark:bg-white/10 my-0.5 transition-all ${isSidebarExpanded ? 'w-full' : 'w-8'}`}></div>
+
+          {/* Vertical Icon Rail & Text Labels */}
+          <nav className="flex flex-col items-center gap-1.5 overflow-y-auto overflow-x-hidden scrollbar-hide max-h-[calc(100vh-230px)] w-full">
+            {menuItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }: any) => `transition-all duration-200 group relative ${
+                  isSidebarExpanded 
+                    ? `w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-2xl font-bold text-xs ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-[0_4px_16px_rgba(55,88,249,0.25)]'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/5'
+                      }`
+                    : `w-11 h-11 rounded-2xl flex items-center justify-center ${
+                        isActive
+                          ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-[0_4px_16px_rgba(55,88,249,0.18)] border border-slate-100 dark:border-slate-700/60 ring-1 ring-black/5 scale-105'
+                          : 'text-slate-400 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-white/70 dark:hover:bg-white/5'
+                      }`
+                }`}
+              >
+                <div className="shrink-0">{item.icon}</div>
+                {isSidebarExpanded ? (
+                  <span className="truncate whitespace-nowrap">{item.name}</span>
+                ) : (
+                  /* Tooltip when collapsed */
+                  <span className="absolute left-16 px-3 py-1.5 bg-slate-900/95 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold rounded-xl shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-white/10 dark:border-slate-200">
+                    {item.name}
+                  </span>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+
+        {/* Bottom Actions: Hamburger Toggle (Expand/Collapse) & Logout */}
+        <div className={`flex flex-col items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-white/10 w-full ${isSidebarExpanded ? 'px-1' : 'px-2'}`}>
+          {/* Hamburger Menu Toggle button at bottom */}
+          <button
+            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+            className={`rounded-2xl transition-all duration-200 group relative cursor-pointer ${
+              isSidebarExpanded
+                ? 'w-full flex items-center gap-3.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400'
+                : 'w-11 h-11 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
+            }`}
+            title={isSidebarExpanded ? "Kecilkan Menu" : "Buka Menu Lengkap"}
+          >
+            <div className="shrink-0">
+              <Menu size={20} />
+            </div>
+            {isSidebarExpanded ? (
+              <span className="truncate whitespace-nowrap font-bold">Kecilkan Menu</span>
+            ) : (
+              <span className="absolute left-16 px-3 py-1.5 bg-slate-900/95 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold rounded-xl shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-white/10 dark:border-slate-200">
+                Menu Lengkap
+              </span>
+            )}
+          </button>
+
+          {user && (
+            <button
+              onClick={() => { if (confirm("Apakah Anda yakin ingin keluar?")) logout(); }}
+              className={`rounded-2xl transition-all duration-200 group relative cursor-pointer text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 ${
+                isSidebarExpanded
+                  ? 'w-full flex items-center gap-3.5 px-3.5 py-2.5 text-xs font-bold'
+                  : 'w-11 h-11 flex items-center justify-center'
+              }`}
+            >
+              <div className="shrink-0">
+                <LogOut size={19} />
+              </div>
+              {isSidebarExpanded ? (
+                <span className="truncate whitespace-nowrap text-rose-500 font-bold">Keluar Akun</span>
+              ) : (
+                <span className="absolute left-16 px-3 py-1.5 bg-rose-600 text-white text-[11px] font-bold rounded-xl shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                  Keluar Akun
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-        <header className="bg-white/80 dark:bg-ios-secondary-dark/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 no-print z-30 shrink-0 sticky top-0 shadow-sm theme-transition">
-          <div className="h-16 flex items-center px-4 md:px-6 justify-between">
-            <div className="flex items-center gap-2">
+        
+        {/* Modern Top Floating Header */}
+        <header className="px-4 md:px-8 pt-4 md:pt-5 pb-2 shrink-0 z-30 no-print">
+          <div className="flex items-center justify-between gap-4">
+            
+            {/* Left: Greeting & App Title */}
+            <div className="flex items-center gap-3">
               <button 
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-                className="md:hidden p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-ios transition-colors"
+                onClick={() => setIsSidebarOpen(true)} 
+                className="md:hidden p-2.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/80 dark:border-white/10 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-white transition-all"
               >
                 <Menu size={20} />
               </button>
-              <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{settings.appName}</h1>
-              {isRescuing ? (
-                <div className="flex items-center gap-1 bg-ios-blue-light/10 text-ios-blue-light px-2 py-1 rounded-full text-[8px] font-bold animate-pulse"><CloudUpload size={10} /> <span>RESCUING...</span></div>
-              ) : isCloudConnected ? (
-                <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded-full text-[8px] font-bold"><span>SYNC ACTIVE</span></div>
-              ) : syncError ? (
-                <div className="flex items-center gap-1 bg-red-500/10 text-red-500 px-2 py-1 rounded-full text-[8px] font-bold"><ShieldAlert size={10} /> <span>ERROR</span></div>
-              ) : (
-                <div className="flex items-center gap-1 bg-slate-500/10 text-slate-500 px-2 py-1 rounded-full text-[8px] font-bold"><WifiOff size={10} /> <span>OFFLINE</span></div>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              <button onClick={toggleTheme} className="p-2.5 rounded-ios bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">{settings.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
+
               <div className="flex items-center gap-3">
-                {user?.photoURL && (
-                  <img src={user.photoURL} alt={user.displayName || "User"} className="w-8 h-8 rounded-full border border-slate-200 dark:border-white/10 object-cover" referrerPolicy="no-referrer" />
-                )}
-                <div className="text-right hidden sm:block">
-                   <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-none">{user?.displayName || settings.adminName}</p>
-                   <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mt-1.5 leading-none">{todayFormatted}</p>
+                <div className="hidden sm:flex w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 items-center justify-center text-white shadow-md shadow-blue-500/20">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="8" cy="8" r="5" fill="currentColor" fillOpacity="0.9" />
+                    <circle cx="16" cy="8" r="5" fill="currentColor" fillOpacity="0.7" />
+                    <circle cx="8" cy="16" r="5" fill="currentColor" fillOpacity="0.7" />
+                    <circle cx="16" cy="16" r="5" fill="currentColor" fillOpacity="0.9" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+                    {getGreeting()}, <span className="text-blue-600 dark:text-blue-400">{firstName}</span>
+                  </h1>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    Sistem Tanggap Logistik Kebencanaan
+                  </p>
                 </div>
               </div>
             </div>
+
+            {/* Right: Circular Floating Action Buttons */}
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              
+              {/* Cloud Sync Status Badge */}
+              <div className="hidden sm:flex items-center">
+                {isRescuing ? (
+                  <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-blue-500/20 shadow-sm animate-pulse">
+                    <CloudUpload size={12} />
+                    <span>RESCUING...</span>
+                  </div>
+                ) : isCloudConnected ? (
+                  <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-emerald-500/20 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>SYNC AKTIF</span>
+                  </div>
+                ) : syncError ? (
+                  <div className="flex items-center gap-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-rose-500/20 shadow-sm">
+                    <ShieldAlert size={12} />
+                    <span>ERROR</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-slate-500/10 text-slate-600 dark:text-slate-400 px-3 py-1.5 rounded-full text-[10px] font-bold border border-slate-500/20 shadow-sm">
+                    <WifiOff size={12} />
+                    <span>OFFLINE</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Theme Toggle Circle Button */}
+              <button 
+                onClick={toggleTheme} 
+                title="Ganti Tema"
+                className="w-10 h-10 rounded-full bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border border-white/90 dark:border-white/10 shadow-sm flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              >
+                {settings.theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
+
+              {/* User Avatar with Live Online Dot */}
+              <NavLink 
+                to="/dashboard/profile"
+                className="flex items-center gap-2.5 pl-1 group"
+              >
+                <div className="relative">
+                  {user?.photoURL ? (
+                    <img 
+                      src={user.photoURL} 
+                      alt={user.displayName || "User"} 
+                      className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-800 shadow-sm object-cover group-hover:ring-2 group-hover:ring-blue-500 transition-all" 
+                      referrerPolicy="no-referrer" 
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-2 border-white dark:border-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 font-bold text-xs shadow-sm">
+                      {firstName.substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  {/* Live Green Online Dot Indicator */}
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full shadow-sm"></span>
+                </div>
+              </NavLink>
+
+            </div>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-4 md:p-8 pb-32 md:pb-10 scrollbar-hide">
-          <div className="max-w-[1600px] mx-auto">{children}</div>
+
+        {/* Scrollable Viewport Content */}
+        <main className="flex-1 overflow-y-auto px-3 sm:px-5 md:px-7 py-3 md:py-5 pb-28 md:pb-8 scrollbar-hide">
+          <div className="w-full mx-auto animate-in fade-in duration-300">
+            {children}
+          </div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-ios-secondary-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 flex items-center justify-around px-1 py-2 pb-8 z-50 no-print theme-transition shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
-          {menuItems.filter(item => ['Dashboard', 'Keluar', 'Berita Acara', 'Indikator', 'Dokumen', 'Profil'].includes(item.name)).map((item) => (
+        {/* Mobile Floating Bottom Pill Navigation Bar */}
+        <nav className="md:hidden fixed bottom-4 left-4 right-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-full shadow-2xl border border-white/80 dark:border-white/10 px-3 py-2 flex items-center justify-around z-40 no-print shadow-slate-900/10">
+          {menuItems.filter(item => ['Dashboard', 'Masuk', 'Keluar', 'Berita Acara', 'Profil'].includes(item.name)).map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }: any) => `flex flex-col items-center gap-1 px-1 py-1 transition-all ${isActive ? 'text-ios-blue-light dark:text-ios-blue-dark' : 'text-slate-400'}`}
+              className={({ isActive }: any) => `flex flex-col items-center gap-0.5 px-3 py-1 rounded-full transition-all ${
+                isActive 
+                  ? 'text-blue-600 dark:text-blue-400 font-bold scale-105' 
+                  : 'text-slate-400 dark:text-slate-500'
+              }`}
             >
               <div className="shrink-0 scale-90">{item.icon}</div>
-              <span className="text-[8px] font-black uppercase tracking-tighter text-center scale-95">{item.name}</span>
+              <span className="text-[9px] font-bold tracking-tight">{item.name}</span>
             </NavLink>
           ))}
         </nav>
+
       </div>
     </div>
   );
@@ -288,7 +525,12 @@ const LoginGate: React.FC<LoginGateProps> = ({ loginWithGoogle, appName, appSubt
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // Custom Email/Password Authentication States
-  const [useEmail, setUseEmail] = useState(false);
+  const isAndroidWebView = typeof window !== 'undefined' && (
+    /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent) ||
+    (window as any).Android !== undefined
+  );
+
+  const [useEmail, setUseEmail] = useState(isAndroidWebView);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -300,8 +542,18 @@ const LoginGate: React.FC<LoginGateProps> = ({ loginWithGoogle, appName, appSubt
     try {
       await loginWithGoogle();
     } catch (e: any) {
-      console.error(e);
-      setErrorMsg("Gagal login Google. Untuk aplikasi HP (APK), silakan klik tombol 'Masuk dengan Email' di bawah.");
+      console.error("Google Login Error:", e);
+      let msg = "Gagal login dengan Google.";
+      if (e?.code === 'auth/unauthorized-domain') {
+        msg = `Domain (${window.location.hostname}) belum didaftarkan di Firebase Authentication > Settings > Authorized domains.`;
+      } else if (e?.code === 'auth/popup-blocked' || e?.code === 'auth/cancelled-popup-request' || e?.message?.includes('popup')) {
+        msg = "Popup Google diblokir oleh WebView APK Android. Silakan gunakan tab 'Email & Password' di atas untuk masuk.";
+      } else if (e?.message?.includes('disallowed_useragent') || e?.code === 'auth/disallowed-useragent') {
+        msg = "Google memblokir login OAuth di dalam WebView APK Android (disallowed_useragent). Silakan gunakan tab 'Email & Password' atau install lewat Google Chrome (PWA).";
+      } else {
+        msg = `Gagal login Google (${e?.code || e?.message || 'Error'}). Untuk pengguna APK HP, silakan gunakan tab 'Email & Password' di atas.`;
+      }
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -327,33 +579,37 @@ const LoginGate: React.FC<LoginGateProps> = ({ loginWithGoogle, appName, appSubt
     try {
       if (isSignUp) {
         // Sign Up Flow
-        const newUserCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const newUserCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (newUserCredential.user) {
-          await updateProfile(newUserCredential.user, { displayName });
+          await updateProfile(newUserCredential.user, { displayName: displayName.trim() });
           // Force a state update
           window.location.reload();
         }
       } else {
         // Sign In Flow
-        await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, email.trim(), password);
       }
     } catch (error: any) {
-      console.error(error);
+      console.error("Email Auth Error:", error);
       let msg = "Terjadi kesalahan saat otentikasi.";
       if (error.code === 'auth/user-not-found') {
-        msg = "Email belum terdaftar. Silakan pilih tab 'Daftar Baru' di bawah.";
+        msg = "Email belum terdaftar. Silakan klik teks 'Belum punya akun? Daftar gratis disini' di bawah.";
       } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        msg = "Password salah atau kredensial tidak sesuai. Silakan coba lagi.";
+        msg = "Password salah atau kredensial tidak sesuai. Jika belum mendaftar, silakan klik 'Daftar gratis disini'.";
       } else if (error.code === 'auth/invalid-email') {
-        msg = "Format email tidak valid.";
+        msg = "Format email tidak valid. Masukkan alamat email yang benar.";
       } else if (error.code === 'auth/email-already-in-use') {
-        msg = "Email sudah digunakan oleh akun lain. Silakan langsung login.";
+        msg = "Email ini sudah terdaftar. Silakan langsung login atau gunakan kata sandi yang sesuai.";
       } else if (error.code === 'auth/weak-password') {
-        msg = "Password terlalu lemah (minimal 6 karakter).";
+        msg = "Password terlalu lemah (minimal harus 6 karakter).";
       } else if (error.code === 'auth/operation-not-allowed') {
-        msg = "Provider 'Email/Password' belum aktif di Firebase Console. Harap aktifkan menu Authentication > Sign-in method > Email/Password.";
+        msg = "Metode 'Email/Password' belum diaktifkan di Firebase Console. Harap buka Firebase Console > Authentication > Sign-in method dan aktifkan 'Email/Password'.";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        msg = `Domain (${window.location.hostname}) belum diizinkan. Daftarkan di Firebase Console > Authentication > Settings > Authorized domains.`;
+      } else if (error.code === 'auth/network-request-failed') {
+        msg = "Koneksi internet gagal. Pastikan APK memiliki izin internet aktif.";
       } else {
-        msg = `${error.message}. Pastikan provider 'Email/Password' sudah diaktifkan di Firebase Console Anda.`;
+        msg = `${error.message || 'Error saat otentikasi'}. Pastikan Email/Password aktif di Firebase Console.`;
       }
       setErrorMsg(msg);
     } finally {
@@ -522,6 +778,26 @@ const LoginGate: React.FC<LoginGateProps> = ({ loginWithGoogle, appName, appSubt
               </div>
             </form>
           )}
+        </div>
+
+        <div className="text-center pt-2">
+          <details className="group text-left bg-slate-900/60 rounded-ios p-3 border border-white/5 text-[11px] text-slate-400">
+            <summary className="font-bold text-blue-400 cursor-pointer flex items-center justify-between select-none">
+              <span>❓ Bantuan: Mengapa APK tidak bisa login?</span>
+              <span className="group-open:rotate-180 transition-transform text-xs">▼</span>
+            </summary>
+            <div className="mt-2.5 space-y-2 text-slate-300 leading-relaxed border-t border-white/5 pt-2">
+              <p>
+                <b>1. Google memblokir APK biasa:</b> Google memblokir login akun Google di dalam WebView aplikasi APK (aturan <i>disallowed_useragent</i>).
+              </p>
+              <p>
+                <b>2. Solusi Terbaik (PWA):</b> Buka link web di <b>Google Chrome HP</b> &rarr; klik titik tiga (⋮) di kanan atas &rarr; pilih <b>"Instal aplikasi"</b> atau <b>"Tambahkan ke Layar Utama"</b>. Aplikasi terpasang seperti APK asli dan Login Google berfungsi 100% normal.
+              </p>
+              <p>
+                <b>3. Jika tetap pakai APK:</b> Gunakan tab <b>"Email & Password"</b> di atas. Klik <i>"Daftar gratis disini"</i> untuk membuat akun pertama kali. (Pastikan provider Email/Password sudah diaktifkan di Firebase Console).
+              </p>
+            </div>
+          </details>
         </div>
 
         <div className="text-[10px] text-slate-500 font-medium tracking-tight mt-6">

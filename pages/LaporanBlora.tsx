@@ -244,13 +244,13 @@ const LaporanBlora: React.FC = () => {
       </div>
 
       {/* Filter Card */}
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm space-y-6">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-4 sm:p-6 rounded-ios-lg border border-white/80 dark:border-white/10 shadow-sm space-y-6 w-full">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 space-y-3">
             <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
               <Filter size={12}/> Jenis Laporan
             </label>
-            <div className="flex p-1 bg-slate-100 dark:bg-white/5 rounded-ios gap-1">
+            <div className="flex p-1 bg-slate-100/80 dark:bg-white/5 rounded-ios gap-1">
               <button 
                 onClick={() => setReportType('monthly')}
                 className={`flex-1 py-2 text-xs font-bold rounded-ios transition-all ${reportType === 'monthly' ? 'bg-white dark:bg-ios-secondary-dark shadow-sm text-ios-blue-light dark:text-ios-blue-dark' : 'text-slate-500'}`}
@@ -275,7 +275,7 @@ const LaporanBlora: React.FC = () => {
                 <select 
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                  className="w-full bg-slate-100 dark:bg-white/5 border-none px-4 py-2.5 rounded-ios font-bold text-slate-800 dark:text-slate-200 outline-none appearance-none cursor-pointer"
+                  className="w-full bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 px-4 py-2.5 rounded-ios font-bold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
                 >
                   {MONTHS.map((m, i) => (
                     <option key={i} value={i}>{m}</option>
@@ -291,7 +291,7 @@ const LaporanBlora: React.FC = () => {
                 type="number"
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(parseInt(e.target.value) || new Date().getFullYear())}
-                className="w-full bg-slate-100 dark:bg-white/5 border-none px-4 py-2.5 rounded-ios font-bold text-slate-800 dark:text-slate-200 outline-none"
+                className="w-full bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 px-4 py-2.5 rounded-ios font-bold text-slate-800 dark:text-slate-200 outline-none"
               />
             </div>
           </div>
@@ -299,7 +299,7 @@ const LaporanBlora: React.FC = () => {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
         <div className="bg-emerald-500 p-6 rounded-ios-lg text-white shadow-lg shadow-emerald-500/20 relative overflow-hidden group">
           <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
             <ArrowDownCircle size={120}/>
@@ -333,7 +333,7 @@ const LaporanBlora: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex flex-col justify-center">
+        <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-6 rounded-ios-lg border border-white/80 dark:border-white/10 shadow-sm flex flex-col justify-center">
           <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total Nilai Sisa</p>
           <p className="text-xl font-black text-slate-900 dark:text-white mt-1">Rp {totalValuation.toLocaleString('id-ID')}</p>
           <p className="text-[9px] text-slate-400 font-medium uppercase mt-1">Valuasi Sisa Barang</p>
@@ -341,22 +341,22 @@ const LaporanBlora: React.FC = () => {
       </div>
 
       {/* Table Section */}
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden">
-        <div className="p-5 border-b dark:border-white/5 flex items-center justify-between">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg shadow-sm border border-white/80 dark:border-white/10 overflow-hidden w-full">
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
           <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Rincian Transaksi & Stok Persediaan</h3>
-          <span className="text-[10px] font-bold bg-slate-100 dark:bg-white/5 px-3 py-1 rounded-full text-slate-500">
+          <span className="text-[10px] font-bold bg-slate-100/80 dark:bg-white/5 px-3 py-1 rounded-full text-slate-500">
             {summaryItems.length} Jenis Barang
           </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[800px]">
-            <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left min-w-full">
+            <thead className="bg-slate-50/70 dark:bg-white/5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b dark:border-white/5">
               <tr>
-                <th className="px-6 py-4">Jenis Barang</th>
-                <th className="px-6 py-4 text-center">Jumlah Masuk</th>
-                <th className="px-6 py-4 text-center">Jumlah Keluar</th>
-                <th className="px-6 py-4 text-center">Sisa Barang</th>
-                <th className="px-6 py-4 text-right">Nilai Sisa</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[35%]">Jenis Barang</th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[16%]">Jumlah Masuk</th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[16%]">Jumlah Keluar</th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[16%]">Sisa Barang</th>
+                <th className="px-4 sm:px-6 py-3.5 text-right w-[17%]">Nilai Sisa</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">

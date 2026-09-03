@@ -153,7 +153,7 @@ const RekapBulanan: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-4 theme-transition">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-4 sm:p-6 rounded-ios-lg border border-white/80 dark:border-white/10 shadow-sm flex items-center gap-4 theme-transition w-full">
         <div className="p-3 bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark rounded-ios">
           <Calendar size={24} />
         </div>
@@ -161,35 +161,35 @@ const RekapBulanan: React.FC = () => {
           <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wide">Pilih Tahun Laporan</label>
           <input 
             type="number" 
-            className="w-full max-w-[200px] bg-slate-100 dark:bg-white/5 border-none px-4 py-2 rounded-ios font-bold text-slate-800 dark:text-slate-200 outline-none transition-all text-lg" 
+            className="w-full max-w-[200px] bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 px-4 py-2 rounded-ios font-bold text-slate-800 dark:text-slate-200 outline-none transition-all text-lg" 
             value={selectedYear} 
             onChange={(e) => setSelectedYear(parseInt(e.target.value) || new Date().getFullYear())} 
           />
         </div>
       </div>
 
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
-        <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left text-[11px] min-w-[1200px]">
-            <thead className="bg-slate-50 dark:bg-white/5 font-bold border-b dark:border-white/5 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg shadow-sm border border-white/80 dark:border-white/10 overflow-hidden theme-transition w-full">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-[11px] min-w-full">
+            <thead className="bg-slate-50/70 dark:bg-white/5 font-bold border-b dark:border-white/5 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               <tr>
-                <th className="px-6 py-4 sticky left-0 bg-slate-50 dark:bg-ios-secondary-dark z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Nama Barang</th>
-                <th className="px-4 py-4 text-center w-20">Masuk</th>
+                <th className="px-4 sm:px-6 py-4 sticky left-0 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] min-w-[200px]">Nama Barang</th>
+                <th className="px-3 sm:px-4 py-4 text-center w-20">Masuk</th>
                 {MONTHS.map(m => (
-                  <th key={m} className="px-2 py-4 text-center w-16">{m.substring(0, 3)}</th>
+                  <th key={m} className="px-2 py-4 text-center w-14">{m.substring(0, 3)}</th>
                 ))}
-                <th className="px-4 py-4 text-center bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark">Total</th>
-                <th className="px-4 py-4 text-center w-20">Sisa</th>
+                <th className="px-3 sm:px-4 py-4 text-center bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark font-bold min-w-[70px]">Total</th>
+                <th className="px-3 sm:px-4 py-4 text-center w-20">Sisa</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {rekapTahunan.length > 0 ? rekapTahunan.map((r, idx) => (
-                <tr key={idx} className="hover:bg-ios-blue-light/5 dark:hover:bg-ios-blue-dark/5 transition-colors group">
-                  <td className="px-6 py-4 sticky left-0 bg-ios-secondary-light dark:bg-ios-secondary-dark group-hover:bg-ios-blue-light/5 dark:group-hover:bg-ios-blue-dark/5 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+                <tr key={idx} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group">
+                  <td className="px-4 sm:px-6 py-4 sticky left-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur group-hover:bg-blue-50/90 dark:group-hover:bg-slate-800/90 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                     <p className="font-bold text-slate-800 dark:text-slate-200">{r.namaBarang}</p>
                     <p className="text-[9px] text-slate-500 dark:text-slate-400 font-mono">{r.kodeBarang}</p>
                   </td>
-                  <td className="px-4 py-4 text-center font-bold text-emerald-600 dark:text-emerald-400">
+                  <td className="px-3 sm:px-4 py-4 text-center font-bold text-emerald-600 dark:text-emerald-400">
                     {r.totalMasuk || '-'}
                   </td>
                   {r.monthlyTotals.map((val, mIdx) => (
@@ -197,10 +197,10 @@ const RekapBulanan: React.FC = () => {
                       {val || '-'}
                     </td>
                   ))}
-                  <td className="px-4 py-4 text-center font-bold text-ios-blue-light dark:text-ios-blue-dark bg-ios-blue-light/10 dark:bg-ios-blue-dark/10">
+                  <td className="px-3 sm:px-4 py-4 text-center font-bold text-ios-blue-light dark:text-ios-blue-dark bg-ios-blue-light/10 dark:bg-ios-blue-dark/10">
                     {r.totalYear} <span className="text-[8px] text-slate-500 dark:text-slate-400 font-normal ml-1">{r.satuan}</span>
                   </td>
-                  <td className="px-4 py-4 text-center font-bold text-amber-600 dark:text-amber-400">
+                  <td className="px-3 sm:px-4 py-4 text-center font-bold text-amber-600 dark:text-amber-400">
                     {r.sisa}
                   </td>
                 </tr>
@@ -209,9 +209,9 @@ const RekapBulanan: React.FC = () => {
               )}
             </tbody>
             {rekapTahunan.length > 0 && (
-              <tfoot className="bg-slate-100 dark:bg-white/10 font-bold border-t border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-200">
+              <tfoot className="bg-slate-100/90 dark:bg-white/10 font-bold border-t border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-200">
                 <tr>
-                  <td className="px-6 py-4 sticky left-0 bg-slate-100 dark:bg-ios-secondary-dark z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] font-black uppercase">
+                  <td className="px-4 sm:px-6 py-4 sticky left-0 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] font-black uppercase">
                     Jumlah
                   </td>
                   <td className="px-4 py-4 text-center font-black text-emerald-600 dark:text-emerald-400">

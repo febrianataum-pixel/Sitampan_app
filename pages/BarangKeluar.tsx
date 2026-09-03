@@ -308,10 +308,10 @@ const BarangKeluar: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden theme-transition">
-        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg border border-white/80 dark:border-white/10 shadow-sm overflow-hidden theme-transition w-full">
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-ios">
+            <div className="p-2.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-ios border border-orange-500/20">
               <TrendingUp size={20} />
             </div>
             <div>
@@ -322,10 +322,10 @@ const BarangKeluar: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             {/* Filter Bulan */}
-            <div className="flex-1 lg:flex-initial min-w-[140px]">
+            <div className="flex-1 sm:flex-initial min-w-[140px]">
               <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bulan</label>
               <select
-                className="w-full text-xs font-bold bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                className="w-full text-xs font-bold bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
                 value={filterMonth}
                 onChange={(e) => setFilterMonth(e.target.value)}
               >
@@ -337,10 +337,10 @@ const BarangKeluar: React.FC = () => {
             </div>
 
             {/* Filter Bencana */}
-            <div className="flex-1 lg:flex-initial min-w-[170px]">
+            <div className="flex-1 sm:flex-initial min-w-[170px]">
               <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bencana</label>
               <select
-                className="w-full text-xs font-bold bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                className="w-full text-xs font-bold bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
                 value={filterDisaster}
                 onChange={(e) => setFilterDisaster(e.target.value)}
               >
@@ -365,54 +365,54 @@ const BarangKeluar: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left min-w-[1000px]">
-            <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b dark:border-white/5 select-none">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left min-w-full">
+            <thead className="bg-slate-50/70 dark:bg-white/5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b dark:border-white/5 select-none">
               <tr>
-                <th className="px-6 py-3 w-12 text-center">No.</th>
+                <th className="px-4 sm:px-6 py-3.5 w-12 text-center">No.</th>
                 <th 
-                  className={`px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${sortConfig.key === 'tanggal' ? 'text-ios-blue-light dark:text-ios-blue-dark' : ''}`}
+                  className={`px-4 sm:px-6 py-3.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors w-[15%] ${sortConfig.key === 'tanggal' ? 'text-ios-blue-light dark:text-ios-blue-dark' : ''}`}
                   onClick={() => handleSort('tanggal')}
                 >
                   <div className="flex items-center gap-2">Tanggal Transaksi {renderSortIcon('tanggal')}</div>
                 </th>
                 <th 
-                  className={`px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${sortConfig.key === 'penerima' ? 'text-ios-blue-light dark:text-ios-blue-dark' : ''}`}
+                  className={`px-4 sm:px-6 py-3.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors w-[22%] ${sortConfig.key === 'penerima' ? 'text-ios-blue-light dark:text-ios-blue-dark' : ''}`}
                   onClick={() => handleSort('penerima')}
                 >
                   <div className="flex items-center gap-2">Nama Penerima {renderSortIcon('penerima')}</div>
                 </th>
                 <th 
-                  className={`px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${sortConfig.key === 'alamat' ? 'text-ios-blue-light dark:text-ios-blue-dark' : ''}`}
+                  className={`px-4 sm:px-6 py-3.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors w-[22%] ${sortConfig.key === 'alamat' ? 'text-ios-blue-light dark:text-ios-blue-dark' : ''}`}
                   onClick={() => handleSort('alamat')}
                 >
                   <div className="flex items-center gap-2">Alamat / Tujuan {renderSortIcon('alamat')}</div>
                 </th>
-                <th className="px-6 py-3">Jenis Bencana</th>
-                <th className="px-6 py-3">Status / Dokumentasi</th>
-                <th className="px-6 py-3 text-center">Aksi</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[15%]">Jenis Bencana</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[14%]">Status / Dokumentasi</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[12%] text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {sortedOutbound.map((o, index) => {
                 const isTuntas = o.images && o.images.length > 0;
                 return (
-                  <tr key={o.id} className="hover:bg-ios-blue-light/5 dark:hover:bg-ios-blue-dark/5 transition-colors group">
-                    <td className="px-6 py-4 text-center text-xs font-bold text-slate-300 dark:text-slate-700">{index + 1}</td>
-                    <td className="px-6 py-4 text-slate-400 dark:text-slate-500 text-xs font-semibold whitespace-nowrap">
+                  <tr key={o.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group">
+                    <td className="px-4 sm:px-6 py-4 text-center text-xs font-bold text-slate-300 dark:text-slate-700">{index + 1}</td>
+                    <td className="px-4 sm:px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-semibold whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className={`w-1.5 h-1.5 rounded-full ${isTuntas ? 'bg-emerald-500' : 'bg-ios-blue-light'}`}></div>
                         {formatIndoDate(o.tanggal)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-sm">{o.penerima}</td>
-                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-medium max-w-[250px] truncate" title={o.alamat}>
+                    <td className="px-4 sm:px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-sm">{o.penerima}</td>
+                    <td className="px-4 sm:px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-medium max-w-[250px] truncate" title={o.alamat}>
                       <div className="flex items-center gap-1.5">
-                        <MapPin size={12} className="text-slate-300 dark:text-slate-700 shrink-0"/>
+                        <MapPin size={12} className="text-slate-400 dark:text-slate-600 shrink-0"/>
                         <span className="truncate">{o.alamat || '-'}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">{o.jenisBencana || '-'}</span>
                         <span className="text-[9px] text-slate-500 dark:text-slate-400 italic truncate max-w-[150px]">
@@ -420,7 +420,7 @@ const BarangKeluar: React.FC = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-4">
                       {isTuntas ? (
                         <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full w-fit border border-emerald-100 dark:border-emerald-800/30">
                           <CheckCircle2 size={12}/>
@@ -433,7 +433,7 @@ const BarangKeluar: React.FC = () => {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex justify-center gap-1">
                         {hasPermission('keluar', 'edit') && (
                           <button onClick={() => { setUploadingTxId(o.id); setIsUploadModalOpen(true); }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all"><Camera size={16}/></button>

@@ -259,10 +259,10 @@ const BarangMasuk: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm theme-transition">
-        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg border border-white/80 dark:border-white/10 overflow-hidden shadow-sm theme-transition w-full">
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-ios">
+            <div className="p-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-ios border border-emerald-500/20">
               <TrendingUp size={20} />
             </div>
             <div>
@@ -270,28 +270,28 @@ const BarangMasuk: React.FC = () => {
               <p className="text-xl font-black text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</p>
             </div>
           </div>
-          <div className="relative group flex-1 max-w-md">
+          <div className="relative group flex-1 max-w-md w-full">
              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light transition-colors" size={18} />
              <input 
               type="text" 
-              placeholder="Cari transaksi..." 
-              className="w-full pl-12 pr-6 py-2 bg-slate-100 dark:bg-white/5 border-none rounded-full outline-none text-sm font-medium transition-all dark:text-slate-200"
+              placeholder="Cari transaksi berdasarkan nama atau kode..." 
+              className="w-full pl-12 pr-6 py-2.5 bg-slate-100/80 dark:bg-white/5 border-none rounded-full outline-none text-sm font-medium transition-all dark:text-slate-200"
               value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} 
             />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[850px]">
-            <thead className="bg-slate-50 dark:bg-white/5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b dark:border-white/5">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left min-w-full">
+            <thead className="bg-slate-50/70 dark:bg-white/5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b dark:border-white/5">
               <tr>
-                <th className="px-6 py-3">Tanggal</th>
-                <th className="px-6 py-3">Nama Barang</th>
-                <th className="px-6 py-3">Kode Barang</th>
-                <th className="px-6 py-3">Satuan</th>
-                <th className="px-6 py-3">Jumlah</th>
-                <th className="px-6 py-3">Total Nilai</th>
-                <th className="px-6 py-3 text-center">Aksi</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[14%]">Tanggal</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[28%]">Nama Barang</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[14%]">Kode Barang</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[10%]">Satuan</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[12%]">Jumlah</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[14%]">Total Nilai</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[8%] text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -299,14 +299,14 @@ const BarangMasuk: React.FC = () => {
                 const p = products.find(prod => prod.id === i.productId);
                 const total = (p?.harga || 0) * i.jumlah;
                 return (
-                  <tr key={i.id} className="hover:bg-ios-blue-light/5 dark:hover:bg-ios-blue-dark/5 transition-colors group">
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">{formatIndoDate(i.tanggal)}</td>
-                    <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-sm">{p?.namaBarang}</td>
-                    <td className="px-6 py-4 font-mono text-xs font-bold text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-tight">{p?.kodeBarang}</td>
-                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase">{p?.satuan}</td>
-                    <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">+{i.jumlah}</td>
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {total.toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4">
+                  <tr key={i.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group">
+                    <td className="px-4 sm:px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatIndoDate(i.tanggal)}</td>
+                    <td className="px-4 sm:px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-sm">{p?.namaBarang}</td>
+                    <td className="px-4 sm:px-6 py-4 font-mono text-xs font-bold text-ios-blue-light dark:text-ios-blue-dark uppercase tracking-tight">{p?.kodeBarang}</td>
+                    <td className="px-4 sm:px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase">{p?.satuan}</td>
+                    <td className="px-4 sm:px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">+{i.jumlah}</td>
+                    <td className="px-4 sm:px-6 py-4 font-bold text-slate-900 dark:text-slate-100">Rp {total.toLocaleString('id-ID')}</td>
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex justify-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         {hasPermission('masuk', 'edit') && (
                           <button onClick={() => handleOpenModal(i)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios"><Edit2 size={16} /></button>

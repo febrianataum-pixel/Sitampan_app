@@ -239,7 +239,7 @@ const CetakBeritaAcara: React.FC = () => {
       container.style.backgroundColor = '#ffffff';
       container.style.padding = '50px 45px';
       container.style.boxSizing = 'border-box';
-      container.style.fontFamily = "'Inter', Arial, Helvetica, sans-serif";
+      container.style.fontFamily = "'Urbanist', Arial, Helvetica, sans-serif";
       container.style.display = 'flex';
       container.style.flexDirection = 'column';
       container.style.alignItems = 'center';
@@ -615,8 +615,8 @@ const CetakBeritaAcara: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
-        <div className="px-6 py-4 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg shadow-sm border border-white/80 dark:border-white/10 overflow-hidden theme-transition w-full">
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             Daftar Berita Acara & SPPB
           </div>
@@ -624,7 +624,7 @@ const CetakBeritaAcara: React.FC = () => {
             {/* Filter Bulan */}
             <div className="flex-1 sm:flex-initial min-w-[160px]">
               <select
-                className="w-full text-xs font-bold bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                className="w-full text-xs font-bold bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
                 value={filterMonth}
                 onChange={(e) => setFilterMonth(e.target.value)}
               >
@@ -645,25 +645,25 @@ const CetakBeritaAcara: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left text-sm min-w-[700px]">
-            <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] border-b dark:border-white/5 uppercase tracking-wide">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-sm min-w-full">
+            <thead className="bg-slate-50/70 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] border-b dark:border-white/5 uppercase tracking-wide">
               <tr>
-                <th className="px-6 py-4 w-12 text-center">No.</th>
-                <th className="px-6 py-4 cursor-pointer hover:text-slate-700 transition-colors" onClick={() => handleSort('tanggal')}><div className="flex items-center gap-2">Tanggal {renderSortIcon('tanggal')}</div></th>
-                <th className="px-6 py-4 cursor-pointer hover:text-slate-700 transition-colors" onClick={() => handleSort('penerima')}><div className="flex items-center gap-2">Nama Penerima {renderSortIcon('penerima')}</div></th>
-                <th className="px-6 py-4 cursor-pointer hover:text-slate-700 transition-colors" onClick={() => handleSort('alamat')}><div className="flex items-center gap-2">Tujuan {renderSortIcon('alamat')}</div></th>
-                <th className="px-6 py-4 text-center">Aksi</th>
+                <th className="px-4 sm:px-6 py-3.5 w-12 text-center">No.</th>
+                <th className="px-4 sm:px-6 py-3.5 cursor-pointer hover:text-slate-700 transition-colors w-[18%]" onClick={() => handleSort('tanggal')}><div className="flex items-center gap-2">Tanggal {renderSortIcon('tanggal')}</div></th>
+                <th className="px-4 sm:px-6 py-3.5 cursor-pointer hover:text-slate-700 transition-colors w-[30%]" onClick={() => handleSort('penerima')}><div className="flex items-center gap-2">Nama Penerima {renderSortIcon('penerima')}</div></th>
+                <th className="px-4 sm:px-6 py-3.5 cursor-pointer hover:text-slate-700 transition-colors w-[27%]" onClick={() => handleSort('alamat')}><div className="flex items-center gap-2">Tujuan {renderSortIcon('alamat')}</div></th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[25%]">Aksi Dokumen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {sortedOutbound.map((o, idx) => (
-                <tr key={o.id} className="hover:bg-ios-blue-light/5 dark:hover:bg-ios-blue-dark/5 transition-colors group">
-                  <td className="px-6 py-4 text-center text-xs font-bold text-slate-300 dark:text-slate-700">{idx + 1}</td>
-                  <td className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400">{formatIndoDate(o.tanggal)}</td>
-                  <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 italic">{o.penerima}</td>
-                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{o.alamat || '-'}</td>
-                  <td className="px-6 py-4 text-center">
+                <tr key={o.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group">
+                  <td className="px-4 sm:px-6 py-4 text-center text-xs font-bold text-slate-300 dark:text-slate-700">{idx + 1}</td>
+                  <td className="px-4 sm:px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatIndoDate(o.tanggal)}</td>
+                  <td className="px-4 sm:px-6 py-4 font-bold text-slate-800 dark:text-slate-200">{o.penerima}</td>
+                  <td className="px-4 sm:px-6 py-4 text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{o.alamat || '-'}</td>
+                  <td className="px-4 sm:px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button onClick={() => { setDocType('BA'); setSelectedTx(o); }} className="text-ios-blue-light dark:text-ios-blue-dark font-bold bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 px-3 py-1.5 rounded-ios text-[10px] uppercase hover:bg-ios-blue-light dark:hover:bg-ios-blue-dark hover:text-white transition-all cursor-pointer">BA</button>
                       <button onClick={() => { setDocType('SPPB'); setSelectedTx(o); }} className="text-emerald-500 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-ios text-[10px] uppercase hover:bg-emerald-500 hover:text-white transition-all cursor-pointer">SPPB</button>

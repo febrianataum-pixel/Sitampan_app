@@ -424,15 +424,15 @@ const Dokumen: React.FC = () => {
       </div>
 
       {/* Filters & Search */}
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-4 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex flex-col md:flex-row gap-4 theme-transition">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl p-4 rounded-ios-lg border border-white/80 dark:border-white/10 shadow-sm flex flex-col md:flex-row gap-4 theme-transition w-full">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
           <input 
-            type="text"
-            placeholder="Cari judul atau deskripsi..."
+            type="text" 
+            placeholder="Cari judul atau deskripsi..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-white/5 border-none rounded-ios outline-none font-medium text-sm"
+            className="w-full pl-10 pr-4 py-2 bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios outline-none font-medium text-sm text-slate-800 dark:text-slate-200"
           />
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 md:pb-0">
@@ -440,7 +440,7 @@ const Dokumen: React.FC = () => {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-ios text-xs font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-ios-blue-light dark:bg-ios-blue-dark text-white shadow-sm' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'}`}
+              className={`px-4 py-2 rounded-ios text-xs font-bold whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-ios-blue-light dark:bg-ios-blue-dark text-white shadow-sm' : 'bg-slate-100/80 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'}`}
             >
               {cat}
             </button>
@@ -450,7 +450,7 @@ const Dokumen: React.FC = () => {
 
       {/* Document Grid */}
       {filteredDocuments.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 w-full">
           {filteredDocuments.map(doc => (
             <div key={doc.id} className="group bg-white dark:bg-ios-secondary-dark rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden hover:shadow-md transition-all flex flex-col">
               <div className="p-4 flex-1 space-y-3">

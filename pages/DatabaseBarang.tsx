@@ -161,17 +161,17 @@ const DatabaseBarang: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden theme-transition">
-        <div className="px-6 py-3 bg-ios-secondary-light dark:bg-ios-secondary-dark border-b border-slate-100 dark:border-white/5 flex items-center relative group">
-          <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light" size={18} />
-          <input type="text" placeholder="Cari barang..." className="w-full pl-12 pr-4 py-2.5 bg-slate-100 dark:bg-white/5 border-none rounded-full outline-none text-sm font-medium dark:text-slate-200" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg shadow-sm border border-white/80 dark:border-white/10 overflow-hidden theme-transition w-full">
+        <div className="px-4 sm:px-6 py-3.5 border-b border-slate-100 dark:border-white/5 flex items-center relative group">
+          <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light" size={18} />
+          <input type="text" placeholder="Cari barang berdasarkan nama atau kode..." className="w-full pl-12 pr-4 py-2.5 bg-slate-100/80 dark:bg-white/5 border-none rounded-full outline-none text-sm font-medium dark:text-slate-200" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
 
-        <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left min-w-[650px]">
-            <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wide border-b dark:border-white/5">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left min-w-full">
+            <thead className="bg-slate-50/70 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-wide border-b dark:border-white/5">
               <tr>
-                <th className="px-6 py-3 w-12 text-center">
+                <th className="px-4 sm:px-6 py-3.5 w-12 text-center">
                   <button onClick={() => {
                     if (selectedIds.size === filteredProducts.length) setSelectedIds(new Set());
                     else setSelectedIds(new Set(filteredProducts.map(p => p.id)));
@@ -179,28 +179,28 @@ const DatabaseBarang: React.FC = () => {
                     {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare size={18} className="text-ios-blue-light dark:text-ios-blue-dark" /> : <Square size={18} />}
                   </button>
                 </th>
-                <th className="px-6 py-3">Kode</th>
-                <th className="px-6 py-3">Nama Barang</th>
-                <th className="px-6 py-3">Kategori</th>
-                <th className="px-6 py-3">Satuan</th>
-                <th className="px-6 py-3">Harga</th>
-                <th className="px-6 py-3 text-center">Aksi</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[15%]">Kode</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[30%]">Nama Barang</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[15%]">Kategori</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[10%]">Satuan</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[15%]">Harga</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[15%] text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {filteredProducts.map((p) => (
-                <tr key={p.id} className={`hover:bg-ios-blue-light/5 dark:hover:bg-ios-blue-dark/5 transition-colors ${selectedIds.has(p.id) ? 'bg-ios-blue-light/10 dark:bg-ios-blue-dark/10' : ''}`}>
-                  <td className="px-6 py-4 text-center">
+                <tr key={p.id} className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${selectedIds.has(p.id) ? 'bg-blue-500/10 dark:bg-blue-500/20' : ''}`}>
+                  <td className="px-4 sm:px-6 py-4 text-center">
                     <button onClick={() => toggleSelect(p.id)}>
                       {selectedIds.has(p.id) ? <CheckSquare size={18} className="text-ios-blue-light dark:text-ios-blue-dark" /> : <Square size={18} className="text-slate-200 dark:text-slate-800" />}
                     </button>
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs text-ios-blue-light dark:text-ios-blue-dark font-bold">{p.kodeBarang}</td>
-                  <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-sm">{p.namaBarang}</td>
-                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">{p.kategori || '-'}</td>
-                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">{p.satuan}</td>
-                  <td className="px-6 py-4 font-bold text-slate-900 dark:text-slate-100 text-sm">Rp {p.harga.toLocaleString('id-ID')}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 sm:px-6 py-4 font-mono text-xs text-ios-blue-light dark:text-ios-blue-dark font-bold">{p.kodeBarang}</td>
+                  <td className="px-4 sm:px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-sm">{p.namaBarang}</td>
+                  <td className="px-4 sm:px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">{p.kategori || '-'}</td>
+                  <td className="px-4 sm:px-6 py-4 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase">{p.satuan}</td>
+                  <td className="px-4 sm:px-6 py-4 font-bold text-slate-900 dark:text-slate-100 text-sm">Rp {p.harga.toLocaleString('id-ID')}</td>
+                  <td className="px-4 sm:px-6 py-4">
                     <div className="flex justify-center gap-1">
                       {hasPermission('database', 'edit') && (
                         <button onClick={() => handleOpenModal(p)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark"><Edit2 size={16} /></button>
@@ -213,7 +213,7 @@ const DatabaseBarang: React.FC = () => {
                 </tr>
               ))}
               {filteredProducts.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Database kosong.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Database kosong.</td></tr>
               )}
             </tbody>
           </table>

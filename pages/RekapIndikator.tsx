@@ -596,13 +596,13 @@ const RekapIndikator: React.FC = () => {
       )}
 
       {/* 7. Rekap Data Barang (Table) - MOVED TO TOP */}
-      <div className="bg-white dark:bg-ios-secondary-dark rounded-ios-lg shadow-sm border border-slate-200 dark:border-white/5 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-white/5">
+      <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg shadow-sm border border-white/80 dark:border-white/10 overflow-hidden w-full">
+        <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-white/5">
           <div className="flex items-center gap-2">
             <PackageSearch className="text-ios-blue-light" size={20} />
-            <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Rekap Data Barang & Nominal</h3>
+            <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight text-sm sm:text-base">Rekap Data Barang & Nominal</h3>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 self-end sm:self-auto">
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-black text-slate-400 uppercase">Grand Total</span>
               <span className="text-lg font-black text-ios-blue-light">{formatCurrency(grandTotal)}</span>
@@ -616,8 +616,8 @@ const RekapIndikator: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left min-w-full">
             <thead className="bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] uppercase tracking-widest border-b dark:border-white/5">
               <tr>
                 <th className="px-6 py-4">Nama Barang</th>

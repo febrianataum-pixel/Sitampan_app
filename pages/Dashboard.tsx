@@ -2,6 +2,17 @@
 import React, { useMemo, useState } from 'react';
 import { useInventory } from '../App';
 import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ReferenceLine 
+} from 'recharts';
+import { 
   Package, 
   ArrowDownCircle, 
   ArrowUpCircle, 
@@ -15,7 +26,12 @@ import {
   History,
   Smartphone,
   Info,
-  ChevronRight
+  ChevronRight,
+  Users,
+  Calendar,
+  Activity,
+  Search,
+  Sparkles
 } from 'lucide-react';
 import { formatIndoDate } from '../types';
 
@@ -168,6 +184,83 @@ const Dashboard: React.FC = () => {
     }).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
   }, [selectedKecName, outbound]);
 
+  // 6. Trend Pergerakan Bantuan (Berdasarkan Nama Penerima di Menu Keluar)
+  const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    const current = new Date().getFullYear();
+    years.add(current);
+    outbound.forEach(tx => {
+      if (tx.tanggal) {
+        const y = new Date(tx.tanggal).getFullYear();
+        if (!isNaN(y) && y > 2000 && y < 2100) years.add(y);
+      }
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [outbound]);
+
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
+    return new Date().getFullYear();
+  });
+
+  const [selectedMonthIdx, setSelectedMonthIdx] = useState<number | null>(null);
+  const [monthSearchQuery, setMonthSearchQuery] = useState('');
+
+  // Perhitungan Data Trend Bulanan Berdasarkan Jumlah Nama Penerima di Menu Keluar
+  const monthlyTrendData = useMemo(() => {
+    return MONTH_LABELS.map((name, index) => {
+      const monthTxs = outbound.filter(tx => {
+        if (!tx.tanggal) return false;
+        const d = new Date(tx.tanggal);
+        if (isNaN(d.getTime())) return false;
+        return d.getFullYear() === selectedYear && d.getMonth() === index;
+      });
+
+      // Validasi penerima di menu keluar
+      const validTxs = monthTxs.filter(tx => tx.penerima && tx.penerima.trim().length > 0);
+      const recipientNames = Array.from(new Set(validTxs.map(tx => tx.penerima.trim())));
+
+      const penerimaCount = validTxs.length;
+      const totalTransaksi = monthTxs.length;
+      const totalItems = monthTxs.reduce((sum, tx) => 
+        sum + (tx.items || []).reduce((iSum, it) => iSum + (it.jumlah || 0), 0), 0
+      );
+
+      return {
+        month: name,
+        monthIndex: index,
+        penerima: penerimaCount,
+        uniquePenerima: recipientNames.length,
+        transaksi: totalTransaksi,
+        totalItems,
+        recipientList: recipientNames,
+        transactions: monthTxs
+      };
+    });
+  }, [outbound, selectedYear]);
+
+  // Statistik Ringkasan Trend
+  const trendStats = useMemo(() => {
+    const totalPenerima = monthlyTrendData.reduce((acc, curr) => acc + curr.penerima, 0);
+    const totalTransaksi = monthlyTrendData.reduce((acc, curr) => acc + curr.transaksi, 0);
+    const totalLogistik = monthlyTrendData.reduce((acc, curr) => acc + curr.totalItems, 0);
+    const avgPenerima = totalPenerima > 0 ? Number((totalPenerima / 12).toFixed(1)) : 0;
+    
+    let peak = monthlyTrendData[0];
+    monthlyTrendData.forEach(m => {
+      if (m.penerima > peak.penerima) peak = m;
+    });
+
+    return {
+      totalPenerima,
+      totalTransaksi,
+      totalLogistik,
+      avgPenerima,
+      peakMonth: peak.penerima > 0 ? peak : null
+    };
+  }, [monthlyTrendData]);
+
   return (
     <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 pb-24 md:pb-10">
       
@@ -213,175 +306,259 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Peta Sebaran Realtime & Sidebar Info (Blora Map) */}
+      {/* Trend Pergerakan Bantuan & Sidebar Info */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
-        {/* PETA BLORA INTERAKTIF */}
+        {/* GRAFIK TREND PERGERAKAN BANTUAN (BERDASARKAN PENERIMA) */}
         <div className="lg:col-span-8 flex flex-col space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
-              <MapPin size={14} className="text-rose-500 animate-pulse"/> Peta Sebaran Distribusi (Kabupaten Blora)
-            </h3>
-            <span className="text-[9px] bg-rose-500/10 text-rose-600 dark:text-rose-450 font-black px-2 py-0.5 rounded uppercase tracking-wider">
-              Klik Kecamatan untuk Rincian
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2">
+            <div>
+              <h3 className="text-xs md:text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                <TrendingUp size={16} className="text-[#3b5bfd] animate-pulse"/> Trend Pergerakan Bantuan
+              </h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                Jumlah pergerakan bantuan per bulan dilihat dari nama penerima di menu keluar
+              </p>
+            </div>
+
+            {/* Top Right: Legend & Year Selector */}
+            <div className="flex items-center gap-3">
+              {/* Legend matching reference image */}
+              <div className="flex items-center gap-3 text-[10px] font-bold">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#3b5bfd]"></span>
+                  <span className="text-slate-700 dark:text-slate-300">Penerima Bantuan</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#f43f5e]"></span>
+                  <span className="text-slate-700 dark:text-slate-300">Total Penyaluran</span>
+                </div>
+              </div>
+
+              {/* Year Selector */}
+              {availableYears.length > 1 && (
+                <div className="relative">
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-[10px] font-black rounded-lg px-2.5 py-1 text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
+                  >
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>Tahun {year}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-6 md:p-8 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex flex-col items-center justify-center relative overflow-hidden min-h-[500px]">
+          <div className="bg-ios-secondary-light dark:bg-ios-secondary-dark p-4 md:p-6 rounded-ios-lg border border-slate-200 dark:border-white/5 shadow-sm flex flex-col justify-between relative overflow-hidden min-h-[500px]">
             {/* Ambient background glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-rose-500/5 dark:bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[380px] bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-            {/* Map Legend */}
-            <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-3 rounded-ios border border-slate-200 dark:border-white/5 text-[9px] font-bold uppercase tracking-wider space-y-1.5 z-10 shadow-sm">
-              <p className="text-slate-400 mb-1 font-black">Status Penyaluran</p>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"></span>
-                <span className="text-slate-600 dark:text-slate-300">0 Kali Penyaluran</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-rose-500/30 border border-rose-500/40"></span>
-                <span className="text-slate-600 dark:text-slate-300">1 - 2 Kali</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-rose-500/60 border border-rose-500/80"></span>
-                <span className="text-slate-600 dark:text-slate-300">3 - 4 Kali</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-rose-600 border border-rose-700"></span>
-                <span className="text-slate-600 dark:text-slate-300 font-extrabold text-slate-800 dark:text-white">5+ Kali</span>
-              </div>
-            </div>
+            {/* Recharts Area & Line Chart */}
+            <div className="w-full relative z-10">
+              <div className="h-[340px] md:h-[370px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={monthlyTrendData}
+                    margin={{ top: 25, right: 15, left: -20, bottom: 5 }}
+                    onClick={(data: any) => {
+                      if (data && data.activePayload && data.activePayload.length > 0) {
+                        setSelectedMonthIdx(data.activePayload[0].payload.monthIndex);
+                      }
+                    }}
+                  >
+                    <defs>
+                      <linearGradient id="colorTrendPenerima" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b5bfd" stopOpacity={0.45}/>
+                        <stop offset="50%" stopColor="#3b5bfd" stopOpacity={0.18}/>
+                        <stop offset="95%" stopColor="#3b5bfd" stopOpacity={0.02}/>
+                      </linearGradient>
+                    </defs>
 
-            {/* Compass / Directions Marker */}
-            <div className="absolute top-4 left-4 text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-2 font-bold uppercase">
-              <Info size={12}/> Klik wilayah untuk melihat daftar pengiriman
-            </div>
+                    <CartesianGrid 
+                      strokeDasharray="4 4" 
+                      vertical={false} 
+                      stroke="currentColor" 
+                      className="text-slate-200/80 dark:text-white/5" 
+                    />
 
-            {/* SVG Map Container */}
-            <div className="w-full max-w-xl aspect-[500/450] relative z-10 flex items-center justify-center">
-              <svg 
-                viewBox="0 0 500 450" 
-                className="w-full h-full drop-shadow-lg select-none"
-              >
-                {/* Compass graphic */}
-                <g transform="translate(60, 200)" className="opacity-30 dark:opacity-50">
-                  <line x1="0" y1="-22" x2="0" y2="22" stroke="currentColor" strokeWidth="1.5" />
-                  <line x1="-22" y1="0" x2="22" y2="0" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" />
-                  <polygon points="0,-22 -4,-4 0,-8" fill="currentColor" />
-                  <polygon points="0,-22 4,-4 0,-8" fill="currentColor" className="opacity-60" />
-                  <text x="0" y="-28" fontSize="11" fontWeight="900" textAnchor="middle" fill="currentColor">U</text>
-                </g>
+                    <XAxis 
+                      dataKey="month" 
+                      fontSize={11} 
+                      fontWeight={700} 
+                      tick={{ fill: '#64748b' }} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      dy={8} 
+                    />
 
-                {/* Sub-district SVG geographic paths */}
-                {BLORA_KECAMATAN_DATA.map((kec) => {
-                  const dbName = kec.name;
-                  const totalPenyaluran = distributionByKecamatan.find(
-                    d => d.name.toLowerCase() === dbName.toLowerCase() || 
-                         d.name.toLowerCase().includes(dbName.toLowerCase())
-                  )?.value || 0;
+                    <YAxis 
+                      fontSize={10} 
+                      fontWeight={700} 
+                      tick={{ fill: '#64748b' }} 
+                      axisLine={false} 
+                      tickLine={false} 
+                      dx={-4}
+                      domain={[0, (dataMax: number) => Math.max(Math.ceil(dataMax * 1.25), 10)]}
+                      allowDecimals={false}
+                    />
 
-                  const isHovered = hoveredKecId === kec.id;
-
-                  // Define dynamic styling based on the active shipment count
-                  let strokeWidth = isHovered ? 2.5 : 1.2;
-                  let opacity = 0.4;
-                  if (totalPenyaluran > 0) {
-                    opacity = 0.5 + Math.min(totalPenyaluran * 0.12, 0.5);
-                  }
-
-                  const getDynamicFillClass = () => {
-                    if (totalPenyaluran === 0) {
-                      return 'fill-slate-100 dark:fill-slate-800 stroke-slate-200 dark:stroke-slate-700/60 text-slate-350 dark:text-slate-700';
-                    }
-                    return ''; // Handled by inline styles for vector precision
-                  };
-
-                  return (
-                    <g key={kec.id}>
-                      <path
-                        d={kec.path}
-                        className={`transition-all duration-300 cursor-pointer ${getDynamicFillClass()} ${
-                          isHovered 
-                            ? 'drop-shadow-[0_0_12px_rgba(239,68,68,0.35)] brightness-105 scale-[1.015]' 
-                            : 'hover:brightness-105 active:scale-[0.995]'
-                        }`}
-                        style={totalPenyaluran > 0 ? {
-                          fill: kec.originalColor,
-                          fillOpacity: opacity,
-                          stroke: isHovered ? '#ef4444' : 'rgba(255, 255, 255, 0.75)',
-                          strokeWidth: strokeWidth,
-                          transformOrigin: `${kec.labelX}px ${kec.labelY}px`
-                        } : {
-                          stroke: isHovered ? '#ef4444' : 'rgba(150, 150, 150, 0.25)',
-                          transformOrigin: `${kec.labelX}px ${kec.labelY}px`
-                        }}
-                        onMouseEnter={() => setHoveredKecId(kec.id)}
-                        onMouseLeave={() => setHoveredKecId(null)}
-                        onClick={() => setSelectedKecName(kec.name)}
+                    {trendStats.avgPenerima > 0 && (
+                      <ReferenceLine 
+                        y={trendStats.avgPenerima} 
+                        stroke="#94a3b8" 
+                        strokeDasharray="4 4" 
+                        strokeOpacity={0.75} 
+                        label={{ 
+                          value: `Rata-rata (${trendStats.avgPenerima})`, 
+                          fill: '#94a3b8', 
+                          fontSize: 9, 
+                          fontWeight: 700, 
+                          position: 'insideTopRight' 
+                        }} 
                       />
+                    )}
 
-                      {/* Subdistrict Name Text Badge overlay */}
-                      <g 
-                        className="pointer-events-none transition-all duration-300"
-                        style={{ opacity: isHovered ? 1 : 0.85 }}
-                      >
-                        <text
-                          x={kec.labelX}
-                          y={kec.labelY}
-                          className="text-[9px] font-black uppercase text-center select-none"
-                          textAnchor="middle"
-                          fill={totalPenyaluran > 0 ? '#ffffff' : '#94a3b8'}
-                          style={{
-                            textShadow: totalPenyaluran > 0 ? '1px 1px 2px rgba(0,0,0,0.85), -1px -1px 2px rgba(0,0,0,0.85)' : 'none',
-                          }}
-                        >
-                          {kec.name}
-                        </text>
-                        {totalPenyaluran > 0 && (
-                          <text
-                            x={kec.labelX}
-                            y={kec.labelY + 8}
-                            className="text-[8px] font-bold text-center select-none"
-                            textAnchor="middle"
-                            fill="#ffe4e6"
-                            style={{
-                              textShadow: '1px 1px 1px rgba(0,0,0,0.85)'
-                            }}
-                          >
-                            {totalPenyaluran}x
-                          </text>
-                        )}
-                      </g>
-                    </g>
-                  );
-                })}
-              </svg>
+                    <Tooltip 
+                      content={({ active, payload, label }: any) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0]?.payload;
+                          const penerimaVal = payload.find((p: any) => p.dataKey === 'penerima')?.value ?? 0;
+                          const transaksiVal = payload.find((p: any) => p.dataKey === 'transaksi')?.value ?? 0;
 
-              {/* Float popover details on hover */}
-              {hoveredKecId && (() => {
-                const kec = BLORA_KECAMATAN_DATA.find(k => k.id === hoveredKecId);
-                if (!kec) return null;
-                const totalPenyaluran = distributionByKecamatan.find(
-                  d => d.name.toLowerCase() === kec.name.toLowerCase() || 
-                       d.name.toLowerCase().includes(kec.name.toLowerCase())
-                )?.value || 0;
+                          return (
+                            <div className="flex flex-col items-center pointer-events-none select-none z-50">
+                              {/* Floating Top Pill Badge matching reference image */}
+                              <div className="mb-2 bg-[#3b5bfd] text-white text-[11px] font-black px-3.5 py-1 rounded-full shadow-lg shadow-blue-500/40 border border-blue-400/40 flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                                <span>{penerimaVal}</span>
+                                <span className="text-[9px] font-bold opacity-80 uppercase tracking-wider">Penerima</span>
+                              </div>
 
-                return (
-                  <div className="absolute top-4 right-4 bg-slate-900/95 dark:bg-slate-950/95 text-white p-4 rounded-ios border border-white/10 shadow-2xl space-y-2 animate-in fade-in zoom-in-95 duration-150 max-w-[220px] z-20 text-left">
-                    <p className="text-[10px] font-black text-rose-450 uppercase tracking-widest">Kecamatan</p>
-                    <p className="text-sm font-black tracking-tight">{kec.name}</p>
-                    <div className="border-t border-white/10 my-1 pt-1.5 space-y-0.5">
-                      <p className="text-[9px] text-slate-400 font-bold uppercase">Total Penyaluran:</p>
-                      <p className="text-lg font-black text-rose-400">
-                        {totalPenyaluran} <span className="text-xs font-normal text-slate-300">Transaksi</span>
-                      </p>
-                    </div>
-                    <p className="text-[8px] font-bold italic text-rose-300 flex items-center gap-1">
-                      ➔ Klik untuk lihat histori
-                    </p>
-                  </div>
-                );
-              })()}
+                              {/* Detail Popover Card */}
+                              <div className="bg-slate-900/95 dark:bg-slate-950/95 text-white p-3.5 rounded-2xl shadow-2xl border border-white/10 text-xs min-w-[210px] backdrop-blur-md space-y-2">
+                                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-1.5">
+                                  <span className="font-extrabold uppercase text-[10px] tracking-wider text-slate-300">
+                                    Bulan {label} {selectedYear}
+                                  </span>
+                                  <span className="text-[9px] bg-blue-500/20 text-blue-300 font-black px-2 py-0.5 rounded-full">
+                                    Penyaluran
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1.5 text-[11px]">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1.5 text-blue-300 font-semibold">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-[#3b5bfd] ring-2 ring-blue-400/30"></span>
+                                      Penerima Bantuan:
+                                    </span>
+                                    <span className="font-black text-white">{penerimaVal} Nama</span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1.5 text-rose-300 font-semibold">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-[#f43f5e] ring-2 ring-rose-400/30"></span>
+                                      Frekuensi Penyaluran:
+                                    </span>
+                                    <span className="font-black text-white">{transaksiVal} Transaksi</span>
+                                  </div>
+
+                                  {data?.totalItems > 0 && (
+                                    <div className="flex items-center justify-between gap-3 pt-1 border-t border-white/5 text-[10px] text-slate-400">
+                                      <span>Total Barang Keluar:</span>
+                                      <span className="font-bold text-slate-200">{data.totalItems.toLocaleString('id-ID')} Unit</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {data?.recipientList && data.recipientList.length > 0 && (
+                                  <div className="pt-1.5 border-t border-white/10">
+                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">
+                                      Penerima di Bulan Ini:
+                                    </p>
+                                    <div className="space-y-0.5 text-[10px] text-blue-200">
+                                      {data.recipientList.slice(0, 2).map((rName: string, idx: number) => (
+                                        <p key={idx} className="truncate max-w-[190px]">• {rName}</p>
+                                      ))}
+                                      {data.recipientList.length > 2 && (
+                                        <p className="text-[9px] text-slate-400 italic">
+                                          +{data.recipientList.length - 2} penerima lainnya
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="text-[9px] text-blue-300/80 pt-1 text-center font-medium border-t border-white/5">
+                                  ➔ Klik titik untuk rincian lengkap
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }} 
+                      cursor={{ stroke: '#6366f1', strokeWidth: 1.5, strokeDasharray: '0 0' }} 
+                    />
+
+                    {/* Smooth Blue Area curve with fill */}
+                    <Area 
+                      type="monotone" 
+                      dataKey="penerima" 
+                      name="Jumlah Penerima" 
+                      stroke="#3b5bfd" 
+                      strokeWidth={3} 
+                      fillOpacity={1} 
+                      fill="url(#colorTrendPenerima)" 
+                      activeDot={{ r: 6.5, stroke: '#ffffff', strokeWidth: 2.5, fill: '#3b5bfd' }} 
+                    />
+
+                    {/* Smooth Red Line curve without fill */}
+                    <Line 
+                      type="monotone" 
+                      dataKey="transaksi" 
+                      name="Total Penyaluran" 
+                      stroke="#f43f5e" 
+                      strokeWidth={2.5} 
+                      dot={false} 
+                      activeDot={{ r: 5, stroke: '#ffffff', strokeWidth: 2, fill: '#f43f5e' }} 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Quick Metrics Bar Underneath */}
+            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/5 grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Penerima ({selectedYear})</p>
+                <p className="text-base font-black text-[#3b5bfd] mt-0.5">
+                  {trendStats.totalPenerima.toLocaleString('id-ID')} <span className="text-[10px] font-medium text-slate-400">Nama</span>
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Rata-rata Bulanan</p>
+                <p className="text-base font-black text-slate-800 dark:text-slate-100 mt-0.5">
+                  {trendStats.avgPenerima} <span className="text-[10px] font-medium text-slate-400">Penerima</span>
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Puncak Penyaluran</p>
+                <p className="text-base font-black text-rose-500 mt-0.5 truncate">
+                  {trendStats.peakMonth ? `${trendStats.peakMonth.month} (${trendStats.peakMonth.penerima})` : '-'}
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Logistik Keluar</p>
+                <p className="text-base font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  {trendStats.totalLogistik.toLocaleString('id-ID')} <span className="text-[10px] font-medium text-slate-400">Unit</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 text-center text-[10px] text-slate-400 font-bold flex items-center justify-center gap-1.5">
+              <Info size={12}/> Klik titik bulan pada grafik untuk melihat rincian lengkap daftar penerima bantuan
             </div>
           </div>
         </div>
@@ -683,6 +860,155 @@ const Dashboard: React.FC = () => {
               <button 
                 onClick={() => setSelectedKecName(null)}
                 className="w-full md:w-auto px-10 py-4 bg-ios-blue-light dark:bg-ios-blue-dark text-white font-bold text-sm rounded-ios shadow-sm active:scale-95 transition-all"
+              >
+                Tutup Rincian
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RINCIAN PENERIMA BULANAN (TREND PENERIMA BANTUAN) */}
+      {selectedMonthIdx !== null && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-ios-bg-light dark:bg-ios-bg-dark w-full max-w-4xl h-[90vh] md:h-auto md:max-h-[85vh] rounded-t-ios-lg md:rounded-ios-lg shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-white/10 animate-in slide-in-from-bottom-6 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 md:p-6 border-b dark:border-white/10 flex items-center justify-between bg-gradient-to-r from-[#3b5bfd] to-indigo-600 text-white shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner">
+                  <Users size={22}/>
+                </div>
+                <div>
+                  <h3 className="text-lg md:text-xl font-black tracking-tight">
+                    Rincian Penerima: Bulan {MONTH_LABELS[selectedMonthIdx]} {selectedYear}
+                  </h3>
+                  <p className="text-[10px] font-bold opacity-85 uppercase tracking-widest mt-0.5">
+                    {monthlyTrendData[selectedMonthIdx]?.penerima || 0} Nama Penerima • {monthlyTrendData[selectedMonthIdx]?.transaksi || 0} Transaksi Penyaluran
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setSelectedMonthIdx(null); setMonthSearchQuery(''); }}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95 cursor-pointer"
+                title="Tutup"
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            {/* Search Filter Box */}
+            <div className="p-3.5 md:px-6 border-b dark:border-white/5 bg-slate-50 dark:bg-white/5">
+              <div className="relative">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+                <input 
+                  type="text"
+                  value={monthSearchQuery}
+                  onChange={(e) => setMonthSearchQuery(e.target.value)}
+                  placeholder="Cari nama penerima bantuan, alamat, atau jenis bencana..."
+                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3b5bfd]"
+                />
+              </div>
+            </div>
+
+            {/* Modal Content - Recipients list */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3.5 scrollbar-thin">
+              {(() => {
+                const monthTxs = (monthlyTrendData[selectedMonthIdx]?.transactions || []).filter(tx => {
+                  if (!monthSearchQuery) return true;
+                  const q = monthSearchQuery.toLowerCase();
+                  return (
+                    tx.penerima?.toLowerCase().includes(q) ||
+                    tx.alamat?.toLowerCase().includes(q) ||
+                    tx.jenisBencana?.toLowerCase().includes(q)
+                  );
+                });
+
+                if (monthTxs.length === 0) {
+                  return (
+                    <div className="py-16 text-center space-y-2.5">
+                      <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-white/5 text-slate-400 flex items-center justify-center mx-auto">
+                        <Users size={24}/>
+                      </div>
+                      <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                        {monthSearchQuery ? 'Tidak ditemukan data penerima yang cocok dengan pencarian.' : 'Belum ada transaksi penyaluran bantuan di bulan ini.'}
+                      </p>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                        Setiap transaksi penyaluran yang dicatat pada menu Keluar dengan nama penerima akan otomatis ditampilkan di sini.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {monthTxs.map((tx, idx) => (
+                      <div 
+                        key={tx.id || idx} 
+                        className="bg-ios-secondary-light dark:bg-ios-secondary-dark rounded-ios p-4 border border-slate-200 dark:border-white/10 space-y-2.5 shadow-sm"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-100 dark:border-white/5 pb-2.5">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#3b5bfd] shrink-0"></span>
+                              <h4 className="text-sm md:text-base font-black text-slate-900 dark:text-slate-100">
+                                {tx.penerima || 'Penerima Tanpa Nama'}
+                              </h4>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 ml-4.5">
+                              {tx.alamat || 'Alamat tidak terdata'}
+                            </p>
+                          </div>
+                          <div className="flex sm:flex-col sm:items-end justify-between">
+                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              {formatIndoDate(tx.tanggal)}
+                            </span>
+                            {tx.jenisBencana && (
+                              <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 mt-1 uppercase">
+                                {tx.jenisBencana}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Items distributed to recipient */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left">
+                            <thead className="text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b dark:border-white/5">
+                              <tr>
+                                <th className="pb-1.5">Logistik Bantuan</th>
+                                <th className="pb-1.5 text-right">Jumlah</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-xs">
+                              {(tx.items || []).map((item, itemIdx) => {
+                                const p = products.find(prod => prod.id === item.productId);
+                                return (
+                                  <tr key={itemIdx}>
+                                    <td className="py-1.5">
+                                      <span className="font-bold text-slate-800 dark:text-slate-200">{p?.namaBarang || 'Item Logistik'}</span>
+                                      {p?.kodeBarang && <span className="text-[10px] font-mono text-slate-400 ml-1.5">({p.kodeBarang})</span>}
+                                    </td>
+                                    <td className="py-1.5 text-right font-black text-slate-900 dark:text-slate-100">
+                                      {item.jumlah.toLocaleString('id-ID')} <span className="text-[10px] font-semibold text-slate-400 uppercase">{p?.satuan || 'Unit'}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-ios-secondary-dark border-t dark:border-white/5 flex justify-end shrink-0">
+              <button 
+                onClick={() => { setSelectedMonthIdx(null); setMonthSearchQuery(''); }}
+                className="w-full sm:w-auto px-6 py-2.5 bg-[#3b5bfd] hover:bg-blue-700 text-white font-bold text-xs rounded-ios shadow-sm active:scale-95 transition-all cursor-pointer"
               >
                 Tutup Rincian
               </button>
