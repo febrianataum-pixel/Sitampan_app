@@ -42,6 +42,7 @@ const BarangKeluar: React.FC = () => {
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterDisaster, setFilterDisaster] = useState<string>('All');
 
@@ -224,6 +225,25 @@ const BarangKeluar: React.FC = () => {
     if (filterDisaster !== 'All') {
       if (tx.jenisBencana !== filterDisaster) return false;
     }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchPenerima = tx.penerima?.toLowerCase().includes(q);
+      const matchAlamat = tx.alamat?.toLowerCase().includes(q);
+      const matchBencana = tx.jenisBencana?.toLowerCase().includes(q) || 
+                            tx.subJenisBencana?.toLowerCase().includes(q) || 
+                            tx.keteranganBencana?.toLowerCase().includes(q);
+      const matchNomorSurat = tx.nomorSurat?.toLowerCase().includes(q);
+      const matchPemberi = tx.namaPemberi?.toLowerCase().includes(q) || 
+                           tx.namaPengemudi?.toLowerCase().includes(q) || 
+                           tx.nomorPolisi?.toLowerCase().includes(q);
+      const matchItems = tx.items?.some(item => {
+        const p = products.find(prod => prod.id === item.productId);
+        return p?.namaBarang?.toLowerCase().includes(q) || p?.kodeBarang?.toLowerCase().includes(q);
+      });
+      if (!matchPenerima && !matchAlamat && !matchBencana && !matchNomorSurat && !matchPemberi && !matchItems) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -309,60 +329,95 @@ const BarangKeluar: React.FC = () => {
       </div>
 
       <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg border border-white/80 dark:border-white/10 shadow-sm overflow-hidden theme-transition w-full">
-        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-ios border border-orange-500/20">
-              <TrendingUp size={20} />
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col gap-4">
+          {/* Baris 1: Grand Total & Kolom Pencarian */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="p-2.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-ios border border-orange-500/20">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Grand Total Distribusi</p>
+                <p className="text-xl font-black text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Grand Total Distribusi</p>
-              <p className="text-xl font-black text-slate-900 dark:text-slate-100">Rp {grandTotal.toLocaleString('id-ID')}</p>
+
+            {/* Input Pencarian */}
+            <div className="relative group flex-1 max-w-md w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-ios-blue-light transition-colors" size={17} />
+              <input 
+                type="text" 
+                placeholder="Cari penerima, alamat, bencana, barang..." 
+                className="w-full pl-10 pr-9 py-2.5 bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios outline-none text-xs font-medium transition-all text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-ios-blue-light/20"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)} 
+              />
+              {searchQuery && (
+                <button 
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 transition-colors cursor-pointer"
+                  title="Hapus pencarian"
+                >
+                  <X size={15} />
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            {/* Filter Bulan */}
-            <div className="flex-1 sm:flex-initial min-w-[140px]">
-              <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bulan</label>
-              <select
-                className="w-full text-xs font-bold bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-              >
-                <option value="All">Semua Bulan</option>
-                {MONTHS.map((label, idx) => (
-                  <option key={idx} value={idx.toString()}>{label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filter Bencana */}
-            <div className="flex-1 sm:flex-initial min-w-[170px]">
-              <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bencana</label>
-              <select
-                className="w-full text-xs font-bold bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
-                value={filterDisaster}
-                onChange={(e) => setFilterDisaster(e.target.value)}
-              >
-                <option value="All">Semua Bencana</option>
-                <option value="Bencana Alam">Bencana Alam</option>
-                <option value="Bencana Non Alam">Bencana Non Alam</option>
-                <option value="Bencana Sosial">Bencana Sosial</option>
-              </select>
-            </div>
-
-            {/* Clear Filters Button */}
-            {(filterMonth !== 'All' || filterDisaster !== 'All') && (
-              <div className="self-end pb-0.5">
-                <button
-                  type="button"
-                  onClick={() => { setFilterMonth('All'); setFilterDisaster('All'); }}
-                  className="px-3 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-100 transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 border border-red-100 dark:border-red-900/30"
+          {/* Baris 2: Filter Bulan, Filter Bencana, Reset & Info Jumlah */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-white/5">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              {/* Filter Bulan */}
+              <div className="flex-1 sm:flex-initial min-w-[140px]">
+                <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bulan</label>
+                <select
+                  className="w-full text-xs font-bold bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
                 >
-                  <X size={12} /> Reset
-                </button>
+                  <option value="All">Semua Bulan</option>
+                  {MONTHS.map((label, idx) => (
+                    <option key={idx} value={idx.toString()}>{label}</option>
+                  ))}
+                </select>
               </div>
-            )}
+
+              {/* Filter Bencana */}
+              <div className="flex-1 sm:flex-initial min-w-[170px]">
+                <label className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-1 ml-1">Filter Bencana</label>
+                <select
+                  className="w-full text-xs font-bold bg-slate-100/80 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 rounded-ios px-3 py-2 outline-none focus:ring-2 focus:ring-ios-blue-light/10 text-slate-800 dark:text-slate-200"
+                  value={filterDisaster}
+                  onChange={(e) => setFilterDisaster(e.target.value)}
+                >
+                  <option value="All">Semua Bencana</option>
+                  <option value="Bencana Alam">Bencana Alam</option>
+                  <option value="Bencana Non Alam">Bencana Non Alam</option>
+                  <option value="Bencana Sosial">Bencana Sosial</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button */}
+              {(filterMonth !== 'All' || filterDisaster !== 'All' || searchQuery.trim() !== '') && (
+                <div className="self-end pb-0.5">
+                  <button
+                    type="button"
+                    onClick={() => { setFilterMonth('All'); setFilterDisaster('All'); setSearchQuery(''); }}
+                    className="px-3 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-100 transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 border border-red-100 dark:border-red-900/30 cursor-pointer"
+                  >
+                    <X size={12} /> Reset Filter
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium ml-auto">
+              Menampilkan <span className="font-bold text-slate-800 dark:text-slate-200">{sortedOutbound.length}</span> dari {outbound.length} transaksi
+              {searchQuery.trim() && (
+                <span className="ml-1 text-blue-600 dark:text-blue-400 font-bold">(pencarian: &ldquo;{searchQuery}&rdquo;)</span>
+              )}
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto w-full">
@@ -454,7 +509,29 @@ const BarangKeluar: React.FC = () => {
                 );
               })}
               {sortedOutbound.length === 0 && (
-                <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 dark:text-slate-600 italic">Belum ada catatan transaksi.</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center text-slate-400 dark:text-slate-500">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Search size={32} className="opacity-30 stroke-[1.5]" />
+                      <p className="font-semibold text-sm">
+                        {searchQuery.trim() 
+                          ? `Tidak ditemukan transaksi dengan kata kunci "${searchQuery}"`
+                          : (filterMonth !== 'All' || filterDisaster !== 'All')
+                            ? 'Tidak ada transaksi yang cocok dengan filter yang dipilih.'
+                            : 'Belum ada catatan transaksi barang keluar.'}
+                      </p>
+                      {(searchQuery.trim() || filterMonth !== 'All' || filterDisaster !== 'All') && (
+                        <button
+                          type="button"
+                          onClick={() => { setSearchQuery(''); setFilterMonth('All'); setFilterDisaster('All'); }}
+                          className="mt-1 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer"
+                        >
+                          Reset Semua Pencarian & Filter
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

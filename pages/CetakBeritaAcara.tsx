@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { useInventory } from '../App';
 import html2canvas from 'html2canvas';
+import JSZip from 'jszip';
 import { 
   Eye, 
   ArrowLeft, 
@@ -24,7 +25,11 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
-  Loader2
+  Loader2,
+  Archive,
+  FolderArchive,
+  FileText,
+  CheckCircle2
 } from 'lucide-react';
 import { OutboundTransaction, MONTHS, formatIndoDate } from '../types';
 
@@ -75,6 +80,12 @@ const CetakBeritaAcara: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloadingDoc, setIsDownloadingDoc] = useState(false);
   const [downloadingTxId, setDownloadingTxId] = useState<string | null>(null);
+  const [zipProgress, setZipProgress] = useState<{
+    title: string;
+    label: string;
+    current: number;
+    total: number;
+  } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const printAreaRef = useRef<HTMLDivElement>(null);
 
@@ -554,6 +565,273 @@ const CetakBeritaAcara: React.FC = () => {
     });
   };
 
+  const generateDocumentationSheetBlob = async (tx: OutboundTransaction): Promise<Blob | null> => {
+    if (!tx.images || tx.images.length === 0) return null;
+
+    const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const dateObjRaw = new Date(tx.tanggal);
+    const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
+    const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '794px';
+    container.style.minHeight = '1123px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.padding = '50px 45px';
+    container.style.boxSizing = 'border-box';
+    container.style.fontFamily = "'Urbanist', Arial, Helvetica, sans-serif";
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'flex-start';
+    container.style.color = '#000000';
+
+    const imageCount = tx.images.length;
+    let imgMaxHeight = '420px';
+    if (imageCount === 1) {
+      imgMaxHeight = '650px';
+    } else if (imageCount === 2) {
+      imgMaxHeight = '420px';
+    } else if (imageCount >= 3) {
+      imgMaxHeight = '300px';
+    }
+
+    container.innerHTML = `
+      <div style="width: 100%; text-align: center; margin-bottom: 24px;">
+        <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 14px 0; text-transform: uppercase; color: #000000; letter-spacing: 1.5px; font-family: 'Inter', Arial, sans-serif;">
+          DOKUMENTASI
+        </h2>
+        <p style="font-size: 15px; margin: 0 0 6px 0; color: #1e293b; line-height: 1.5; font-family: 'Inter', Arial, sans-serif;">
+          Penyaluran Bantuan Sosial <strong style="color: #000000; font-weight: 700;">${tx.penerima}</strong>, di <strong style="color: #000000; font-weight: 700;">${tx.alamat || '-'}</strong>
+        </p>
+        <p style="font-size: 13.5px; margin: 0; color: #475569; font-family: 'Inter', Arial, sans-serif;">
+          ${formattedDateLabel}
+        </p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; box-sizing: border-box;">
+        ${tx.images.map((imgSrc, idx) => `
+          <div style="border: 1px solid #e2e8f0; padding: 10px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-radius: 12px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 620px;">
+            <img src="${imgSrc}" style="max-height: ${imgMaxHeight}; width: auto; max-width: 100%; object-fit: contain; border-radius: 8px; display: block;" crossOrigin="anonymous" alt="Dokumentasi ${idx + 1}" />
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.body.appendChild(container);
+
+    try {
+      const imgElements = Array.from(container.querySelectorAll('img'));
+      await Promise.all(imgElements.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+      await new Promise(r => setTimeout(r, 60));
+
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 794
+      });
+
+      return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+    } catch (err) {
+      console.error("Gagal generateDocumentationSheetBlob:", err);
+      return null;
+    } finally {
+      if (document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
+    }
+  };
+
+  const handleDownloadMonthlyBAZip = async () => {
+    if (filteredOutbound.length === 0) {
+      const selName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : '';
+      alert(`Tidak ada data transaksi pada bulan ${selName}.`);
+      return;
+    }
+
+    const selName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : 'Semua';
+    try {
+      setZipProgress({
+        title: `Download ZIP Berita Acara (Bulan ${selName})`,
+        label: 'Menyiapkan berkas dokumen...',
+        current: 0,
+        total: filteredOutbound.length
+      });
+
+      const zip = new JSZip();
+      const yearStr = filteredOutbound[0]?.tanggal 
+        ? new Date(filteredOutbound[0].tanggal).getFullYear().toString() 
+        : new Date().getFullYear().toString();
+
+      for (let i = 0; i < filteredOutbound.length; i++) {
+        const tx = filteredOutbound[i];
+        setZipProgress({
+          title: `Download ZIP Berita Acara (Bulan ${selName})`,
+          label: `Membuat PDF BA: ${tx.penerima} (${i + 1}/${filteredOutbound.length})...`,
+          current: i + 1,
+          total: filteredOutbound.length
+        });
+
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '210mm';
+        container.style.backgroundColor = '#ffffff';
+        container.innerHTML = renderBA(tx, true);
+        document.body.appendChild(container);
+
+        const imgElements = Array.from(container.querySelectorAll('img'));
+        await Promise.all(imgElements.map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(res => { img.onload = res; img.onerror = res; });
+        }));
+        await new Promise(res => setTimeout(res, 60));
+
+        const sanitizedPenerima = (tx.penerima || 'Penerima').replace(/[/\\?%*:|"<>]/g, '_').trim();
+        const sanitizedTanggal = (tx.tanggal || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
+
+        const opt = { 
+          margin: 0, 
+          filename: `BAST_${sanitizedPenerima}.pdf`, 
+          image: { type: 'jpeg', quality: 0.98 }, 
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true }, 
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+        };
+
+        const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+        if (document.body.contains(container)) {
+          document.body.removeChild(container);
+        }
+
+        const pdfFilename = `${String(i + 1).padStart(2, '0')}_BAST_${sanitizedPenerima}_${sanitizedTanggal}.pdf`;
+        zip.file(pdfFilename, pdfBlob);
+      }
+
+      setZipProgress({
+        title: `Download ZIP Berita Acara (Bulan ${selName})`,
+        label: 'Mengompresi seluruh berkas ke dalam file ZIP...',
+        current: filteredOutbound.length,
+        total: filteredOutbound.length
+      });
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `BA_Bulanan_${selName}_${yearStr}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Gagal mengunduh ZIP Berita Acara:", err);
+      alert("Terjadi kendala saat menyusun file ZIP Berita Acara. Silakan coba kembali.");
+    } finally {
+      setZipProgress(null);
+    }
+  };
+
+  const handleDownloadMonthlyPhotosZip = async () => {
+    const selName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : 'Semua';
+    const txsWithImages = filteredOutbound.filter(tx => tx.images && tx.images.length > 0);
+    if (txsWithImages.length === 0) {
+      alert(`Tidak ada foto dokumentasi pada transaksi di bulan ${selName}.`);
+      return;
+    }
+
+    try {
+      setZipProgress({
+        title: `Download ZIP Foto Dokumentasi (Bulan ${selName})`,
+        label: 'Mengumpulkan foto transaksi...',
+        current: 0,
+        total: txsWithImages.length
+      });
+
+      const zip = new JSZip();
+      const yearStr = filteredOutbound[0]?.tanggal 
+        ? new Date(filteredOutbound[0].tanggal).getFullYear().toString() 
+        : new Date().getFullYear().toString();
+
+      for (let i = 0; i < txsWithImages.length; i++) {
+        const tx = txsWithImages[i];
+        setZipProgress({
+          title: `Download ZIP Foto Dokumentasi (Bulan ${selName})`,
+          label: `Mengemas foto: ${tx.penerima} (${i + 1}/${txsWithImages.length})...`,
+          current: i + 1,
+          total: txsWithImages.length
+        });
+
+        const sanitizedPenerima = (tx.penerima || 'Penerima').replace(/[/\\?%*:|"<>]/g, '_').trim();
+        const sanitizedTanggal = (tx.tanggal || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
+        const folderName = `${String(i + 1).padStart(2, '0')}_${sanitizedPenerima}_${sanitizedTanggal}`;
+        const folder = zip.folder(folderName);
+
+        // 1. Tambahkan foto-foto asli
+        if (tx.images && tx.images.length > 0) {
+          for (let pIdx = 0; pIdx < tx.images.length; pIdx++) {
+            const imgSrc = tx.images[pIdx];
+            if (imgSrc.startsWith('data:')) {
+              const base64Data = imgSrc.includes(',') ? imgSrc.split(',')[1] : imgSrc;
+              folder?.file(`Foto_${pIdx + 1}.jpg`, base64Data, { base64: true });
+            } else if (imgSrc.startsWith('http')) {
+              try {
+                const res = await fetch(imgSrc);
+                const blob = await res.blob();
+                folder?.file(`Foto_${pIdx + 1}.jpg`, blob);
+              } catch (e) {
+                console.error("Gagal mengunduh foto:", imgSrc, e);
+              }
+            }
+          }
+        }
+
+        // 2. Tambahkan lembar A4 Dokumentasi resmi
+        try {
+          const sheetBlob = await generateDocumentationSheetBlob(tx);
+          if (sheetBlob) {
+            folder?.file(`Lembar_Dokumentasi_${sanitizedPenerima}.jpg`, sheetBlob);
+          }
+        } catch (e) {
+          console.warn("Gagal membuat lembar dokumentasi:", tx.penerima, e);
+        }
+      }
+
+      setZipProgress({
+        title: `Download ZIP Foto Dokumentasi (Bulan ${selName})`,
+        label: 'Mengompresi foto ke dalam file ZIP...',
+        current: txsWithImages.length,
+        total: txsWithImages.length
+      });
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `Foto_Dokumentasi_${selName}_${yearStr}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Gagal mengunduh ZIP Foto Dokumentasi:", err);
+      alert("Terjadi kendala saat menyusun file ZIP foto. Silakan coba kembali.");
+    } finally {
+      setZipProgress(null);
+    }
+  };
+
   const handleFormat = (command: string, value: string = '') => {
     document.execCommand(command, false, value);
     if (editorRef.current) setCurrentTemplate(editorRef.current.innerHTML);
@@ -602,6 +880,9 @@ const CetakBeritaAcara: React.FC = () => {
     );
   }
 
+  const selectedMonthName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : '';
+  const totalPhotosInMonth = filteredOutbound.reduce((acc, tx) => acc + (tx.images?.length || 0), 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -620,7 +901,7 @@ const CetakBeritaAcara: React.FC = () => {
           <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             Daftar Berita Acara & SPPB
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
             {/* Filter Bulan */}
             <div className="flex-1 sm:flex-initial min-w-[160px]">
               <select
@@ -635,16 +916,94 @@ const CetakBeritaAcara: React.FC = () => {
               </select>
             </div>
             {filterMonth !== 'All' && (
-              <button
-                type="button"
-                onClick={() => setFilterMonth('All')}
-                className="px-3 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-100 transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 border border-red-100 dark:border-red-900/30"
-              >
-                <X size={12} /> Reset
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleDownloadMonthlyBAZip}
+                  disabled={zipProgress !== null || filteredOutbound.length === 0}
+                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 shadow-sm shadow-blue-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  title="Download semua Berita Acara bulan ini (ZIP)"
+                >
+                  <FileText size={12} /> Download BA
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadMonthlyPhotosZip}
+                  disabled={zipProgress !== null || totalPhotosInMonth === 0}
+                  className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 shadow-sm shadow-amber-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  title="Download semua Foto bulan ini (ZIP)"
+                >
+                  <ImageIcon size={12} /> Download Foto ({totalPhotosInMonth})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMonth('All')}
+                  className="px-3 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-100 transition-all rounded-ios font-bold text-[10px] uppercase flex items-center gap-1.5 border border-red-100 dark:border-red-900/30 cursor-pointer"
+                  title="Reset Filter"
+                >
+                  <X size={12} /> Reset
+                </button>
+              </>
             )}
           </div>
         </div>
+
+        {/* Banner Aksi Download Bulanan Berupa ZIP ketika Bulan Dipilih */}
+        {filterMonth !== 'All' && (
+          <div className="px-4 sm:px-6 py-3.5 bg-gradient-to-r from-blue-50/95 via-indigo-50/80 to-blue-50/95 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-blue-950/40 border-b border-blue-100 dark:border-blue-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 shrink-0">
+                <Archive size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                    Download Bulanan: Bulan {selectedMonthName}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px]">
+                    {filteredOutbound.length} Dokumen
+                  </span>
+                  {totalPhotosInMonth > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-bold text-[10px]">
+                      {totalPhotosInMonth} Foto Dokumentasi
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium mt-0.5">
+                  Arsip otomatis Berita Acara dan Foto Dokumentasi bulan {selectedMonthName} dalam format ZIP siap unduh.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleDownloadMonthlyBAZip}
+                disabled={zipProgress !== null || filteredOutbound.length === 0}
+                className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs rounded-ios flex items-center justify-center gap-2 shadow-sm shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50"
+                title={`Unduh seluruh Berita Acara bulan ${selectedMonthName} (ZIP)`}
+              >
+                <FileText size={15} />
+                <span>Download BA (ZIP)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadMonthlyPhotosZip}
+                disabled={zipProgress !== null || totalPhotosInMonth === 0}
+                className="flex-1 sm:flex-none px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-ios flex items-center justify-center gap-2 shadow-sm shadow-amber-500/25 transition-all cursor-pointer disabled:opacity-50"
+                title={totalPhotosInMonth === 0 ? "Tidak ada foto di bulan ini" : `Unduh ${totalPhotosInMonth} foto dokumentasi (ZIP)`}
+              >
+                <ImageIcon size={15} />
+                <span>Download Foto (ZIP)</span>
+                <span className="px-1.5 py-0.5 bg-black/20 text-white rounded-full text-[10px] font-bold">
+                  {totalPhotosInMonth}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto w-full">
           <table className="w-full text-left text-sm min-w-full">
             <thead className="bg-slate-50/70 dark:bg-white/5 text-slate-500 dark:text-slate-400 font-bold text-[10px] border-b dark:border-white/5 uppercase tracking-wide">
@@ -700,10 +1059,56 @@ const CetakBeritaAcara: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {sortedOutbound.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
+                    <p className="font-semibold text-sm">Tidak ada transaksi ditemukan pada filter bulan ini.</p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Modal Progress ZIP */}
+      {zipProgress && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 animate-pulse shrink-0">
+                <Archive size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                  {zipProgress.title}
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {zipProgress.label}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                <span>Progress Pengemasan</span>
+                <span>{zipProgress.current} / {zipProgress.total}</span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-300"
+                  style={{ width: `${zipProgress.total > 0 ? (zipProgress.current / zipProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 italic">
+              <Loader2 size={13} className="animate-spin text-blue-500 shrink-0" />
+              <span>Harap tunggu, proses pembuatan file ZIP sedang berlangsung...</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isEditorOpen && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm z-[200] flex flex-col p-4 animate-in fade-in duration-300">
