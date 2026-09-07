@@ -31,7 +31,7 @@ import { generateReportPDF } from '../services/pdfService';
 type SortKey = 'tanggal' | 'penerima' | 'alamat';
 
 const BarangKeluar: React.FC = () => {
-  const { products, outbound, setOutbound, calculateStock, settings, hasPermission } = useInventory();
+  const { products, outbound, setOutbound, calculateStock, settings, hasPermission, selectedYear } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -51,13 +51,17 @@ const BarangKeluar: React.FC = () => {
     direction: 'desc'
   });
 
-  const [generalData, setGeneralData] = useState({
-    penerima: '',
-    tanggal: new Date().toISOString().split('T')[0],
-    alamat: '',
-    jenisBencana: '',
-    subJenisBencana: '',
-    keteranganBencana: ''
+  const [generalData, setGeneralData] = useState(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const initialTanggal = selectedYear && !today.startsWith(selectedYear) ? `${selectedYear}-${today.slice(5)}` : today;
+    return {
+      penerima: '',
+      tanggal: initialTanggal,
+      alamat: '',
+      jenisBencana: '',
+      subJenisBencana: '',
+      keteranganBencana: ''
+    };
   });
 
   const disasterCategories = [
@@ -109,12 +113,14 @@ const BarangKeluar: React.FC = () => {
   };
 
   const handleOpenModal = (tx?: OutboundTransaction, duplicate = false) => {
+    const today = new Date().toISOString().split('T')[0];
+    const defaultDate = selectedYear && !today.startsWith(selectedYear) ? `${selectedYear}-${today.slice(5)}` : today;
     if (tx) {
       if (!duplicate) setEditingTx(tx);
       else setEditingTx(null);
       setGeneralData({ 
         penerima: tx.penerima, 
-        tanggal: duplicate ? new Date().toISOString().split('T')[0] : tx.tanggal, 
+        tanggal: duplicate ? defaultDate : tx.tanggal, 
         alamat: tx.alamat,
         jenisBencana: tx.jenisBencana || '',
         subJenisBencana: tx.subJenisBencana || '',
@@ -125,7 +131,7 @@ const BarangKeluar: React.FC = () => {
       setEditingTx(null);
       setGeneralData({ 
         penerima: '', 
-        tanggal: new Date().toISOString().split('T')[0], 
+        tanggal: defaultDate, 
         alamat: '',
         jenisBencana: '',
         subJenisBencana: '',
@@ -216,10 +222,24 @@ const BarangKeluar: React.FC = () => {
   };
 
   const filteredOutbound = outbound.filter(tx => {
-    if (filterMonth !== 'All') {
+    // Filter Tahun
+    if (selectedYear) {
+      const stringYear = (tx.tanggal || '').slice(0, 4);
       const txDate = new Date(tx.tanggal);
-      if (isNaN(txDate.getTime())) return false;
-      const txMonthIndex = txDate.getMonth();
+      const txYear = stringYear.length === 4 && !isNaN(Number(stringYear))
+        ? stringYear
+        : (!isNaN(txDate.getTime()) ? txDate.getFullYear().toString() : '');
+      if (txYear !== selectedYear) return false;
+    }
+    if (filterMonth !== 'All') {
+      const parts = (tx.tanggal || '').split('-');
+      let txMonthIndex = -1;
+      if (parts.length >= 2 && !isNaN(Number(parts[1]))) {
+        txMonthIndex = parseInt(parts[1], 10) - 1;
+      } else {
+        const txDate = new Date(tx.tanggal);
+        if (!isNaN(txDate.getTime())) txMonthIndex = txDate.getMonth();
+      }
       if (txMonthIndex.toString() !== filterMonth) return false;
     }
     if (filterDisaster !== 'All') {
@@ -313,7 +333,12 @@ const BarangKeluar: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Barang Keluar</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Barang Keluar</h2>
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-extrabold text-[11px] border border-blue-200/50 dark:border-blue-800/40">
+              Tahun {selectedYear}
+            </span>
+          </div>
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Manajemen distribusi dan pengurutan data.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">

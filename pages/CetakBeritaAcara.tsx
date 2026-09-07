@@ -1,8 +1,9 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useInventory } from '../App';
 import html2canvas from 'html2canvas';
 import JSZip from 'jszip';
+import { PDFDocument } from 'pdf-lib';
 import { 
   Eye, 
   ArrowLeft, 
@@ -32,8 +33,6 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { OutboundTransaction, MONTHS, formatIndoDate } from '../types';
-
-declare var html2pdf: any;
 
 const terbilang = (num: number): string => {
   const words = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
@@ -70,10 +69,35 @@ const formatHariTanggalTahunIndo = (dateStr: string): string => {
   return `Hari ${dayName}, Tanggal ${terbilang(dateNum)} Bulan ${monthName} Tahun ${terbilang(yearNum)}`;
 };
 
+const dataUrlToBytes = (dataUrl: string): Uint8Array => {
+  const base64 = dataUrl.split(',')[1] || dataUrl;
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const waitForImages = async (element: HTMLElement) => {
+  const imgElements = Array.from(element.querySelectorAll('img'));
+  if (imgElements.length === 0) return;
+  await Promise.all(imgElements.map(img => {
+    if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+    return new Promise(resolve => {
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(true);
+      setTimeout(() => resolve(true), 3000);
+    });
+  }));
+  await new Promise(r => setTimeout(r, 60));
+};
+
 type SortKey = 'tanggal' | 'penerima' | 'alamat';
 
 const CetakBeritaAcara: React.FC = () => {
-  const { products, outbound, settings, setSettings } = useInventory();
+  const { products, outbound, settings, setSettings, selectedYear } = useInventory();
   const [selectedTx, setSelectedTx] = useState<OutboundTransaction | null>(null);
   const [docType, setDocType] = useState<'BA' | 'SPPB'>('BA');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -90,6 +114,10 @@ const CetakBeritaAcara: React.FC = () => {
   const printAreaRef = useRef<HTMLDivElement>(null);
 
   const [filterMonth, setFilterMonth] = useState<string>('All');
+
+  useEffect(() => {
+    setSelectedTx(null);
+  }, [selectedYear]);
 
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({
     key: 'tanggal',
@@ -225,6 +253,92 @@ const CetakBeritaAcara: React.FC = () => {
     setIsEditorOpen(true);
   };
 
+  const generateDocumentationSheetBlob = async (tx: OutboundTransaction): Promise<Blob | null> => {
+    if (!tx.images || tx.images.length === 0) return null;
+
+    const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const dateObjRaw = new Date(tx.tanggal);
+    const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
+    const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+
+    const container = document.createElement('div');
+    container.className = 'document-root';
+    container.setAttribute('data-document-font', 'arial');
+    container.style.position = 'fixed';
+    container.style.left = '0';
+    container.style.top = '0';
+    container.style.width = '794px';
+    container.style.minHeight = '1123px';
+    container.style.backgroundColor = '#ffffff';
+    container.style.padding = '50px 45px';
+    container.style.boxSizing = 'border-box';
+    container.style.fontFamily = "Arial, Helvetica, sans-serif";
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'flex-start';
+    container.style.color = '#000000';
+    container.style.zIndex = '99999';
+    container.style.pointerEvents = 'none';
+
+    const imageCount = tx.images.length;
+    let imgMaxHeight = '420px';
+    if (imageCount === 1) {
+      imgMaxHeight = '650px';
+    } else if (imageCount === 2) {
+      imgMaxHeight = '420px';
+    } else if (imageCount >= 3) {
+      imgMaxHeight = '300px';
+    }
+
+    container.innerHTML = `
+      <div style="width: 100%; text-align: center; margin-bottom: 24px; font-family: Arial, Helvetica, sans-serif;">
+        <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 14px 0; text-transform: uppercase; color: #000000; letter-spacing: 1.5px; font-family: Arial, Helvetica, sans-serif;">
+          DOKUMENTASI
+        </h2>
+        <p style="font-size: 15px; margin: 0 0 6px 0; color: #1e293b; line-height: 1.5; font-family: Arial, Helvetica, sans-serif;">
+          Penyaluran Bantuan Sosial <strong style="color: #000000; font-weight: 700;">${tx.penerima}</strong>, di <strong style="color: #000000; font-weight: 700;">${tx.alamat || '-'}</strong>
+        </p>
+        <p style="font-size: 13.5px; margin: 0; color: #475569; font-family: Arial, Helvetica, sans-serif;">
+          ${formattedDateLabel}
+        </p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; box-sizing: border-box;">
+        ${tx.images.map((imgSrc, idx) => `
+          <div style="border: 1px solid #e2e8f0; padding: 10px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-radius: 12px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 620px;">
+            <img src="${imgSrc}" style="max-height: ${imgMaxHeight}; width: auto; max-width: 100%; object-fit: contain; border-radius: 8px; display: block;" ${imgSrc.startsWith('http') ? 'crossOrigin="anonymous"' : ''} alt="Dokumentasi ${idx + 1}" />
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.body.appendChild(container);
+
+    try {
+      await waitForImages(container);
+
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 794
+      });
+
+      return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+    } catch (err) {
+      console.error("Gagal generateDocumentationSheetBlob:", err);
+      return null;
+    } finally {
+      if (document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
+    }
+  };
+
   const handleDownloadDocumentationJPG = async (tx: OutboundTransaction) => {
     if (!tx.images || tx.images.length === 0) {
       alert("Tidak ada foto dokumentasi untuk transaksi ini.");
@@ -235,96 +349,23 @@ const CetakBeritaAcara: React.FC = () => {
       setIsDownloadingDoc(true);
       setDownloadingTxId(tx.id);
 
-      const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-      const dateObjRaw = new Date(tx.tanggal);
-      const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
-      const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
-
-      // Create an off-screen container matching Page 2 (Dokumentasi) layout exactly
-      const container = document.createElement('div');
-      container.style.position = 'fixed';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.width = '794px'; // Standard A4 width in px at 96dpi
-      container.style.minHeight = '1123px'; // Standard A4 height in px at 96dpi
-      container.style.backgroundColor = '#ffffff';
-      container.style.padding = '50px 45px';
-      container.style.boxSizing = 'border-box';
-      container.style.fontFamily = "'Urbanist', Arial, Helvetica, sans-serif";
-      container.style.display = 'flex';
-      container.style.flexDirection = 'column';
-      container.style.alignItems = 'center';
-      container.style.justifyContent = 'flex-start';
-      container.style.color = '#000000';
-
-      const imageCount = tx.images.length;
-      let imgMaxHeight = '420px';
-      if (imageCount === 1) {
-        imgMaxHeight = '650px';
-      } else if (imageCount === 2) {
-        imgMaxHeight = '420px';
-      } else if (imageCount >= 3) {
-        imgMaxHeight = '300px';
+      const sheetBlob = await generateDocumentationSheetBlob(tx);
+      if (!sheetBlob) {
+        throw new Error("Gagal membuat lembar dokumentasi JPG");
       }
 
-      container.innerHTML = `
-        <div style="width: 100%; text-align: center; margin-bottom: 24px;">
-          <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 14px 0; text-transform: uppercase; color: #000000; letter-spacing: 1.5px; font-family: 'Inter', Arial, sans-serif;">
-            DOKUMENTASI
-          </h2>
-          <p style="font-size: 15px; margin: 0 0 6px 0; color: #1e293b; line-height: 1.5; font-family: 'Inter', Arial, sans-serif;">
-            Penyaluran Bantuan Sosial <strong style="color: #000000; font-weight: 700;">${tx.penerima}</strong>, di <strong style="color: #000000; font-weight: 700;">${tx.alamat || '-'}</strong>
-          </p>
-          <p style="font-size: 13.5px; margin: 0; color: #475569; font-family: 'Inter', Arial, sans-serif;">
-            ${formattedDateLabel}
-          </p>
-        </div>
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; box-sizing: border-box;">
-          ${tx.images.map((imgSrc, idx) => `
-            <div style="border: 1px solid #e2e8f0; padding: 10px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-radius: 12px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 620px;">
-              <img src="${imgSrc}" style="max-height: ${imgMaxHeight}; width: auto; max-width: 100%; object-fit: contain; border-radius: 8px; display: block;" crossOrigin="anonymous" alt="Dokumentasi ${idx + 1}" />
-            </div>
-          `).join('')}
-        </div>
-      `;
-
-      document.body.appendChild(container);
-
-      // Ensure all images are fully loaded before rendering to canvas
-      const imgElements = Array.from(container.querySelectorAll('img'));
-      await Promise.all(imgElements.map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      }));
-
-      // Small delay for DOM layout settling
-      await new Promise(r => setTimeout(r, 120));
-
-      const canvas = await html2canvas(container, {
-        scale: 2, // 2x high resolution
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        windowWidth: 794
-      });
-
-      const jpgUrl = canvas.toDataURL('image/jpeg', 0.95);
       const sanitizedPenerima = tx.penerima.replace(/[/\\?%*:|"<>]/g, '_').trim();
       const sanitizedTanggal = (tx.tanggal || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
       const filename = `Dokumentasi_BAST_${sanitizedPenerima}_${sanitizedTanggal}.jpg`;
 
+      const downloadUrl = URL.createObjectURL(sheetBlob);
       const link = document.createElement('a');
-      link.href = jpgUrl;
+      link.href = downloadUrl;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      document.body.removeChild(container);
+      URL.revokeObjectURL(downloadUrl);
     } catch (err) {
       console.error("Gagal mengunduh lembar dokumentasi JPG:", err);
       alert("Gagal mengunduh lembar dokumentasi JPG. Silakan coba lagi.");
@@ -350,10 +391,24 @@ const CetakBeritaAcara: React.FC = () => {
   };
 
   const filteredOutbound = outbound.filter(tx => {
-    if (filterMonth !== 'All') {
+    // Filter Tahun
+    if (selectedYear) {
+      const stringYear = (tx.tanggal || '').slice(0, 4);
       const txDate = new Date(tx.tanggal);
-      if (isNaN(txDate.getTime())) return false;
-      const txMonthIndex = txDate.getMonth();
+      const txYear = stringYear.length === 4 && !isNaN(Number(stringYear))
+        ? stringYear
+        : (!isNaN(txDate.getTime()) ? txDate.getFullYear().toString() : '');
+      if (txYear !== selectedYear) return false;
+    }
+    if (filterMonth !== 'All') {
+      const parts = (tx.tanggal || '').split('-');
+      let txMonthIndex = -1;
+      if (parts.length >= 2 && !isNaN(Number(parts[1]))) {
+        txMonthIndex = parseInt(parts[1], 10) - 1;
+      } else {
+        const txDate = new Date(tx.tanggal);
+        if (!isNaN(txDate.getTime())) txMonthIndex = txDate.getMonth();
+      }
       return txMonthIndex.toString() === filterMonth;
     }
     return true;
@@ -370,29 +425,30 @@ const CetakBeritaAcara: React.FC = () => {
     return 0;
   });
 
-  const renderBA = (tx: OutboundTransaction, forPdf = false) => {
-    let html = docType === 'BA' 
+  const renderLetterHtml = (tx: OutboundTransaction, overrideDocType?: 'BA' | 'SPPB') => {
+    const activeDocType = overrideDocType || docType;
+    let html = activeDocType === 'BA' 
       ? (settings.baTemplate || defaultBA) 
       : (settings.sppbTemplate || defaultSPPB);
     
     // If we are in the editor, use the currentTemplate state
-    if (isEditorOpen) {
+    if (isEditorOpen && !overrideDocType) {
       html = currentTemplate;
     }
 
     const dateObj = new Date(tx.tanggal);
     const datePanjang = formatIndoDate(tx.tanggal);
     const logoHtml = settings.logo 
-      ? `<img src="${settings.logo}" style="height:75px; width:auto; object-fit:contain;" />`
+      ? `<img src="${settings.logo}" style="height:75px; width:auto; object-fit:contain;" ${settings.logo.startsWith('http') ? 'crossOrigin="anonymous"' : ''} />`
       : `<div style="width:60px; height:60px; background:#f8fafc; border:1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:8px; color:#94a3b8;">LOGO</div>`;
     let grandTotal = 0;
     const tableRows = tx.items.map((item, idx) => {
       const p = products.find(prod => prod.id === item.productId);
       const total = item.jumlah * (p?.harga || 0);
       grandTotal += total;
-      return `<tr style="font-size:11px;"><td style="border:1px solid #000; padding:6px; text-align:center;">${idx + 1}</td><td style="border:1px solid #000; padding:6px;">${p?.namaBarang || '-'}</td><td style="border:1px solid #000; padding:6px; text-align:center;">${item.jumlah}</td><td style="border:1px solid #000; padding:6px; text-align:center;">${p?.satuan || '-'}</td><td style="border:1px solid #000; padding:6px; text-align:right;">Rp ${(p?.harga || 0).toLocaleString('id-ID')}</td><td style="border:1px solid #000; padding:6px; text-align:right; font-weight:bold;">Rp ${total.toLocaleString('id-ID')}</td></tr>`;
+      return `<tr style="font-size:11px; font-family: Arial, Helvetica, sans-serif;"><td style="border:1px solid #000; padding:6px; text-align:center;">${idx + 1}</td><td style="border:1px solid #000; padding:6px;">${p?.namaBarang || '-'}</td><td style="border:1px solid #000; padding:6px; text-align:center;">${item.jumlah}</td><td style="border:1px solid #000; padding:6px; text-align:center;">${p?.satuan || '-'}</td><td style="border:1px solid #000; padding:6px; text-align:right;">Rp ${(p?.harga || 0).toLocaleString('id-ID')}</td><td style="border:1px solid #000; padding:6px; text-align:right; font-weight:bold;">Rp ${total.toLocaleString('id-ID')}</td></tr>`;
     }).join('');
-    const tableHtml = `<table style="width:100%; border-collapse:collapse; margin:10px 0;"><thead><tr style="background-color:#fff; font-size:10px; text-transform:uppercase;"><th style="border:1px solid #000; padding:8px; width:30px;">No</th><th style="border:1px solid #000; padding:8px; text-align:left;">Nama Barang</th><th style="border:1px solid #000; padding:8px; width:60px;">Jumlah</th><th style="border:1px solid #000; padding:8px; width:80px;">Satuan</th><th style="border:1px solid #000; padding:8px; text-align:right; width:100px;">Harga</th><th style="border:1px solid #000; padding:8px; text-align:right; width:120px;">Total</th></tr></thead><tbody>${tableRows}<tr style="font-weight:bold; font-size:11px;"><td colspan="5" style="border:1px solid #000; padding:8px; text-align:right;">Grand Total</td><td style="border:1px solid #000; padding:8px; text-align:right;">Rp ${grandTotal.toLocaleString('id-ID')}</td></tr></tbody></table>`;
+    const tableHtml = `<table style="width:100%; border-collapse:collapse; margin:10px 0; font-family: Arial, Helvetica, sans-serif;"><thead><tr style="background-color:#fff; font-size:10px; text-transform:uppercase; font-family: Arial, Helvetica, sans-serif;"><th style="border:1px solid #000; padding:8px; width:30px;">No</th><th style="border:1px solid #000; padding:8px; text-align:left;">Nama Barang</th><th style="border:1px solid #000; padding:8px; width:60px;">Jumlah</th><th style="border:1px solid #000; padding:8px; width:80px;">Satuan</th><th style="border:1px solid #000; padding:8px; text-align:right; width:100px;">Harga</th><th style="border:1px solid #000; padding:8px; text-align:right; width:120px;">Total</th></tr></thead><tbody>${tableRows}<tr style="font-weight:bold; font-size:11px; font-family: Arial, Helvetica, sans-serif;"><td colspan="5" style="border:1px solid #000; padding:8px; text-align:right;">Grand Total</td><td style="border:1px solid #000; padding:8px; text-align:right;">Rp ${grandTotal.toLocaleString('id-ID')}</td></tr></tbody></table>`;
     const kabidNama = settings.kabidNama || "NURKHOLIS, S.Kep, MM.";
     const kabidNip = settings.kabidNip || "19680328 198803 1 004";
     const kabidJabatan = settings.kabidJabatan || "Plt. Kepala Bidang Sosial Dinsos PPPA Kab. Blora";
@@ -461,191 +517,186 @@ const CetakBeritaAcara: React.FC = () => {
       .replace(/\[nama_sk_petugas\]/g, petugasNamaSk)
       .replace(/padding-left:\s*106px/gi, "padding-left:60px; white-space:nowrap")
       .replace(/padding-left:\s*130px/gi, "padding-left:90px; white-space:nowrap");
-    
-    const hasImages = docType === 'BA' && tx.images && tx.images.length > 0;
-    
-    if (forPdf) {
-      if (hasImages) {
-        const imageCount = tx.images?.length || 0;
-        let imgHeightStyle = "max-height: 110mm;";
-        if (imageCount >= 3) {
-          imgHeightStyle = "max-height: 60mm;";
-        } else if (imageCount === 2) {
-          imgHeightStyle = "max-height: 80mm;";
-        }
 
-        const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-        const dateObjRaw = new Date(tx.tanggal);
-        const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
-        const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+    // Enforce Arial across all font declarations in the letter
+    html = html.replace(/font-family:\s*[^;'"]+/gi, 'font-family: Arial, Helvetica, sans-serif');
 
-        const documentationHtml = `
-          <div class="html2pdf__page-break" style="page-break-before: always; text-align: center; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 170mm; min-height: auto; margin: 0 auto; padding-top: 0px;">
-            <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; color: #000; letter-spacing: 1px; text-align: center; width: 100%;">DOKUMENTASI</h2>
-            <p style="font-size: 14px; margin-bottom: 6px; color: #333; line-height: 1.4; text-align: center; width: 100%;">
-              Penyaluran Bantuan Sosial <strong>${tx.penerima}</strong>, di <strong>${tx.alamat || '-'}</strong>
-            </p>
-            <p style="font-size: 13px; margin-bottom: 30px; color: #555; text-align: center; width: 100%;">
-              ${formattedDateLabel}
-            </p>
-            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; width: 100%; max-width: 100%;">
-              ${(tx.images || []).map(img => `
-                <div style="border: 1px solid #ddd; padding: 10px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; box-sizing: border-box; display: inline-block;">
-                  <img src="${img}" style="${imgHeightStyle} max-width: 100%; object-fit: contain; border-radius: 4px;" />
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
+    return `<div class="document-root" data-document-font="arial" style="font-family: Arial, Helvetica, sans-serif !important; color: #000000; width: 100%;">${html}</div>`;
+  };
 
-        return `
-          <div style="background: white; margin: 0; padding: 0;">
-            <div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; box-sizing: border-box; background: white; margin: 0; padding: 0;">
-              <div style="width: 170mm; min-height: 240mm; font-family: 'Arial', sans-serif;">
-                ${html}
+  const renderBA = (tx: OutboundTransaction, forPdf = false, overrideDocType?: 'BA' | 'SPPB') => {
+    const letterHtml = renderLetterHtml(tx, overrideDocType);
+    const hasImages = (overrideDocType || docType) === 'BA' && tx.images && tx.images.length > 0;
+
+    if (hasImages) {
+      const imageCount = tx.images?.length || 0;
+      let imgHeightStyle = "max-height: 110mm;";
+      if (imageCount >= 3) {
+        imgHeightStyle = "max-height: 60mm;";
+      } else if (imageCount === 2) {
+        imgHeightStyle = "max-height: 80mm;";
+      }
+
+      const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      const dateObjRaw = new Date(tx.tanggal);
+      const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
+      const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+
+      const documentationHtml = `
+        <div class="document-root" data-document-font="arial" style="page-break-before: always; margin-top: 50px; border-top: 2px dashed #e2e8f0; padding-top: 50px; text-align: center; font-family: Arial, Helvetica, sans-serif !important; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%;">
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; color: #000; letter-spacing: 1px; text-align: center; width: 100%; font-family: Arial, Helvetica, sans-serif;">DOKUMENTASI</h2>
+          <p style="font-size: 14px; margin-bottom: 6px; color: #333; line-height: 1.4; text-align: center; width: 100%; font-family: Arial, Helvetica, sans-serif;">
+            Penyaluran Bantuan Sosial <strong>${tx.penerima}</strong>, di <strong>${tx.alamat || '-'}</strong>
+          </p>
+          <p style="font-size: 13px; margin-bottom: 30px; color: #555; text-align: center; width: 100%; font-family: Arial, Helvetica, sans-serif;">
+            ${formattedDateLabel}
+          </p>
+          <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; width: 100%; max-width: 100%;">
+            ${(tx.images || []).map(img => `
+              <div style="border: 1px solid #ddd; padding: 10px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; box-sizing: border-box; display: inline-block;">
+                <img src="${img}" style="${imgHeightStyle} max-width: 100%; object-fit: contain; border-radius: 4px;" ${img.startsWith('http') ? 'crossOrigin="anonymous"' : ''} />
               </div>
-            </div>
-            <div style="width: 210mm; height: 297mm; display: flex; align-items: flex-start; justify-content: center; box-sizing: border-box; background: white; margin: 0; padding: 25mm 0 0 0;">
-              ${documentationHtml}
-            </div>
+            `).join('')}
           </div>
-        `;
-      } else {
-        return `<div style="width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center; background: white; margin: 0; padding: 0;"><div style="width: 170mm; min-height: 240mm; font-family: 'Arial', sans-serif;">${html}</div></div>`;
-      }
-    } else {
-      if (hasImages) {
-        const imageCount = tx.images?.length || 0;
-        let imgHeightStyle = "max-height: 110mm;";
-        if (imageCount >= 3) {
-          imgHeightStyle = "max-height: 60mm;";
-        } else if (imageCount === 2) {
-          imgHeightStyle = "max-height: 80mm;";
-        }
-
-        const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-        const dateObjRaw = new Date(tx.tanggal);
-        const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
-        const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
-
-        const documentationHtml = `
-          <div class="html2pdf__page-break" style="page-break-before: always; margin-top: 50px; border-top: 2px dashed #e2e8f0; padding-top: 50px; text-align: center; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; box-sizing: border-box; width: 100%;">
-            <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; color: #000; letter-spacing: 1px; text-align: center; width: 100%;">DOKUMENTASI</h2>
-            <p style="font-size: 14px; margin-bottom: 6px; color: #333; line-height: 1.4; text-align: center; width: 100%;">
-              Penyaluran Bantuan Sosial <strong>${tx.penerima}</strong>, di <strong>${tx.alamat || '-'}</strong>
-            </p>
-            <p style="font-size: 13px; margin-bottom: 30px; color: #555; text-align: center; width: 100%;">
-              ${formattedDateLabel}
-            </p>
-            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; width: 100%; max-width: 100%;">
-              ${(tx.images || []).map(img => `
-                <div style="border: 1px solid #ddd; padding: 10px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 8px; box-sizing: border-box; display: inline-block;">
-                  <img src="${img}" style="${imgHeightStyle} max-width: 100%; object-fit: contain; border-radius: 4px;" />
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-        return `<div>${html}</div>${documentationHtml}`;
-      }
-      return html;
+        </div>
+      `;
+      return `<div>${letterHtml}</div>${documentationHtml}`;
     }
+    return letterHtml;
   };
 
-  const handleDownloadPDF = () => {
-    if (!printAreaRef.current || !selectedTx) return;
-    setIsGenerating(true);
-    const container = document.createElement('div');
-    container.innerHTML = renderBA(selectedTx, true);
-    document.body.appendChild(container);
-    const opt = { margin: 0, filename: `BAST_${selectedTx.penerima.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 1 }, html2canvas: { scale: 3, useCORS: true, letterRendering: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
-    html2pdf().set(opt).from(container).save().then(() => {
-      document.body.removeChild(container);
-      setIsGenerating(false);
-    });
-  };
-
-  const generateDocumentationSheetBlob = async (tx: OutboundTransaction): Promise<Blob | null> => {
-    if (!tx.images || tx.images.length === 0) return null;
-
-    const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-    const dateObjRaw = new Date(tx.tanggal);
-    const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
-    const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+  const generateTransactionPdfBlob = async (tx: OutboundTransaction, overrideDocType?: 'BA' | 'SPPB'): Promise<Blob> => {
+    const targetDocType = overrideDocType || docType;
+    const letterHtml = renderLetterHtml(tx, targetDocType);
+    const hasImages = targetDocType === 'BA' && tx.images && tx.images.length > 0;
 
     const container = document.createElement('div');
+    container.className = 'document-root';
+    container.setAttribute('data-document-font', 'arial');
     container.style.position = 'fixed';
-    container.style.left = '-9999px';
     container.style.top = '0';
+    container.style.left = '0';
     container.style.width = '794px';
     container.style.minHeight = '1123px';
     container.style.backgroundColor = '#ffffff';
-    container.style.padding = '50px 45px';
+    container.style.zIndex = '99999';
+    container.style.pointerEvents = 'none';
     container.style.boxSizing = 'border-box';
-    container.style.fontFamily = "'Urbanist', Arial, Helvetica, sans-serif";
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.alignItems = 'center';
-    container.style.justifyContent = 'flex-start';
-    container.style.color = '#000000';
-
-    const imageCount = tx.images.length;
-    let imgMaxHeight = '420px';
-    if (imageCount === 1) {
-      imgMaxHeight = '650px';
-    } else if (imageCount === 2) {
-      imgMaxHeight = '420px';
-    } else if (imageCount >= 3) {
-      imgMaxHeight = '300px';
-    }
-
-    container.innerHTML = `
-      <div style="width: 100%; text-align: center; margin-bottom: 24px;">
-        <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 14px 0; text-transform: uppercase; color: #000000; letter-spacing: 1.5px; font-family: 'Inter', Arial, sans-serif;">
-          DOKUMENTASI
-        </h2>
-        <p style="font-size: 15px; margin: 0 0 6px 0; color: #1e293b; line-height: 1.5; font-family: 'Inter', Arial, sans-serif;">
-          Penyaluran Bantuan Sosial <strong style="color: #000000; font-weight: 700;">${tx.penerima}</strong>, di <strong style="color: #000000; font-weight: 700;">${tx.alamat || '-'}</strong>
-        </p>
-        <p style="font-size: 13.5px; margin: 0; color: #475569; font-family: 'Inter', Arial, sans-serif;">
-          ${formattedDateLabel}
-        </p>
-      </div>
-      <div style="display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; box-sizing: border-box;">
-        ${tx.images.map((imgSrc, idx) => `
-          <div style="border: 1px solid #e2e8f0; padding: 10px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-radius: 12px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 620px;">
-            <img src="${imgSrc}" style="max-height: ${imgMaxHeight}; width: auto; max-width: 100%; object-fit: contain; border-radius: 8px; display: block;" crossOrigin="anonymous" alt="Dokumentasi ${idx + 1}" />
-          </div>
-        `).join('')}
-      </div>
-    `;
+    container.style.opacity = '1';
+    container.style.visibility = 'visible';
+    container.style.fontFamily = 'Arial, Helvetica, sans-serif';
 
     document.body.appendChild(container);
 
     try {
-      const imgElements = Array.from(container.querySelectorAll('img'));
-      await Promise.all(imgElements.map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      }));
-      await new Promise(r => setTimeout(r, 60));
+      // 1. Render Page 1 (Surat)
+      container.innerHTML = `
+        <div class="document-root" data-document-font="arial" style="width: 794px; min-height: 1123px; background: #ffffff; padding: 45px 50px; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif !important; color: #000000;">
+          ${letterHtml}
+        </div>
+      `;
 
-      const canvas = await html2canvas(container, {
+      await waitForImages(container);
+
+      const canvas1 = await html2canvas(container, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        scrollX: 0,
+        scrollY: 0,
         windowWidth: 794
       });
 
-      return await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-    } catch (err) {
-      console.error("Gagal generateDocumentationSheetBlob:", err);
-      return null;
+      // 2. Render Page 2 (Foto Dokumentasi) if images exist
+      let canvas2: HTMLCanvasElement | null = null;
+      if (hasImages) {
+        const dateDays = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        const dateObjRaw = new Date(tx.tanggal);
+        const dayName = !isNaN(dateObjRaw.getTime()) ? dateDays[dateObjRaw.getDay()] : "";
+        const formattedDateLabel = dayName ? `${dayName}, ${formatIndoDate(tx.tanggal)}` : formatIndoDate(tx.tanggal);
+
+        const imageCount = tx.images?.length || 0;
+        let imgMaxHeight = '420px';
+        if (imageCount === 1) {
+          imgMaxHeight = '650px';
+        } else if (imageCount === 2) {
+          imgMaxHeight = '420px';
+        } else if (imageCount >= 3) {
+          imgMaxHeight = '300px';
+        }
+
+        container.innerHTML = `
+          <div class="document-root" data-document-font="arial" style="width: 794px; min-height: 1123px; background: #ffffff; padding: 50px 45px; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif !important; color: #000000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+            <div style="width: 100%; text-align: center; margin-bottom: 24px; font-family: Arial, Helvetica, sans-serif;">
+              <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 14px 0; text-transform: uppercase; color: #000000; letter-spacing: 1.5px; font-family: Arial, Helvetica, sans-serif;">
+                DOKUMENTASI
+              </h2>
+              <p style="font-size: 15px; margin: 0 0 6px 0; color: #1e293b; line-height: 1.5; font-family: Arial, Helvetica, sans-serif;">
+                Penyaluran Bantuan Sosial <strong style="color: #000000; font-weight: 700;">${tx.penerima}</strong>, di <strong style="color: #000000; font-weight: 700;">${tx.alamat || '-'}</strong>
+              </p>
+              <p style="font-size: 13.5px; margin: 0; color: #475569; font-family: Arial, Helvetica, sans-serif;">
+                ${formattedDateLabel}
+              </p>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; box-sizing: border-box;">
+              ${(tx.images || []).map((imgSrc, idx) => `
+                <div style="border: 1px solid #e2e8f0; padding: 10px; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-radius: 12px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 620px;">
+                  <img src="${imgSrc}" style="max-height: ${imgMaxHeight}; width: auto; max-width: 100%; object-fit: contain; border-radius: 8px; display: block;" ${imgSrc.startsWith('http') ? 'crossOrigin="anonymous"' : ''} alt="Dokumentasi ${idx + 1}" />
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+
+        await waitForImages(container);
+
+        canvas2 = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 794
+        });
+      }
+
+      // 3. Assemble PDF using pdf-lib
+      const pdfDoc = await PDFDocument.create();
+      const a4Width = 595.28;
+      const a4Height = 841.89;
+
+      // Add Page 1 (Surat)
+      const img1DataUrl = canvas1.toDataURL('image/jpeg', 0.95);
+      const img1Bytes = dataUrlToBytes(img1DataUrl);
+      const pdfImage1 = await pdfDoc.embedJpg(img1Bytes);
+      const pdfPage1 = pdfDoc.addPage([a4Width, a4Height]);
+      pdfPage1.drawImage(pdfImage1, {
+        x: 0,
+        y: 0,
+        width: a4Width,
+        height: a4Height,
+      });
+
+      // Add Page 2 (Dokumentasi) if available
+      if (canvas2) {
+        const img2DataUrl = canvas2.toDataURL('image/jpeg', 0.95);
+        const img2Bytes = dataUrlToBytes(img2DataUrl);
+        const pdfImage2 = await pdfDoc.embedJpg(img2Bytes);
+        const pdfPage2 = pdfDoc.addPage([a4Width, a4Height]);
+        pdfPage2.drawImage(pdfImage2, {
+          x: 0,
+          y: 0,
+          width: a4Width,
+          height: a4Height,
+        });
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      return new Blob([pdfBytes], { type: 'application/pdf' });
     } finally {
       if (document.body.contains(container)) {
         document.body.removeChild(container);
@@ -653,15 +704,39 @@ const CetakBeritaAcara: React.FC = () => {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!selectedTx) return;
+    try {
+      setIsGenerating(true);
+      const pdfBlob = await generateTransactionPdfBlob(selectedTx, docType);
+      const sanitizedPenerima = selectedTx.penerima.replace(/[/\\?%*:|"<>]/g, '_').trim();
+      const filename = `${docType === 'BA' ? 'BAST' : 'SPPB'}_${sanitizedPenerima}.pdf`;
+      const downloadUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Gagal mengunduh PDF:", err);
+      alert("Terjadi kendala saat membuat file PDF. Silakan coba kembali.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleDownloadMonthlyBAZip = async () => {
+    const selName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : 'Semua';
     if (filteredOutbound.length === 0) {
-      const selName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : '';
-      alert(`Tidak ada data transaksi pada bulan ${selName}.`);
+      alert(`Tidak ada Berita Acara yang ditemukan pada bulan ${selName}.`);
       return;
     }
 
-    const selName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : 'Semua';
+    const prevScrollY = window.scrollY;
     try {
+      window.scrollTo(0, 0);
       setZipProgress({
         title: `Download ZIP Berita Acara (Bulan ${selName})`,
         label: 'Menyiapkan berkas dokumen...',
@@ -670,9 +745,9 @@ const CetakBeritaAcara: React.FC = () => {
       });
 
       const zip = new JSZip();
-      const yearStr = filteredOutbound[0]?.tanggal 
+      const yearStr = selectedYear || (filteredOutbound[0]?.tanggal 
         ? new Date(filteredOutbound[0].tanggal).getFullYear().toString() 
-        : new Date().getFullYear().toString();
+        : new Date().getFullYear().toString());
 
       for (let i = 0; i < filteredOutbound.length; i++) {
         const tx = filteredOutbound[i];
@@ -683,38 +758,10 @@ const CetakBeritaAcara: React.FC = () => {
           total: filteredOutbound.length
         });
 
-        const container = document.createElement('div');
-        container.style.position = 'fixed';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.width = '210mm';
-        container.style.backgroundColor = '#ffffff';
-        container.innerHTML = renderBA(tx, true);
-        document.body.appendChild(container);
-
-        const imgElements = Array.from(container.querySelectorAll('img'));
-        await Promise.all(imgElements.map(img => {
-          if (img.complete) return Promise.resolve();
-          return new Promise(res => { img.onload = res; img.onerror = res; });
-        }));
-        await new Promise(res => setTimeout(res, 60));
-
         const sanitizedPenerima = (tx.penerima || 'Penerima').replace(/[/\\?%*:|"<>]/g, '_').trim();
         const sanitizedTanggal = (tx.tanggal || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
 
-        const opt = { 
-          margin: 0, 
-          filename: `BAST_${sanitizedPenerima}.pdf`, 
-          image: { type: 'jpeg', quality: 0.98 }, 
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true }, 
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
-        };
-
-        const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
-        if (document.body.contains(container)) {
-          document.body.removeChild(container);
-        }
-
+        const pdfBlob = await generateTransactionPdfBlob(tx, 'BA');
         const pdfFilename = `${String(i + 1).padStart(2, '0')}_BAST_${sanitizedPenerima}_${sanitizedTanggal}.pdf`;
         zip.file(pdfFilename, pdfBlob);
       }
@@ -730,7 +777,7 @@ const CetakBeritaAcara: React.FC = () => {
       const downloadUrl = URL.createObjectURL(zipBlob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `BA_Bulanan_${selName}_${yearStr}.zip`;
+      link.download = `Berita_Acara_${selName}_${yearStr}.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -739,6 +786,7 @@ const CetakBeritaAcara: React.FC = () => {
       console.error("Gagal mengunduh ZIP Berita Acara:", err);
       alert("Terjadi kendala saat menyusun file ZIP Berita Acara. Silakan coba kembali.");
     } finally {
+      window.scrollTo(0, prevScrollY);
       setZipProgress(null);
     }
   };
@@ -751,7 +799,9 @@ const CetakBeritaAcara: React.FC = () => {
       return;
     }
 
+    const prevScrollY = window.scrollY;
     try {
+      window.scrollTo(0, 0);
       setZipProgress({
         title: `Download ZIP Foto Dokumentasi (Bulan ${selName})`,
         label: 'Mengumpulkan foto transaksi...',
@@ -760,9 +810,9 @@ const CetakBeritaAcara: React.FC = () => {
       });
 
       const zip = new JSZip();
-      const yearStr = filteredOutbound[0]?.tanggal 
+      const yearStr = selectedYear || (filteredOutbound[0]?.tanggal 
         ? new Date(filteredOutbound[0].tanggal).getFullYear().toString() 
-        : new Date().getFullYear().toString();
+        : new Date().getFullYear().toString());
 
       for (let i = 0; i < txsWithImages.length; i++) {
         const tx = txsWithImages[i];
@@ -828,6 +878,7 @@ const CetakBeritaAcara: React.FC = () => {
       console.error("Gagal mengunduh ZIP Foto Dokumentasi:", err);
       alert("Terjadi kendala saat menyusun file ZIP foto. Silakan coba kembali.");
     } finally {
+      window.scrollTo(0, prevScrollY);
       setZipProgress(null);
     }
   };
@@ -870,8 +921,8 @@ const CetakBeritaAcara: React.FC = () => {
           </div>
         </div>
         <div className="flex justify-start sm:justify-center overflow-x-auto p-4 scrollbar-hide bg-slate-200/50 dark:bg-white/5 rounded-ios-lg border border-slate-300 dark:border-white/5">
-          <div ref={printAreaRef} className="bg-white w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl shrink-0 flex flex-col justify-start">
-            <div className="w-[170mm] mx-auto text-black">
+          <div ref={printAreaRef} className="print-area document-root bg-white w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl shrink-0 flex flex-col justify-start" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+            <div className="w-[170mm] mx-auto text-black" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
               <div dangerouslySetInnerHTML={{ __html: renderBA(selectedTx) }} />
             </div>
           </div>
@@ -887,7 +938,12 @@ const CetakBeritaAcara: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Berita Acara & SPPB</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Berita Acara & SPPB</h2>
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-extrabold text-[11px] border border-blue-200/50 dark:border-blue-800/40">
+              Tahun {selectedYear}
+            </span>
+          </div>
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Buat dokumen serah terima resmi atau surat perintah pengeluaran barang.</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -898,8 +954,9 @@ const CetakBeritaAcara: React.FC = () => {
 
       <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg shadow-sm border border-white/80 dark:border-white/10 overflow-hidden theme-transition w-full">
         <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            Daftar Berita Acara & SPPB
+          <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <span>Daftar Berita Acara & SPPB</span>
+            <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-extrabold text-[10px] normal-case">Tahun {selectedYear}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
             {/* Filter Bulan */}
@@ -958,7 +1015,7 @@ const CetakBeritaAcara: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                    Download Bulanan: Bulan {selectedMonthName}
+                    Download Bulanan: Bulan {selectedMonthName} {selectedYear}
                   </span>
                   <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px]">
                     {filteredOutbound.length} Dokumen
@@ -1171,7 +1228,7 @@ const CetakBeritaAcara: React.FC = () => {
                       <button onClick={() => handleFormat('bold')} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-ios text-slate-600 dark:text-slate-300"><Bold size={18}/></button>
                       <button onClick={() => handleFormat('justifyCenter')} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-ios text-slate-600 dark:text-slate-300"><AlignCenter size={18}/></button>
                     </div>
-                    <div ref={editorRef} contentEditable suppressContentEditableWarning className="bg-white w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl outline-none shrink-0 text-black" style={{ fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: currentTemplate }} onInput={(e) => setCurrentTemplate(e.currentTarget.innerHTML)}/>
+                    <div ref={editorRef} contentEditable suppressContentEditableWarning className="print-area document-root bg-white w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl outline-none shrink-0 text-black" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }} dangerouslySetInnerHTML={{ __html: currentTemplate }} onInput={(e) => setCurrentTemplate(e.currentTarget.innerHTML)}/>
                   </div>
                </div>
             </div>

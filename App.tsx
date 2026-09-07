@@ -30,7 +30,8 @@ import {
   Bell,
   LogOut,
   Sparkles,
-  LayoutGrid
+  LayoutGrid,
+  ChevronDown
 } from 'lucide-react';
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
@@ -118,6 +119,8 @@ interface InventoryContextType {
   setDocuments: (data: ArchiveDocument[] | ((prev: ArchiveDocument[]) => ArchiveDocument[])) => void;
   settings: AppSettings;
   setSettings: (newSettings: AppSettings) => void;
+  selectedYear: string;
+  setSelectedYear: (year: string) => void;
   calculateStock: (productId: string) => number;
   isCloudConnected: boolean;
   isRescuing: boolean;
@@ -141,7 +144,7 @@ export const useInventory = () => {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout, userPermissions, hasPermission } = useInventory();
+  const { settings, isCloudConnected, isRescuing, toggleTheme, syncError, user, logout, userPermissions, hasPermission, selectedYear, setSelectedYear } = useInventory();
   const location = useLocation();
   const todayFormatted = formatIndoDate(new Date().toISOString().split('T')[0]);
 
@@ -352,8 +355,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
 
             {/* Right: Circular Floating Action Buttons */}
-            <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-2.5">
               
+              {/* Selector Dropdown Tahun (2026, 2027) di sebelah kiri status sync */}
+              <div className="flex items-center">
+                <div className="relative flex items-center bg-slate-100/90 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-ios px-2.5 py-1.5 shadow-sm hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors">
+                  <CalendarDays size={13} className="text-blue-600 dark:text-blue-400 shrink-0 mr-1.5" />
+                  <select
+                    id="year-select-dropdown"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="bg-transparent text-xs font-black text-slate-800 dark:text-slate-100 outline-none cursor-pointer pr-4 appearance-none focus:outline-none"
+                    title="Pilih Tahun"
+                  >
+                    <option value="2026" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-bold">2026</option>
+                    <option value="2027" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-bold">2027</option>
+                  </select>
+                  <ChevronDown size={12} className="text-slate-400 dark:text-slate-500 pointer-events-none absolute right-2 shrink-0" />
+                </div>
+              </div>
+
               {/* Cloud Sync Status Badge */}
               <div className="hidden sm:flex items-center">
                 {isRescuing ? (
@@ -803,6 +824,21 @@ const App: React.FC = () => {
   const [isRescuing, setIsRescuing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [storageState] = useState<FirebaseStorage | null>(firebaseStorage);
+
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('sitampan_selected_year');
+      return saved === '2027' ? '2027' : '2026';
+    } catch (e) {
+      return '2026';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sitampan_selected_year', selectedYear);
+    } catch (e) {}
+  }, [selectedYear]);
 
   const [settings, setSettingsState] = useState<AppSettings>(() => {
     try {
@@ -1287,7 +1323,7 @@ const RestrictedAccess: React.FC<{ user: any; logout: () => void }> = ({ user, l
   };
 
   return (
-    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle, userPermissions, hasPermission }}>
+    <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, selectedYear, setSelectedYear, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle, userPermissions, hasPermission }}>
       <HashRouter>
         <Layout>
           <Routes>

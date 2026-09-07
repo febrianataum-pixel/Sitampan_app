@@ -70,8 +70,31 @@
         :root {
             --font-main: 'Urbanist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        *, html, body, button, input, select, textarea { 
-            font-family: 'Urbanist', var(--font-main) !important;
+        html, body, button, input, select, textarea { 
+            font-family: 'Urbanist', var(--font-main);
+        }
+        
+        /* Enforce Arial font for documents, BA, SPPB, and documentation sheets */
+        .document-root,
+        .document-root *,
+        .print-area,
+        .print-area *,
+        [data-document-font="arial"],
+        [data-document-font="arial"] * {
+            font-family: Arial, Helvetica, sans-serif !important;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: #ffffff !important;
+            }
+            .print-area,
+            .print-area * {
+                font-family: Arial, Helvetica, sans-serif !important;
+            }
         }
         body { 
             background: linear-gradient(135deg, #dbe5fb 0%, #eef3fd 45%, #d6e2fa 100%);
