@@ -734,6 +734,14 @@ const CetakBeritaAcara: React.FC = () => {
       return;
     }
 
+    // Urutkan per tanggal dari kecil ke besar (ascending)
+    const sortedTxs = [...filteredOutbound].sort((a, b) => {
+      const dateA = a.tanggal || '';
+      const dateB = b.tanggal || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return (a.penerima || '').localeCompare(b.penerima || '');
+    });
+
     const prevScrollY = window.scrollY;
     try {
       window.scrollTo(0, 0);
@@ -741,21 +749,21 @@ const CetakBeritaAcara: React.FC = () => {
         title: `Download ZIP Berita Acara (Bulan ${selName})`,
         label: 'Menyiapkan berkas dokumen...',
         current: 0,
-        total: filteredOutbound.length
+        total: sortedTxs.length
       });
 
       const zip = new JSZip();
-      const yearStr = selectedYear || (filteredOutbound[0]?.tanggal 
-        ? new Date(filteredOutbound[0].tanggal).getFullYear().toString() 
+      const yearStr = selectedYear || (sortedTxs[0]?.tanggal 
+        ? new Date(sortedTxs[0].tanggal).getFullYear().toString() 
         : new Date().getFullYear().toString());
 
-      for (let i = 0; i < filteredOutbound.length; i++) {
-        const tx = filteredOutbound[i];
+      for (let i = 0; i < sortedTxs.length; i++) {
+        const tx = sortedTxs[i];
         setZipProgress({
           title: `Download ZIP Berita Acara (Bulan ${selName})`,
-          label: `Membuat PDF BA: ${tx.penerima} (${i + 1}/${filteredOutbound.length})...`,
+          label: `Membuat PDF BA: ${tx.penerima} (${i + 1}/${sortedTxs.length})...`,
           current: i + 1,
-          total: filteredOutbound.length
+          total: sortedTxs.length
         });
 
         const sanitizedPenerima = (tx.penerima || 'Penerima').replace(/[/\\?%*:|"<>]/g, '_').trim();
@@ -769,8 +777,8 @@ const CetakBeritaAcara: React.FC = () => {
       setZipProgress({
         title: `Download ZIP Berita Acara (Bulan ${selName})`,
         label: 'Mengompresi seluruh berkas ke dalam file ZIP...',
-        current: filteredOutbound.length,
-        total: filteredOutbound.length
+        current: sortedTxs.length,
+        total: sortedTxs.length
       });
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -793,7 +801,16 @@ const CetakBeritaAcara: React.FC = () => {
 
   const handleDownloadMonthlyPhotosZip = async () => {
     const selName = filterMonth !== 'All' ? MONTHS[parseInt(filterMonth)] : 'Semua';
-    const txsWithImages = filteredOutbound.filter(tx => tx.images && tx.images.length > 0);
+    // Filter transaksi yang memiliki foto dan urutkan per tanggal dari kecil ke besar (ascending)
+    const txsWithImages = filteredOutbound
+      .filter(tx => tx.images && tx.images.length > 0)
+      .sort((a, b) => {
+        const dateA = a.tanggal || '';
+        const dateB = b.tanggal || '';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        return (a.penerima || '').localeCompare(b.penerima || '');
+      });
+
     if (txsWithImages.length === 0) {
       alert(`Tidak ada foto dokumentasi pada transaksi di bulan ${selName}.`);
       return;
@@ -810,8 +827,8 @@ const CetakBeritaAcara: React.FC = () => {
       });
 
       const zip = new JSZip();
-      const yearStr = selectedYear || (filteredOutbound[0]?.tanggal 
-        ? new Date(filteredOutbound[0].tanggal).getFullYear().toString() 
+      const yearStr = selectedYear || (txsWithImages[0]?.tanggal 
+        ? new Date(txsWithImages[0].tanggal).getFullYear().toString() 
         : new Date().getFullYear().toString());
 
       for (let i = 0; i < txsWithImages.length; i++) {
