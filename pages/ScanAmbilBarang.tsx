@@ -66,12 +66,12 @@ export const ScanAmbilBarang: React.FC = () => {
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
 
-  // Urutkan barang sesuai abjad A - Z
-  const sortedProducts = useMemo(() => {
-    return [...products].sort((a, b) => 
-      a.namaBarang.localeCompare(b.namaBarang, 'id', { sensitivity: 'base' })
-    );
-  }, [products]);
+  // Hanya tampilkan barang yang stoknya masih ada (stok > 0) dan urutkan sesuai abjad A - Z
+  const getAvailableProductsForSelect = (selectedId?: string) => {
+    return products
+      .filter(p => calculateStock(p.id) > 0 || (selectedId && p.id === selectedId))
+      .sort((a, b) => a.namaBarang.localeCompare(b.namaBarang, 'id', { sensitivity: 'base' }));
+  };
 
   const [images, setImages] = useState<string[]>([]);
   const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
@@ -700,20 +700,21 @@ export const ScanAmbilBarang: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between items-center px-1 pt-2 text-[10px] text-slate-400 font-medium">
                                   <span>Urutan Abjad A - Z</span>
-                                  <span>
-                                    {sortedProducts.filter(p => {
+                                  <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                    {getAvailableProductsForSelect(item.productId).filter(p => {
                                       const q = (searchQueries[item.id] || '').toLowerCase();
                                       return p.namaBarang.toLowerCase().includes(q) || p.kodeBarang.toLowerCase().includes(q);
-                                    }).length} barang ditemukan
+                                    }).length} barang bersisa stok
                                   </span>
                                 </div>
                               </div>
 
-                              {/* Scrollable list of products */}
+                              {/* Scrollable list of products (hanya stok > 0) */}
                               <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-white/5 p-1">
                                 {(() => {
+                                  const availableList = getAvailableProductsForSelect(item.productId);
                                   const q = (searchQueries[item.id] || '').toLowerCase();
-                                  const filtered = sortedProducts.filter(p => 
+                                  const filtered = availableList.filter(p => 
                                     p.namaBarang.toLowerCase().includes(q) || 
                                     p.kodeBarang.toLowerCase().includes(q)
                                   );
@@ -722,7 +723,11 @@ export const ScanAmbilBarang: React.FC = () => {
                                     return (
                                       <div className="py-6 text-center text-xs text-slate-400">
                                         <Package size={24} className="mx-auto mb-1.5 opacity-30" />
-                                        <p>Tidak ada barang yang cocok dengan &quot;{searchQueries[item.id]}&quot;</p>
+                                        <p>
+                                          {searchQueries[item.id] 
+                                            ? `Tidak ada barang bersisa stok yang cocok dengan "${searchQueries[item.id]}"` 
+                                            : 'Tidak ada barang dengan stok tersedia (> 0) di gudang'}
+                                        </p>
                                       </div>
                                     );
                                   }
