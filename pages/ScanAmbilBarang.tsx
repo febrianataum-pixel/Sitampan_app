@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useInventory } from '../App';
 import { 
@@ -22,7 +22,10 @@ import {
   Check,
   RotateCcw,
   Sparkles,
-  FileText
+  FileText,
+  Search,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { OutboundTransaction, OutboundItem, formatIndoDate, Product } from '../types';
 
@@ -59,6 +62,16 @@ export const ScanAmbilBarang: React.FC = () => {
   const [items, setItems] = useState<OutboundItem[]>([
     { id: crypto.randomUUID(), productId: '', jumlah: 1 }
   ]);
+
+  const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+
+  // Urutkan barang sesuai abjad A - Z
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => 
+      a.namaBarang.localeCompare(b.namaBarang, 'id', { sensitivity: 'base' })
+    );
+  }, [products]);
 
   const [images, setImages] = useState<string[]>([]);
   const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
@@ -161,7 +174,7 @@ export const ScanAmbilBarang: React.FC = () => {
     e.preventDefault();
 
     if (!generalData.penerima.trim()) {
-      alert('Nama penerima / pengambil barang wajib diisi!');
+      alert('Nama penerima wajib diisi!');
       return;
     }
 
@@ -469,7 +482,7 @@ export const ScanAmbilBarang: React.FC = () => {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Nama Penerima / Pengambil Barang*
+                    Nama Penerima*
                   </label>
                   {user && (
                     <button
@@ -484,7 +497,7 @@ export const ScanAmbilBarang: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Budi Santoso / Tim Evakuasi Desa A"
+                  placeholder="Contoh: Budi Santoso / Tim Relawan / Desa A"
                   value={generalData.penerima}
                   onChange={(e) => setGeneralData({ ...generalData, penerima: e.target.value })}
                   className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -611,24 +624,151 @@ export const ScanAmbilBarang: React.FC = () => {
                     </div>
 
                     <div className="space-y-3">
-                      {/* Product Selector */}
-                      <div>
-                        <select
-                          required
-                          value={item.productId}
-                          onChange={(e) => handleItemChange(item.id, 'productId', e.target.value)}
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-3 font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      {/* Searchable Product Selector */}
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                          Pilih Barang Logistik (Urut Abjad A-Z)*
+                        </label>
+
+                        {/* Trigger Button showing selected item or placeholder */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveDropdownId(activeDropdownId === item.id ? null : item.id);
+                          }}
+                          className={`w-full text-left bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-3 font-bold text-xs text-slate-800 dark:text-slate-200 outline-none transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                            activeDropdownId === item.id 
+                              ? 'ring-2 ring-indigo-500/20 border-indigo-500' 
+                              : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                          }`}
                         >
-                          <option value="">-- Pilih Barang dari Gudang --</option>
-                          {products.map(p => {
-                            const stock = calculateStock(p.id);
-                            return (
-                              <option key={p.id} value={p.id}>
-                                {p.namaBarang} ({p.kodeBarang}) - Sisa Stok: {stock} {p.satuan}
-                              </option>
-                            );
-                          })}
-                        </select>
+                          {selectedProd ? (
+                            <div className="flex items-center justify-between w-full min-w-0 pr-1">
+                              <div className="truncate">
+                                <span className="text-slate-900 dark:text-white font-extrabold">{selectedProd.namaBarang}</span>
+                                <span className="text-slate-400 font-normal ml-1.5 uppercase text-[10px]">({selectedProd.kodeBarang})</span>
+                              </div>
+                              <span className={`shrink-0 ml-2 px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                                currentStock > 10 
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                                  : currentStock > 0 
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' 
+                                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                              }`}>
+                                Stok: {currentStock} {selectedProd.satuan}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-normal flex items-center gap-1.5">
+                              <Search size={14} className="text-slate-400" />
+                              Pilih atau cari barang dari gudang (A-Z)...
+                            </span>
+                          )}
+                          <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${activeDropdownId === item.id ? 'rotate-180 text-indigo-500' : ''}`} />
+                        </button>
+
+                        {/* Searchable Dropdown Popup */}
+                        {activeDropdownId === item.id && (
+                          <>
+                            {/* Backdrop to close when clicking outside */}
+                            <div className="fixed inset-0 z-30" onClick={() => setActiveDropdownId(null)} />
+                            
+                            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 z-40 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                              
+                              {/* Search Input Box */}
+                              <div className="p-2.5 bg-slate-50 dark:bg-white/5 border-b border-slate-100 dark:border-white/10 relative">
+                                <div className="relative flex items-center">
+                                  <Search size={14} className="absolute left-3 text-indigo-500 shrink-0" />
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="Ketik untuk mencari nama atau kode barang..."
+                                    value={searchQueries[item.id] || ''}
+                                    onChange={(e) => setSearchQueries({ ...searchQueries, [item.id]: e.target.value })}
+                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                  />
+                                  {searchQueries[item.id] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSearchQueries({ ...searchQueries, [item.id]: '' })}
+                                      className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full cursor-pointer"
+                                      title="Hapus kata kunci"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex justify-between items-center px-1 pt-2 text-[10px] text-slate-400 font-medium">
+                                  <span>Urutan Abjad A - Z</span>
+                                  <span>
+                                    {sortedProducts.filter(p => {
+                                      const q = (searchQueries[item.id] || '').toLowerCase();
+                                      return p.namaBarang.toLowerCase().includes(q) || p.kodeBarang.toLowerCase().includes(q);
+                                    }).length} barang ditemukan
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Scrollable list of products */}
+                              <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-white/5 p-1">
+                                {(() => {
+                                  const q = (searchQueries[item.id] || '').toLowerCase();
+                                  const filtered = sortedProducts.filter(p => 
+                                    p.namaBarang.toLowerCase().includes(q) || 
+                                    p.kodeBarang.toLowerCase().includes(q)
+                                  );
+
+                                  if (filtered.length === 0) {
+                                    return (
+                                      <div className="py-6 text-center text-xs text-slate-400">
+                                        <Package size={24} className="mx-auto mb-1.5 opacity-30" />
+                                        <p>Tidak ada barang yang cocok dengan &quot;{searchQueries[item.id]}&quot;</p>
+                                      </div>
+                                    );
+                                  }
+
+                                  return filtered.map(p => {
+                                    const stock = calculateStock(p.id);
+                                    const isSelected = item.productId === p.id;
+                                    return (
+                                      <button
+                                        key={p.id}
+                                        type="button"
+                                        onClick={() => {
+                                          handleItemChange(item.id, 'productId', p.id);
+                                          setActiveDropdownId(null);
+                                        }}
+                                        className={`w-full text-left p-2.5 rounded-xl hover:bg-indigo-50/80 dark:hover:bg-indigo-950/30 transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                                          isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400' : ''
+                                        }`}
+                                      >
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
+                                            {isSelected && <Check size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                                            <span>{p.namaBarang}</span>
+                                          </p>
+                                          <p className="text-[10px] text-slate-400 uppercase mt-0.5">
+                                            Kode: {p.kodeBarang} • Satuan: {p.satuan}
+                                          </p>
+                                        </div>
+                                        <span className={`shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                                          stock > 10 
+                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                                            : stock > 0 
+                                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' 
+                                              : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                        }`}>
+                                          Stok: {stock} {p.satuan}
+                                        </span>
+                                      </button>
+                                    );
+                                  });
+                                })()}
+                              </div>
+
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Quantity & Stock Indicator */}
@@ -705,13 +845,16 @@ export const ScanAmbilBarang: React.FC = () => {
             </button>
           </div>
 
-          {/* Section 3: Foto Penyaluran (Otomatis Masuk Kolom Dokumentasi) */}
+          {/* Section 3: Foto Dokumentasi Penyaluran (Opsional) */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
               <div className="flex items-center gap-2">
                 <Camera size={18} className="text-indigo-600 dark:text-indigo-400" />
                 <h2 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
-                  <span>Foto Penyaluran</span>
+                  <span>Foto Dokumentasi Penyaluran</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-400 rounded-full border border-slate-200 dark:border-white/10">
+                    Opsional
+                  </span>
                   {images.length > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-500/20">
                       {images.length} Foto Siap
@@ -721,15 +864,18 @@ export const ScanAmbilBarang: React.FC = () => {
               </div>
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Ambil foto penyaluran barang logistik. Foto yang diambil di sini akan <b>otomatis masuk ke kolom dokumentasi</b> pada data Barang Keluar dan Berita Acara.
-            </p>
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-2xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
+              <Sparkles size={16} className="text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-relaxed">
+                Foto dokumentasi bersifat <b>opsional (tidak wajib)</b>. Anda dapat langsung menyimpan pengambilan barang sekarang tanpa foto. Bukti foto dokumentasi nantinya dapat ditambahkan atau dilengkapi oleh <b>Admin</b> melalui menu Barang Keluar.
+              </p>
+            </div>
 
             {/* Photo Capture & Upload Button */}
             <div className="space-y-3">
-              <label className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-50 dark:bg-indigo-950/40 border-2 border-dashed border-indigo-400/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100/50 dark:hover:bg-indigo-900/40 rounded-2xl font-bold text-xs cursor-pointer transition-all active:scale-[0.99]">
-                <Camera size={18} />
-                <span>{isProcessingPhotos ? 'Sedang Memproses Foto...' : 'Ambil Foto Penyaluran (Kamera / Galeri)'}</span>
+              <label className="flex items-center justify-center gap-2 w-full py-4 bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 border-2 border-dashed border-slate-300 dark:border-white/15 text-slate-700 dark:text-slate-300 rounded-2xl font-bold text-xs cursor-pointer transition-all active:scale-[0.99]">
+                <Camera size={18} className="text-indigo-600 dark:text-indigo-400" />
+                <span>{isProcessingPhotos ? 'Sedang Memproses Foto...' : 'Ambil Foto Dokumentasi (Opsional - Kamera / Galeri)'}</span>
                 <input
                   type="file"
                   multiple
