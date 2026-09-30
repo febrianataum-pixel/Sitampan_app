@@ -243,10 +243,10 @@ export const ScanAmbilBarang: React.FC = () => {
               📍 Barcode Pintu Gudang
             </span>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-2">
-              Formulir Pengambilan Barang
+              Formulir Pengambilan Logistik Kebencanaan
             </h1>
             <p className="text-xs text-slate-400 max-w-xs mx-auto">
-              Silakan masuk dengan akun Anda untuk mulai mengisi catatan barang keluar dari gudang logistik.
+              Silakan masuk dengan akun Anda untuk mulai mengisi formulir pengambilan logistik kebencanaan.
             </p>
           </div>
 
@@ -296,7 +296,7 @@ export const ScanAmbilBarang: React.FC = () => {
               Transaksi Berhasil Disimpan
             </span>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-2">
-              Pengambilan Barang Berhasil!
+              Pengambilan Logistik Berhasil!
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Data transaksi pengeluaran barang dan stok telah otomatis terupdate.
@@ -407,8 +407,8 @@ export const ScanAmbilBarang: React.FC = () => {
                   Scan Pintu Gudang
                 </span>
               </div>
-              <h1 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                Formulir Pengambilan Barang
+              <h1 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+                Formulir Pengambilan Logistik Kebencanaan
               </h1>
             </div>
           </div>
@@ -435,42 +435,16 @@ export const ScanAmbilBarang: React.FC = () => {
 
       {/* Main Container */}
       <main className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
-        
-        {/* User identification badge */}
-        <div className="bg-gradient-to-r from-indigo-500/10 via-blue-500/10 to-indigo-500/5 border border-indigo-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-500/20 shrink-0">
-              <DoorOpen size={20} />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">
-                Petugas / Pengguna Login:
-              </p>
-              <p className="font-extrabold text-sm text-slate-800 dark:text-slate-100">
-                {user.displayName || user.email}
-              </p>
-            </div>
-          </div>
-          {!generalData.penerima && (
-            <button
-              type="button"
-              onClick={handleFillMyName}
-              className="px-3 py-1.5 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40 rounded-xl text-[11px] font-bold shadow-sm hover:bg-indigo-50 dark:hover:bg-slate-700 transition-all cursor-pointer shrink-0"
-            >
-              Saya Penerimanya
-            </button>
-          )}
-        </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* Section 1: Informasi Penerima & Lokasi */}
+          {/* Section 1: Formulir Pengambilan Logistik Kebencanaan */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-100 dark:border-white/5 pb-3">
-              <User size={18} className="text-indigo-600 dark:text-indigo-400" />
+              <FileText size={18} className="text-indigo-600 dark:text-indigo-400" />
               <h2 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wide">
-                Informasi Pengambilan
+                Formulir Pengambilan Logistik Kebencanaan
               </h2>
             </div>
 
@@ -815,12 +789,12 @@ export const ScanAmbilBarang: React.FC = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  <span>Menyimpan Pengambilan Barang...</span>
+                  <span>Menyimpan Pengambilan Logistik...</span>
                 </>
               ) : (
                 <>
                   <Send size={18} />
-                  <span>KIRIM & SIMPAN PENGAMBILAN BARANG</span>
+                  <span>KIRIM & SIMPAN PENGAMBILAN LOGISTIK</span>
                 </>
               )}
             </button>

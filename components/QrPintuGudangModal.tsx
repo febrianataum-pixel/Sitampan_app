@@ -187,7 +187,7 @@ export const QrPintuGudangModal: React.FC<QrPintuGudangModalProps> = ({
                 {appName}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
-                SCAN BARCODE UNTUK PENGAMBILAN BARANG
+                SCAN BARCODE UNTUK PENGAMBILAN LOGISTIK KEBENCANAAN
               </p>
             </div>
 
@@ -327,10 +327,10 @@ export const QrPintuGudangModal: React.FC<QrPintuGudangModalProps> = ({
               PINTU GUDANG LOGISTIK
             </span>
             <h2 style={{ fontSize: '22px', fontWeight: 'bold', margin: '12px 0 6px 0', color: '#0f172a' }}>
-              SCAN UNTUK PENGAMBILAN BARANG
+              SCAN UNTUK PENGAMBILAN LOGISTIK KEBENCANAAN
             </h2>
             <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-              Setiap kali mengambil barang keluar dari gudang, harap scan barcode di bawah ini menggunakan kamera HP Anda.
+              Setiap kali mengambil barang logistik keluar dari gudang, harap scan barcode di bawah ini menggunakan kamera HP Anda.
             </p>
           </div>
 
