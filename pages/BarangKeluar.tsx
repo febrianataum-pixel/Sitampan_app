@@ -37,6 +37,7 @@ const BarangKeluar: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [editingTx, setEditingTx] = useState<OutboundTransaction | null>(null);
   const [viewingTx, setViewingTx] = useState<OutboundTransaction | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [uploadingTxId, setUploadingTxId] = useState<string | null>(null);
   
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
@@ -50,6 +51,8 @@ const BarangKeluar: React.FC = () => {
     key: 'tanggal',
     direction: 'desc'
   });
+
+  const canModifyPhotos = hasPermission('keluar', 'edit') || hasPermission('keluar', 'delete');
 
   const [generalData, setGeneralData] = useState(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -167,6 +170,72 @@ const BarangKeluar: React.FC = () => {
         alert('Gagal mengunggah foto.');
       } finally {
         setIsProcessing(false);
+      }
+    }
+  };
+
+  const handleDeletePhoto = (photoIdx: number) => {
+    if (!viewingTx) return;
+    const photoNumber = photoIdx + 1;
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus foto dokumentasi #${photoNumber}?`)) return;
+
+    const currentImages = viewingTx.images || [];
+    const newImages = currentImages.filter((_, idx) => idx !== photoIdx);
+    const updatedTx: OutboundTransaction = {
+      ...viewingTx,
+      images: newImages
+    };
+
+    setOutbound((prev: OutboundTransaction[]) =>
+      prev.map(tx => (tx.id === viewingTx.id ? updatedTx : tx))
+    );
+    setViewingTx(updatedTx);
+
+    if (previewImage === currentImages[photoIdx]) {
+      setPreviewImage(null);
+    }
+  };
+
+  const handleDeleteAllPhotos = () => {
+    if (!viewingTx || !viewingTx.images || viewingTx.images.length === 0) return;
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus SEMUA (${viewingTx.images.length}) foto dokumentasi untuk transaksi ini?`)) return;
+
+    const updatedTx: OutboundTransaction = {
+      ...viewingTx,
+      images: []
+    };
+
+    setOutbound((prev: OutboundTransaction[]) =>
+      prev.map(tx => (tx.id === viewingTx.id ? updatedTx : tx))
+    );
+    setViewingTx(updatedTx);
+    setPreviewImage(null);
+  };
+
+  const handleUploadFromView = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && viewingTx) {
+      setIsProcessing(true);
+      try {
+        const compressedImages: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          const compressed = await compressImage(files[i]);
+          compressedImages.push(compressed);
+        }
+        const updatedImages = [...(viewingTx.images || []), ...compressedImages];
+        const updatedTx: OutboundTransaction = {
+          ...viewingTx,
+          images: updatedImages
+        };
+        setOutbound((prev: OutboundTransaction[]) =>
+          prev.map(tx => (tx.id === viewingTx.id ? updatedTx : tx))
+        );
+        setViewingTx(updatedTx);
+      } catch (error) {
+        alert('Gagal mengunggah foto.');
+      } finally {
+        setIsProcessing(false);
+        e.target.value = '';
       }
     }
   };
@@ -516,17 +585,17 @@ const BarangKeluar: React.FC = () => {
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex justify-center gap-1">
                         {hasPermission('keluar', 'edit') && (
-                          <button onClick={() => { setUploadingTxId(o.id); setIsUploadModalOpen(true); }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all"><Camera size={16}/></button>
+                          <button onClick={() => { setUploadingTxId(o.id); setIsUploadModalOpen(true); }} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all" title="Upload Foto Dokumentasi"><Camera size={16}/></button>
                         )}
-                        <button onClick={() => setViewingTx(o)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-ios transition-all"><Eye size={16}/></button>
+                        <button onClick={() => setViewingTx(o)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-ios transition-all" title="Lihat Rincian & Dokumentasi (View)"><Eye size={16}/></button>
                         {hasPermission('keluar', 'add') && (
-                          <button onClick={() => handleOpenModal(o, true)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-ios transition-all"><Copy size={16}/></button>
+                          <button onClick={() => handleOpenModal(o, true)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-ios transition-all" title="Duplikat Transaksi"><Copy size={16}/></button>
                         )}
                         {hasPermission('keluar', 'edit') && (
-                          <button onClick={() => handleOpenModal(o)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all"><Edit2 size={16}/></button>
+                          <button onClick={() => handleOpenModal(o)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-ios-blue-light dark:hover:text-ios-blue-dark hover:bg-ios-blue-light/10 dark:hover:bg-ios-blue-dark/10 rounded-ios transition-all" title="Edit Transaksi"><Edit2 size={16}/></button>
                         )}
                         {hasPermission('keluar', 'delete') && (
-                          <button onClick={() => handleDeleteTx(o.id)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios transition-all"><Trash2 size={16}/></button>
+                          <button onClick={() => handleDeleteTx(o.id)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-ios transition-all" title="Hapus Transaksi"><Trash2 size={16}/></button>
                         )}
                       </div>
                     </td>
@@ -594,7 +663,7 @@ const BarangKeluar: React.FC = () => {
           <div className="bg-ios-bg-light dark:bg-ios-bg-dark rounded-ios-lg w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col border dark:border-white/5">
             <div className="p-6 border-b dark:border-white/5 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-bold tracking-tight dark:text-slate-100">Rincian & Dokumentasi</h3>
-              <button onClick={() => setViewingTx(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400"><X size={20}/></button>
+              <button onClick={() => { setViewingTx(null); setPreviewImage(null); }} className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full text-slate-400"><X size={20}/></button>
             </div>
             <div className="p-6 space-y-6 overflow-y-auto scrollbar-hide flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -613,20 +682,105 @@ const BarangKeluar: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
-                  <ImageIcon size={14}/> Dokumentasi Foto
-                </h4>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                    <ImageIcon size={14}/> Dokumentasi Foto {viewingTx.images && viewingTx.images.length > 0 ? `(${viewingTx.images.length})` : ''}
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    {canModifyPhotos && viewingTx.images && viewingTx.images.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteAllPhotos}
+                        className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-ios transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        title="Hapus semua foto dokumentasi"
+                      >
+                        <Trash2 size={12} />
+                        <span>Hapus Semua Foto</span>
+                      </button>
+                    )}
+                    {canModifyPhotos && (
+                      <label className="text-[11px] font-bold text-ios-blue-light dark:text-ios-blue-dark hover:opacity-90 bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 px-2.5 py-1.5 rounded-ios transition-all flex items-center gap-1.5 cursor-pointer">
+                        <Plus size={12} />
+                        <span>Tambah Foto</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleUploadFromView}
+                          disabled={isProcessing}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {isProcessing && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-ios text-xs flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Sedang memproses foto baru...</span>
+                  </div>
+                )}
+
                 {viewingTx.images && viewingTx.images.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {viewingTx.images.map((img, idx) => (
-                      <div key={idx} className="aspect-square rounded-ios overflow-hidden border border-slate-100 dark:border-white/5 shadow-sm relative group">
-                        <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div key={idx} className="group relative aspect-square rounded-ios overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm bg-slate-100 dark:bg-white/5">
+                        <img
+                          src={img}
+                          alt={`Foto Dokumentasi ${idx + 1}`}
+                          className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          onClick={() => setPreviewImage(img)}
+                        />
+                        <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm text-[10px] font-bold text-white rounded pointer-events-none">
+                          #{idx + 1}
+                        </div>
+
+                        {canModifyPhotos && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePhoto(idx);
+                            }}
+                            title={`Hapus Foto #${idx + 1}`}
+                            className="absolute top-2 right-2 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-md transition-all active:scale-90 flex items-center gap-1 text-[10px] font-bold cursor-pointer z-10"
+                          >
+                            <Trash2 size={12} />
+                            <span>Hapus</span>
+                          </button>
+                        )}
+
+                        <div
+                          onClick={() => setPreviewImage(img)}
+                          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between text-white text-[10px] cursor-pointer"
+                        >
+                          <span className="flex items-center gap-1 font-medium">
+                            <Eye size={11} /> Perbesar
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="p-10 border-2 border-dashed border-slate-100 dark:border-white/5 rounded-ios flex flex-col items-center text-slate-400 dark:text-slate-600 italic text-xs">
-                    <Camera size={32} className="mb-2 opacity-20"/> Belum ada dokumentasi foto.
+                  <div className="p-10 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-ios flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 italic text-xs space-y-2">
+                    <Camera size={32} className="opacity-30 mb-1"/>
+                    <p>Belum ada dokumentasi foto untuk transaksi ini.</p>
+                    {canModifyPhotos && (
+                      <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-ios-blue-light dark:bg-ios-blue-dark text-white rounded-ios font-bold text-xs cursor-pointer hover:opacity-90 transition-all not-italic">
+                        <Upload size={13} />
+                        Unggah Bukti Foto
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleUploadFromView}
+                          disabled={isProcessing}
+                        />
+                      </label>
+                    )}
                   </div>
                 )}
               </div>
@@ -667,8 +821,67 @@ const BarangKeluar: React.FC = () => {
               </div>
             </div>
             <div className="p-6 bg-slate-50 dark:bg-white/5 flex justify-end shrink-0">
-              <button onClick={() => setViewingTx(null)} className="px-8 py-2.5 bg-slate-900 dark:bg-ios-blue-dark text-white font-bold rounded-ios text-xs">Tutup</button>
+              <button onClick={() => { setViewingTx(null); setPreviewImage(null); }} className="px-8 py-2.5 bg-slate-900 dark:bg-ios-blue-dark text-white font-bold rounded-ios text-xs">Tutup</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Full-screen Preview with Delete Button */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[150] flex flex-col items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div 
+            className="w-full max-w-4xl flex items-center justify-between text-white mb-3 px-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">Preview Foto Dokumentasi</span>
+              {viewingTx && viewingTx.images && (
+                <span className="text-xs text-white/60">
+                  (Foto {viewingTx.images.indexOf(previewImage) + 1} dari {viewingTx.images.length})
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {canModifyPhotos && viewingTx && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = viewingTx.images?.indexOf(previewImage) ?? -1;
+                    if (idx !== -1) {
+                      handleDeletePhoto(idx);
+                    }
+                  }}
+                  title="Hapus foto ini"
+                  className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-ios shadow-sm transition-all cursor-pointer active:scale-95"
+                >
+                  <Trash2 size={13} />
+                  <span>Hapus Foto Ini</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="p-1.5 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all cursor-pointer"
+                title="Tutup"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+          <div 
+            className="max-w-4xl max-h-[80vh] flex items-center justify-center overflow-hidden rounded-2xl shadow-2xl bg-black/50 border border-white/10 p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewImage}
+              alt="Preview Dokumentasi"
+              className="max-w-full max-h-[75vh] object-contain rounded-xl"
+              referrerPolicy="no-referrer"
+            />
           </div>
         </div>
       )}

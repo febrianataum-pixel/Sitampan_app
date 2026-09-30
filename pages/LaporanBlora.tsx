@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useInventory } from '../App';
 import { 
   FileText, 
@@ -13,7 +13,12 @@ import {
   ArrowUpCircle,
   X,
   User,
-  Clock
+  Clock,
+  Eye,
+  EyeOff,
+  Search,
+  RotateCcw,
+  Check
 } from 'lucide-react';
 import { MONTHS, formatIndoDate } from '../types';
 import { exportToCSV } from '../services/csvService';
@@ -54,8 +59,8 @@ const LaporanBlora: React.FC = () => {
     });
   }, [outbound, reportType, selectedMonth, selectedYear]);
 
-  // Rekap jumlah masuk, keluar, sisa per jenis barang
-  const summaryItems = useMemo(() => {
+  // Rekap jumlah masuk, keluar, sisa per jenis barang (semua barang pada periode ini)
+  const allSummaryItems = useMemo(() => {
     return products.map(product => {
       // Calculate inbound for this product in current filtered period
       const totalIn = filteredInbound
@@ -87,6 +92,76 @@ const LaporanBlora: React.FC = () => {
     .filter(item => item.jumlahMasuk > 0 || item.jumlahKeluar > 0 || item.sisaBarang > 0)
     .sort((a, b) => a.namaBarang.localeCompare(b.namaBarang));
   }, [products, filteredInbound, filteredOutbound, calculateStock]);
+
+  // State ID barang yang disembunyikan (Hide)
+  const [hiddenProductIds, setHiddenProductIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sitampan_laporan_hidden_products');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Simpan preferensi hidden products ke localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sitampan_laporan_hidden_products', JSON.stringify(hiddenProductIds));
+    } catch {}
+  }, [hiddenProductIds]);
+
+  // Daftar barang aktif yang ditampilkan (Show)
+  const summaryItems = useMemo(() => {
+    return allSummaryItems.filter(item => !hiddenProductIds.includes(item.id));
+  }, [allSummaryItems, hiddenProductIds]);
+
+  // Daftar barang yang sedang disembunyikan (Hide)
+  const hiddenItems = useMemo(() => {
+    return allSummaryItems.filter(item => hiddenProductIds.includes(item.id));
+  }, [allSummaryItems, hiddenProductIds]);
+
+  // Tab tampilan tabel: 'visible' (Ditampilkan) atau 'hidden' (Disembunyikan)
+  const [tableTab, setTableTab] = useState<'visible' | 'hidden'>('visible');
+  // Modal kelola Hide / Show
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  // Pencarian pada modal kelola
+  const [searchManageTerm, setSearchManageTerm] = useState('');
+
+  // Aksi toggle, hide, show
+  const hideProduct = (id: string) => {
+    setHiddenProductIds(prev => prev.includes(id) ? prev : [...prev, id]);
+  };
+
+  const showProduct = (id: string) => {
+    setHiddenProductIds(prev => prev.filter(pId => pId !== id));
+  };
+
+  const toggleHideProduct = (id: string) => {
+    setHiddenProductIds(prev => 
+      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    );
+  };
+
+  const showAllProducts = () => {
+    setHiddenProductIds([]);
+  };
+
+  const hideAllProducts = () => {
+    setHiddenProductIds(allSummaryItems.map(item => item.id));
+  };
+
+  // Filter barang pada modal kelola
+  const filteredManageProducts = useMemo(() => {
+    if (!searchManageTerm.trim()) return allSummaryItems;
+    const term = searchManageTerm.toLowerCase();
+    return allSummaryItems.filter(p => 
+      p.namaBarang.toLowerCase().includes(term) || 
+      p.kodeBarang.toLowerCase().includes(term)
+    );
+  }, [allSummaryItems, searchManageTerm]);
+
+  // Item yang sedang aktif di tabel utama
+  const currentTableItems = tableTab === 'visible' ? summaryItems : hiddenItems;
 
   // Sebaran pada periode terpilih (aktif)
   const productDistributionPeriod = useMemo(() => {
@@ -209,16 +284,36 @@ const LaporanBlora: React.FC = () => {
           </div>
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Rekapitulasi aktivitas jumlah masuk, jumlah keluar, dan sisa stok barang.</p>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          <button 
+            onClick={() => setIsManageModalOpen(true)}
+            className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-4 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm transition-all active:scale-95 text-xs cursor-pointer"
+            title="Buka menu pengaturan Hide / Show barang"
+          >
+            {hiddenItems.length > 0 ? (
+              <>
+                <EyeOff size={16} className="text-amber-400 shrink-0" />
+                <span>Hide / Show</span>
+                <span className="bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                  {hiddenItems.length} Hide
+                </span>
+              </>
+            ) : (
+              <>
+                <Eye size={16} className="shrink-0" />
+                <span>Hide / Show Barang</span>
+              </>
+            )}
+          </button>
           <button 
             onClick={handleExportPDF}
-            className="flex-1 md:flex-none bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm transition-all active:scale-95 text-xs"
+            className="flex-1 md:flex-none bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm transition-all active:scale-95 text-xs cursor-pointer"
           >
             <Download size={16}/> PDF
           </button>
           <button 
             onClick={handleExportCSV}
-            className="flex-1 md:flex-none bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-white/5 transition-all active:scale-95 text-xs"
+            className="flex-1 md:flex-none bg-ios-secondary-light dark:bg-ios-secondary-dark border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-ios flex items-center justify-center gap-2 font-bold shadow-sm hover:bg-slate-50 dark:hover:bg-white/5 transition-all active:scale-95 text-xs cursor-pointer"
           >
             <FileText size={16}/> CSV
           </button>
@@ -340,27 +435,111 @@ const LaporanBlora: React.FC = () => {
         </div>
       </div>
 
+      {/* Hidden Items Notice Banner */}
+      {hiddenItems.length > 0 && (
+        <div className="bg-amber-50/90 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-ios-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-300">
+          <div className="flex items-center gap-3 text-amber-900 dark:text-amber-200">
+            <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-ios shrink-0">
+              <EyeOff size={18} />
+            </div>
+            <div>
+              <p className="font-bold text-amber-950 dark:text-amber-100">
+                {hiddenItems.length} jenis barang sedang disembunyikan (Hide)
+              </p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400/90 mt-0.5">
+                Barang yang disembunyikan tidak dihitung dalam ringkasan statistik dan tidak dimasukkan ke dalam cetakan PDF / ekspor CSV.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <button
+              onClick={showAllProducts}
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-ios text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <RotateCcw size={13} /> Tampilkan Semua (Show All)
+            </button>
+            <button
+              onClick={() => setTableTab(tableTab === 'visible' ? 'hidden' : 'visible')}
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 font-bold rounded-ios text-xs flex items-center justify-center gap-1.5 hover:bg-amber-50 dark:hover:bg-slate-700 transition-all cursor-pointer"
+            >
+              {tableTab === 'visible' ? (
+                <>
+                  <EyeOff size={13} /> Lihat Daftar Tersembunyi ({hiddenItems.length})
+                </>
+              ) : (
+                <>
+                  <Eye size={13} /> Lihat Barang Aktif ({summaryItems.length})
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table Section */}
       <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-ios-lg shadow-sm border border-white/80 dark:border-white/10 overflow-hidden w-full">
-        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-          <h3 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Rincian Transaksi & Stok Persediaan</h3>
-          <span className="text-[10px] font-bold bg-slate-100/80 dark:bg-white/5 px-3 py-1 rounded-full text-slate-500">
-            {summaryItems.length} Jenis Barang
-          </span>
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          {/* Tabs Filter Tampilan: Ditampilkan vs Disembunyikan */}
+          <div className="flex items-center gap-2">
+            <div className="flex p-0.5 bg-slate-100/80 dark:bg-white/5 rounded-ios border border-slate-200/60 dark:border-white/5">
+              <button
+                onClick={() => setTableTab('visible')}
+                className={`px-3.5 py-1.5 rounded-ios text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  tableTab === 'visible'
+                    ? 'bg-white dark:bg-ios-secondary-dark text-ios-blue-light dark:text-ios-blue-dark shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                }`}
+              >
+                <Eye size={13} />
+                <span>Ditampilkan ({summaryItems.length})</span>
+              </button>
+              <button
+                onClick={() => setTableTab('hidden')}
+                className={`px-3.5 py-1.5 rounded-ios text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  tableTab === 'hidden'
+                    ? 'bg-white dark:bg-ios-secondary-dark text-amber-600 dark:text-amber-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                }`}
+              >
+                <EyeOff size={13} />
+                <span>Disembunyikan / Hide ({hiddenItems.length})</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+            {hiddenItems.length > 0 && (
+              <button
+                onClick={showAllProducts}
+                className="text-xs font-bold text-ios-blue-light dark:text-ios-blue-dark hover:underline flex items-center gap-1 cursor-pointer"
+                title="Tampilkan semua barang yang tersembunyi"
+              >
+                <RotateCcw size={12} /> Tampilkan Semua
+              </button>
+            )}
+            <button
+              onClick={() => setIsManageModalOpen(true)}
+              className="bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 px-3.5 py-1.5 rounded-ios font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            >
+              <Filter size={13} /> Kelola Hide & Show
+            </button>
+          </div>
         </div>
+
         <div className="overflow-x-auto w-full">
           <table className="w-full text-left min-w-full">
             <thead className="bg-slate-50/70 dark:bg-white/5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b dark:border-white/5">
               <tr>
-                <th className="px-4 sm:px-6 py-3.5 w-[35%]">Jenis Barang</th>
-                <th className="px-4 sm:px-6 py-3.5 text-center w-[16%]">Jumlah Masuk</th>
-                <th className="px-4 sm:px-6 py-3.5 text-center w-[16%]">Jumlah Keluar</th>
-                <th className="px-4 sm:px-6 py-3.5 text-center w-[16%]">Sisa Barang</th>
-                <th className="px-4 sm:px-6 py-3.5 text-right w-[17%]">Nilai Sisa</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[30%]">Jenis Barang</th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[14%]">Jumlah Masuk</th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[14%]">Jumlah Keluar</th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[14%]">Sisa Barang</th>
+                <th className="px-4 sm:px-6 py-3.5 text-right w-[15%]">Nilai Sisa</th>
+                <th className="px-4 sm:px-6 py-3.5 text-center w-[13%]">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-              {summaryItems.length > 0 ? summaryItems.map((item) => (
+              {currentTableItems.length > 0 ? currentTableItems.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
                   <td 
                     className="px-6 py-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/10 transition-colors group/cell"
@@ -401,19 +580,113 @@ const LaporanBlora: React.FC = () => {
                     <p className="text-sm font-black text-slate-900 dark:text-white">Rp {item.totalHargaSisa.toLocaleString('id-ID')}</p>
                     <p className="text-[10px] text-slate-500 font-mono">Rp {item.hargaSatuan.toLocaleString('id-ID')}/unit</p>
                   </td>
+                  <td className="px-6 py-4 text-center">
+                    {tableTab === 'visible' ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          hideProduct(item.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-ios bg-slate-100 hover:bg-rose-50 dark:bg-white/5 dark:hover:bg-rose-950/30 text-slate-600 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 font-bold text-xs transition-all cursor-pointer shadow-xs active:scale-95 border border-slate-200/50 dark:border-white/5"
+                        title="Sembunyikan (Hide) barang ini dari laporan"
+                      >
+                        <EyeOff size={13} className="shrink-0 text-slate-400 group-hover:text-rose-500" />
+                        <span>Hide</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          showProduct(item.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-ios bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs transition-all cursor-pointer shadow-xs active:scale-95 border border-emerald-300/40 dark:border-emerald-700/40"
+                        title="Tampilkan kembali (Show) barang ini ke laporan"
+                      >
+                        <Eye size={13} className="shrink-0" />
+                        <span>Show</span>
+                      </button>
+                    )}
+                  </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center justify-center opacity-30">
-                      <Package size={48} className="mb-4"/>
-                      <p className="text-sm font-bold uppercase tracking-widest">Tidak Ada Data Logistik</p>
-                      <p className="text-[10px] mt-1">Silakan pilih periode lain atau tambahkan data barang baru.</p>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      {tableTab === 'visible' && hiddenItems.length > 0 ? (
+                        <>
+                          <EyeOff size={40} className="mb-3 text-amber-500 opacity-60" />
+                          <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                            Semua barang ({hiddenItems.length}) sedang disembunyikan (Hide)
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                            Tidak ada barang yang aktif di laporan. Klik tombol di bawah untuk menampilkan kembali semua barang.
+                          </p>
+                          <button
+                            onClick={showAllProducts}
+                            className="mt-4 px-4 py-2 bg-ios-blue-light text-white rounded-ios font-bold text-xs flex items-center gap-2 shadow-sm hover:bg-blue-600 transition-all cursor-pointer"
+                          >
+                            <Eye size={14} /> Tampilkan Semua Barang (Show All)
+                          </button>
+                        </>
+                      ) : tableTab === 'hidden' ? (
+                        <>
+                          <Eye size={40} className="mb-3 text-emerald-500 opacity-60" />
+                          <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                            Tidak Ada Barang yang Disembunyikan
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Semua {allSummaryItems.length} jenis barang sedang ditampilkan pada laporan rekapitulasi.
+                          </p>
+                          <button
+                            onClick={() => setTableTab('visible')}
+                            className="mt-4 px-4 py-2 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded-ios font-bold text-xs flex items-center gap-2 hover:bg-slate-200 transition-all cursor-pointer"
+                          >
+                            Lihat Barang Ditampilkan
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <Package size={44} className="mb-3 text-slate-400 opacity-30" />
+                          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Tidak Ada Data Logistik</p>
+                          <p className="text-xs text-slate-400 mt-1">Silakan pilih periode lain atau tambahkan data barang baru.</p>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
               )}
             </tbody>
+            {currentTableItems.length > 0 && (
+              <tfoot className="bg-slate-50/80 dark:bg-white/5 border-t border-slate-200 dark:border-white/10 font-bold text-xs text-slate-800 dark:text-slate-200">
+                <tr>
+                  <td className="px-6 py-3 uppercase tracking-wider text-[11px] text-slate-500">
+                    Total ({currentTableItems.length} Barang {tableTab === 'visible' ? 'Ditampilkan' : 'Disembunyikan'})
+                  </td>
+                  <td className="px-6 py-3 text-center text-emerald-600 dark:text-emerald-400 font-mono">
+                    {currentTableItems.reduce((acc, curr) => acc + curr.jumlahMasuk, 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-3 text-center text-rose-600 dark:text-rose-400 font-mono">
+                    {currentTableItems.reduce((acc, curr) => acc + curr.jumlahKeluar, 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-3 text-center text-ios-blue-light dark:text-ios-blue-dark font-mono">
+                    {currentTableItems.reduce((acc, curr) => acc + curr.sisaBarang, 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-3 text-right font-black">
+                    Rp {currentTableItems.reduce((acc, curr) => acc + curr.totalHargaSisa, 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-3 text-center">
+                    {tableTab === 'visible' && hiddenItems.length > 0 && (
+                      <button
+                        onClick={showAllProducts}
+                        className="text-[10px] text-ios-blue-light dark:text-ios-blue-dark hover:underline font-bold"
+                      >
+                        Reset Show
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
@@ -606,6 +879,165 @@ const LaporanBlora: React.FC = () => {
                 className="w-full sm:w-auto bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white px-6 py-2 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm text-center"
               >
                 Tutup Sebaran
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Kelola Tampilan Barang (Hide / Show) */}
+      {isManageModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-ios-lg shadow-2xl border border-slate-200 dark:border-white/10 w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col scale-in animate-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-white/5 flex items-start justify-between bg-slate-50 dark:bg-slate-900/50">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 text-ios-blue-light dark:text-ios-blue-dark rounded-ios">
+                    <Eye size={16} />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white leading-tight">
+                    Kelola Hide & Show Barang
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Pilih barang yang ingin disembunyikan (Hide) atau dimunculkan (Show) pada Laporan Rekapitulasi Barang.
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsManageModalOpen(false);
+                  setSearchManageTerm('');
+                }}
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Action Bar: Search & Quick Actions */}
+            <div className="p-4 bg-slate-50/70 dark:bg-slate-900/30 border-b border-slate-100 dark:border-white/5 space-y-3">
+              <div className="relative">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchManageTerm}
+                  onChange={(e) => setSearchManageTerm(e.target.value)}
+                  placeholder="Cari nama atau kode barang..."
+                  className="w-full pl-9 pr-14 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-ios text-xs font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-ios-blue-light dark:focus:border-ios-blue-dark"
+                />
+                {searchManageTerm && (
+                  <button
+                    onClick={() => setSearchManageTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-[11px] font-bold cursor-pointer"
+                  >
+                    Hapus
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  Status: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{summaryItems.length} Ditampilkan</span> • <span className="text-amber-600 dark:text-amber-400 font-bold">{hiddenItems.length} Disembunyikan</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={showAllProducts}
+                    className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-ios font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer border border-emerald-200 dark:border-emerald-800/40 shadow-2xs"
+                  >
+                    <Eye size={12} /> Tampilkan Semua (Show All)
+                  </button>
+                  <button
+                    onClick={hideAllProducts}
+                    className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-ios font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer border border-rose-200 dark:border-rose-800/40 shadow-2xs"
+                  >
+                    <EyeOff size={12} /> Sembunyikan Semua (Hide All)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Products */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-1.5 divide-y divide-slate-100 dark:divide-white/5 scrollbar-thin">
+              {filteredManageProducts.map(product => {
+                const isHidden = hiddenProductIds.includes(product.id);
+                return (
+                  <div 
+                    key={product.id}
+                    className={`pt-2 first:pt-0 flex items-center justify-between gap-3 p-3 rounded-ios transition-colors ${
+                      isHidden 
+                        ? 'bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/20' 
+                        : 'hover:bg-slate-50 dark:hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={!isHidden}
+                        onChange={() => toggleHideProduct(product.id)}
+                        className="w-4 h-4 rounded text-ios-blue-light focus:ring-ios-blue-light cursor-pointer"
+                        id={`manage-prod-${product.id}`}
+                      />
+                      <label htmlFor={`manage-prod-${product.id}`} className="min-w-0 cursor-pointer">
+                        <p className={`text-xs font-bold truncate ${isHidden ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200'}`}>
+                          {product.namaBarang}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          {product.kodeBarang} • Sisa: {product.sisaBarang.toLocaleString('id-ID')} {product.satuan} • Masuk: {product.jumlahMasuk} • Keluar: {product.jumlahKeluar}
+                        </p>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => toggleHideProduct(product.id)}
+                        className={`px-3 py-1.5 rounded-ios font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 ${
+                          isHidden
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border border-amber-300 dark:border-amber-700/50'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-700/50'
+                        }`}
+                      >
+                        {isHidden ? (
+                          <>
+                            <EyeOff size={13} className="shrink-0" />
+                            <span>Hidden (Show)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye size={13} className="shrink-0" />
+                            <span>Visible (Hide)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredManageProducts.length === 0 && (
+                <div className="py-12 text-center text-slate-400">
+                  <Package size={36} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-xs font-bold">Barang tidak ditemukan</p>
+                  <p className="text-[10px]">Coba gunakan kata kunci pencarian yang lain.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500 font-medium">
+                Total {allSummaryItems.length} jenis barang terdata pada periode ini
+              </span>
+              <button
+                onClick={() => {
+                  setIsManageModalOpen(false);
+                  setSearchManageTerm('');
+                }}
+                className="bg-ios-blue-light hover:bg-blue-600 text-white px-5 py-2 rounded-ios text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+              >
+                Selesai
               </button>
             </div>
           </div>
