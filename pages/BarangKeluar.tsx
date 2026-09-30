@@ -550,7 +550,7 @@ const BarangKeluar: React.FC = () => {
                   <div className="flex items-center gap-2">Alamat / Tujuan {renderSortIcon('alamat')}</div>
                 </th>
                 <th className="px-4 sm:px-6 py-3.5 w-[15%]">Jenis Bencana</th>
-                <th className="px-4 sm:px-6 py-3.5 w-[14%]">Status / Dokumentasi</th>
+                <th className="px-4 sm:px-6 py-3.5 w-[16%]">Dokumentasi Penyaluran</th>
                 <th className="px-4 sm:px-6 py-3.5 w-[12%] text-center">Aksi</th>
               </tr>
             </thead>
@@ -583,14 +583,37 @@ const BarangKeluar: React.FC = () => {
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       {isTuntas ? (
-                        <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full w-fit border border-emerald-100 dark:border-emerald-800/30">
-                          <CheckCircle2 size={12}/>
-                          <span className="text-[10px] font-bold uppercase">Tuntas ({o.images?.length})</span>
+                        <div 
+                          onClick={() => setViewingTx(o)}
+                          className="flex items-center gap-2.5 bg-emerald-50 hover:bg-emerald-100/80 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 p-1.5 pr-3 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 w-fit cursor-pointer transition-all shadow-sm group/doc"
+                          title="Klik untuk melihat foto penyaluran"
+                        >
+                          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-emerald-300/60 dark:border-emerald-700/60 shadow-inner bg-slate-100 dark:bg-white/10 relative">
+                            <img src={o.images[0]} alt="Foto Penyaluran" className="w-full h-full object-cover group-hover/doc:scale-110 transition-transform duration-200" referrerPolicy="no-referrer" />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0"/>
+                              <span className="text-[10px] font-extrabold uppercase text-emerald-800 dark:text-emerald-200">Foto Penyaluran</span>
+                            </div>
+                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold">{o.images.length} Foto Dokumentasi</span>
+                          </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 text-slate-400 dark:text-slate-500 px-3 py-1 rounded-full w-fit border border-slate-100 dark:border-white/5">
-                          <Clock size={12}/>
-                          <span className="text-[10px] font-bold uppercase">Proses</span>
+                        <div 
+                          onClick={() => {
+                            if (hasPermission('keluar', 'edit')) {
+                              setUploadingTxId(o.id);
+                              setIsUploadModalOpen(true);
+                            } else {
+                              setViewingTx(o);
+                            }
+                          }}
+                          className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 text-slate-400 dark:text-slate-400 px-3 py-1.5 rounded-xl w-fit border border-slate-200/80 dark:border-white/10 cursor-pointer transition-all"
+                          title="Belum ada foto penyaluran, klik untuk upload"
+                        >
+                          <Clock size={12} className="text-amber-500 shrink-0"/>
+                          <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Belum Ada Foto</span>
                         </div>
                       )}
                     </td>
@@ -648,7 +671,7 @@ const BarangKeluar: React.FC = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
           <div className="bg-ios-bg-light dark:bg-ios-bg-dark rounded-ios-lg w-full max-w-md shadow-2xl animate-in zoom-in duration-300 border dark:border-white/5">
             <div className="p-6 border-b dark:border-white/5 flex justify-between items-center">
-              <h3 className="font-bold text-slate-900 dark:text-slate-100 tracking-tight">Dokumentasi Foto</h3>
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 tracking-tight">Foto Penyaluran (Dokumentasi)</h3>
               <button onClick={() => setIsUploadModalOpen(false)} disabled={isProcessing} className="text-slate-400"><X size={20}/></button>
             </div>
             <div className="p-8 text-center space-y-6">
@@ -656,12 +679,12 @@ const BarangKeluar: React.FC = () => {
                 {isProcessing ? <Loader2 size={40} className="animate-spin" /> : <Camera size={40}/>}
               </div>
               <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">{isProcessing ? 'Sedang Memproses...' : 'Upload Bukti Foto'}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Unggah bukti foto penyerahan barang.</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200">{isProcessing ? 'Sedang Memproses...' : 'Upload Foto Penyaluran'}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Unggah bukti foto penyaluran penyerahan logistik.</p>
               </div>
               {!isProcessing && (
                 <label className="block w-full bg-ios-blue-light dark:bg-ios-blue-dark text-white py-3 rounded-ios font-bold text-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-sm">
-                  PILIH FOTO
+                  PILIH FOTO PENYALURAN
                   <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} />
                 </label>
               )}
@@ -696,7 +719,7 @@ const BarangKeluar: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2">
-                    <ImageIcon size={14}/> Dokumentasi Foto {viewingTx.images && viewingTx.images.length > 0 ? `(${viewingTx.images.length})` : ''}
+                    <ImageIcon size={14}/> Foto Penyaluran (Dokumentasi) {viewingTx.images && viewingTx.images.length > 0 ? `(${viewingTx.images.length})` : ''}
                   </h4>
                   <div className="flex items-center gap-2">
                     {canModifyPhotos && viewingTx.images && viewingTx.images.length > 0 && (
@@ -704,7 +727,7 @@ const BarangKeluar: React.FC = () => {
                         type="button"
                         onClick={handleDeleteAllPhotos}
                         className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-ios transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                        title="Hapus semua foto dokumentasi"
+                        title="Hapus semua foto penyaluran"
                       >
                         <Trash2 size={12} />
                         <span>Hapus Semua Foto</span>
@@ -713,7 +736,7 @@ const BarangKeluar: React.FC = () => {
                     {canModifyPhotos && (
                       <label className="text-[11px] font-bold text-ios-blue-light dark:text-ios-blue-dark hover:opacity-90 bg-ios-blue-light/10 dark:bg-ios-blue-dark/10 px-2.5 py-1.5 rounded-ios transition-all flex items-center gap-1.5 cursor-pointer">
                         <Plus size={12} />
-                        <span>Tambah Foto</span>
+                        <span>Tambah Foto Penyaluran</span>
                         <input
                           type="file"
                           multiple
@@ -730,7 +753,7 @@ const BarangKeluar: React.FC = () => {
                 {isProcessing && (
                   <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-ios text-xs flex items-center gap-2">
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Sedang memproses foto baru...</span>
+                    <span>Sedang memproses foto penyaluran...</span>
                   </div>
                 )}
 
@@ -740,7 +763,7 @@ const BarangKeluar: React.FC = () => {
                       <div key={idx} className="group relative aspect-square rounded-ios overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm bg-slate-100 dark:bg-white/5">
                         <img
                           src={img}
-                          alt={`Foto Dokumentasi ${idx + 1}`}
+                          alt={`Foto Penyaluran ${idx + 1}`}
                           className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
                           referrerPolicy="no-referrer"
                           onClick={() => setPreviewImage(img)}
@@ -778,11 +801,11 @@ const BarangKeluar: React.FC = () => {
                 ) : (
                   <div className="p-10 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-ios flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 italic text-xs space-y-2">
                     <Camera size={32} className="opacity-30 mb-1"/>
-                    <p>Belum ada dokumentasi foto untuk transaksi ini.</p>
+                    <p>Belum ada foto penyaluran untuk transaksi ini.</p>
                     {canModifyPhotos && (
                       <label className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-ios-blue-light dark:bg-ios-blue-dark text-white rounded-ios font-bold text-xs cursor-pointer hover:opacity-90 transition-all not-italic">
                         <Upload size={13} />
-                        Unggah Bukti Foto
+                        Unggah Foto Penyaluran
                         <input
                           type="file"
                           multiple
@@ -850,7 +873,7 @@ const BarangKeluar: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">Preview Foto Dokumentasi</span>
+              <span className="text-sm font-bold text-white">Preview Foto Penyaluran</span>
               {viewingTx && viewingTx.images && (
                 <span className="text-xs text-white/60">
                   (Foto {viewingTx.images.indexOf(previewImage) + 1} dari {viewingTx.images.length})

@@ -347,9 +347,9 @@ export const ScanAmbilBarang: React.FC = () => {
             </div>
 
             {submittedTx.images && submittedTx.images.length > 0 && (
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 pt-1">
-                <ImageIcon size={13} className="text-emerald-500" />
-                <span>{submittedTx.images.length} Foto dokumentasi tersimpan</span>
+              <div className="flex items-center gap-2 text-[11px] text-emerald-700 dark:text-emerald-300 font-bold pt-1 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40">
+                <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
+                <span>{submittedTx.images.length} Foto penyaluran tersimpan (otomatis masuk ke kolom dokumentasi)</span>
               </div>
             )}
           </div>
@@ -731,26 +731,31 @@ export const ScanAmbilBarang: React.FC = () => {
             </button>
           </div>
 
-          {/* Section 3: Foto Dokumentasi Pengambilan Barang */}
+          {/* Section 3: Foto Penyaluran (Otomatis Masuk Kolom Dokumentasi) */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
               <div className="flex items-center gap-2">
                 <Camera size={18} className="text-indigo-600 dark:text-indigo-400" />
-                <h2 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wide">
-                  Bukti Foto Pengambilan {images.length > 0 ? `(${images.length})` : ''}
+                <h2 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wide flex items-center gap-2">
+                  <span>Foto Penyaluran</span>
+                  {images.length > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-500/20">
+                      {images.length} Foto Siap
+                    </span>
+                  )}
                 </h2>
               </div>
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Ambil foto barang yang dibawa atau foto serah terima barang sebagai bukti autentik.
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Ambil foto penyaluran barang logistik. Foto yang diambil di sini akan <b>otomatis masuk ke kolom dokumentasi</b> pada data Barang Keluar dan Berita Acara.
             </p>
 
             {/* Photo Capture & Upload Button */}
             <div className="space-y-3">
               <label className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-50 dark:bg-indigo-950/40 border-2 border-dashed border-indigo-400/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100/50 dark:hover:bg-indigo-900/40 rounded-2xl font-bold text-xs cursor-pointer transition-all active:scale-[0.99]">
                 <Camera size={18} />
-                <span>{isProcessingPhotos ? 'Sedang Memproses Foto...' : 'Ambil Foto dari Kamera / Galeri'}</span>
+                <span>{isProcessingPhotos ? 'Sedang Memproses Foto...' : 'Ambil Foto Penyaluran (Kamera / Galeri)'}</span>
                 <input
                   type="file"
                   multiple

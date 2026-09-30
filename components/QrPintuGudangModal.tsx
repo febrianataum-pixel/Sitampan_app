@@ -220,8 +220,8 @@ export const QrPintuGudangModal: React.FC<QrPintuGudangModalProps> = ({
               </div>
               <div className="bg-white/80 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-100 dark:border-white/5 space-y-1">
                 <div className="w-5 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">3</div>
-                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">Foto & Kirim</p>
-                <p className="text-[9px] text-slate-500 dark:text-slate-400">Dokumentasi & simpan</p>
+                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">Foto Penyaluran</p>
+                <p className="text-[9px] text-slate-500 dark:text-slate-400">Otomatis masuk dokumentasi</p>
               </div>
             </div>
 
@@ -366,9 +366,9 @@ export const QrPintuGudangModal: React.FC<QrPintuGudangModalProps> = ({
               </p>
             </div>
             <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <strong style={{ fontSize: '12px', color: '#1e293b' }}>3. Foto & Simpan</strong>
+              <strong style={{ fontSize: '12px', color: '#1e293b' }}>3. Foto Penyaluran</strong>
               <p style={{ fontSize: '10px', color: '#64748b', margin: '4px 0 0 0' }}>
-                Ambil foto barang yang dibawa, lalu klik Simpan Transaksi.
+                Ambil foto penyaluran barang, foto otomatis masuk kolom dokumentasi.
               </p>
             </div>
           </div>
