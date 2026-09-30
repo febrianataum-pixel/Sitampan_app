@@ -1116,9 +1116,9 @@ const App: React.FC = () => {
     }
   };
 
-  // Realtime Cloud connections synced to active user session
+  // Realtime Cloud connections
   useEffect(() => {
-    if (!user || !settings.syncEnabled) {
+    if (!settings.syncEnabled) {
       setIsCloudConnected(false);
       return;
     }
@@ -1131,7 +1131,7 @@ const App: React.FC = () => {
         const syncCol = (name: string, ref: React.MutableRefObject<any[]>, setState: Function) => {
           return onSnapshot(collection(db, name), (snap) => {
             if (snap.empty && ref.current.length > 0) {
-              rescueDataToCloud(name, ref.current);
+              if (user) rescueDataToCloud(name, ref.current);
             } else if (!snap.empty) {
               isRemoteChange.current = true;
               const remote = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
@@ -1216,9 +1216,10 @@ const App: React.FC = () => {
   };
 
   const updateCloud = async (col: string, data: any[], deleted?: any) => {
-    if (isCloudConnected && !isRemoteChange.current && user) {
+    const canSync = isCloudConnected && !isRemoteChange.current && (user || col === 'outbound');
+    if (canSync) {
       try {
-        if (deleted) {
+        if (deleted && user) {
           await deleteDoc(doc(db, col, deleted.id));
         }
         for (const it of data) {
@@ -1312,17 +1313,23 @@ const RestrictedAccess: React.FC<{ user: any; logout: () => void }> = ({ user, l
   </div>
 );
 
-  if (isAuthLoading) {
-    return <SplashLoading appName={settings.appName} appLogo={settings.appLogo} />;
-  }
+  const isPublicScanRoute = typeof window !== 'undefined' && (
+    window.location.hash.includes('ambil-barang') ||
+    window.location.hash.includes('scan-keluar') ||
+    window.location.hash.includes('keluar-cepat') ||
+    window.location.pathname.includes('ambil-barang') ||
+    window.location.pathname.includes('scan-keluar') ||
+    window.location.pathname.includes('keluar-cepat')
+  );
 
-  if (!user) {
-    return <LoginGate loginWithGoogle={loginWithGoogle} appName={settings.appName} appSubtitle={settings.appSubtitle} appLogo={settings.appLogo} />;
+  if (isAuthLoading && !isPublicScanRoute) {
+    return <SplashLoading appName={settings.appName} appLogo={settings.appLogo} />;
   }
 
   const isSpecialUser = user?.email && ['febrianataum@gmail.com', 'febridesain19@gmail.com'].includes(user.email.toLowerCase().trim());
 
   const getFirstAllowedRoute = () => {
+    if (!user) return '/dashboard';
     if (isSpecialUser) return '/dashboard';
     const menuOrder = [
       { key: 'dashboard', path: '/dashboard' },
@@ -1345,32 +1352,36 @@ const RestrictedAccess: React.FC<{ user: any; logout: () => void }> = ({ user, l
     <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, selectedYear, setSelectedYear, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle, userPermissions, hasPermission }}>
       <HashRouter>
         <Routes>
-          {/* Link Khusus Barcode Pintu Gudang (Ambil Barang) */}
+          {/* Link Khusus Barcode Pintu Gudang (Ambil Barang) - TIDAK PERLU LOGIN GOOGLE */}
           <Route path="/ambil-barang" element={<ScanAmbilBarang />} />
           <Route path="/scan-keluar" element={<ScanAmbilBarang />} />
           <Route path="/keluar-cepat" element={<ScanAmbilBarang />} />
 
-          {/* Regular Dashboard Layout Routes */}
+          {/* Regular Dashboard Layout Routes - Memerlukan Login Google */}
           <Route path="/*" element={
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard" element={hasPermission('dashboard', 'view') ? <Dashboard /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/database" element={hasPermission('database', 'view') ? <DatabaseBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/masuk" element={hasPermission('masuk', 'view') ? <BarangMasuk /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/keluar" element={hasPermission('keluar', 'view') ? <BarangKeluar /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/berita-acara" element={hasPermission('berita_acara', 'view') ? <CetakBeritaAcara /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/stok" element={hasPermission('stok', 'view') ? <StokBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/laporan-blora" element={hasPermission('laporan', 'view') ? <LaporanBlora /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/dokumen" element={hasPermission('dokumen', 'view') ? <Dokumen /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/rekap" element={hasPermission('rekap', 'view') ? <RekapBulanan /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/rekap-indikator" element={hasPermission('indikator', 'view') ? <RekapIndikator /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/profile" element={hasPermission('profile', 'view') ? <Profile /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-                <Route path="/dashboard/ambil-barang" element={<ScanAmbilBarang />} />
-                <Route path="/dashboard/restricted" element={<RestrictedAccess user={user} logout={logout} />} />
-                <Route path="*" element={<Navigate to={getFirstAllowedRoute()} replace />} />
-              </Routes>
-            </Layout>
+            !user ? (
+              <LoginGate loginWithGoogle={loginWithGoogle} appName={settings.appName} appSubtitle={settings.appSubtitle} appLogo={settings.appLogo} />
+            ) : (
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard" element={hasPermission('dashboard', 'view') ? <Dashboard /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/database" element={hasPermission('database', 'view') ? <DatabaseBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/masuk" element={hasPermission('masuk', 'view') ? <BarangMasuk /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/keluar" element={hasPermission('keluar', 'view') ? <BarangKeluar /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/berita-acara" element={hasPermission('berita_acara', 'view') ? <CetakBeritaAcara /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/stok" element={hasPermission('stok', 'view') ? <StokBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/laporan-blora" element={hasPermission('laporan', 'view') ? <LaporanBlora /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/dokumen" element={hasPermission('dokumen', 'view') ? <Dokumen /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/rekap" element={hasPermission('rekap', 'view') ? <RekapBulanan /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/rekap-indikator" element={hasPermission('indikator', 'view') ? <RekapIndikator /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/profile" element={hasPermission('profile', 'view') ? <Profile /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                  <Route path="/dashboard/ambil-barang" element={<ScanAmbilBarang />} />
+                  <Route path="/dashboard/restricted" element={<RestrictedAccess user={user} logout={logout} />} />
+                  <Route path="*" element={<Navigate to={getFirstAllowedRoute()} replace />} />
+                </Routes>
+              </Layout>
+            )
           } />
         </Routes>
       </HashRouter>

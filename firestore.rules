@@ -17,23 +17,21 @@ service cloud.firestore {
 
     // Products collection rules
     match /products/{id} {
-      allow get: if isSignedIn() && isValidId(id);
-      allow list: if isSignedIn();
+      allow get, list: if true;
       allow write: if isSignedIn() && isValidId(id);
     }
 
     // Inbound transactions collection rules
     match /inbound/{id} {
-      allow get: if isSignedIn() && isValidId(id);
-      allow list: if isSignedIn();
+      allow get, list: if true;
       allow write: if isSignedIn() && isValidId(id);
     }
 
     // Outbound transactions collection rules
     match /outbound/{id} {
-      allow get: if isSignedIn() && isValidId(id);
-      allow list: if isSignedIn();
-      allow write: if isSignedIn() && isValidId(id);
+      allow get, list: if true;
+      allow create: if isValidId(id);
+      allow update, delete: if isSignedIn() && isValidId(id);
     }
 
     // Documents collection rules
@@ -45,8 +43,7 @@ service cloud.firestore {
 
     // Config & AppSettings collection rules
     match /config/{id} {
-      allow get: if isSignedIn() && isValidId(id);
-      allow list: if isSignedIn();
+      allow get, list: if true;
       allow write: if isSignedIn() && isValidId(id);
     }
 
