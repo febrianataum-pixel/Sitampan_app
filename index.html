@@ -14,6 +14,16 @@
     <meta name="apple-mobile-web-app-title" content="SITAMPAN">
     <meta name="theme-color" content="#2563eb">
     
+    <!-- Automatic hash redirect for direct URL access (e.g. Vercel deployment) -->
+    <script>
+      (function() {
+        var path = window.location.pathname;
+        if (path && path !== '/' && !path.includes('.')) {
+          window.location.replace(window.location.origin + '/#' + path + window.location.search);
+        }
+      })();
+    </script>
+    
     <!-- Favicon & PWA Icons -->
     <link id="dynamic-favicon" rel="icon" type="image/png" href="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png">
     <link id="dynamic-apple-icon" rel="apple-touch-icon" href="https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/sitampan-logo.png">

@@ -23,10 +23,12 @@ import {
   Image as ImageIcon,
   Loader2,
   FileText,
-  TrendingUp
+  TrendingUp,
+  QrCode
 } from 'lucide-react';
 import { OutboundTransaction, OutboundItem, formatIndoDate, Product, MONTHS } from '../types';
 import { generateReportPDF } from '../services/pdfService';
+import { QrPintuGudangModal } from '../components/QrPintuGudangModal';
 
 type SortKey = 'tanggal' | 'penerima' | 'alamat';
 
@@ -39,6 +41,7 @@ const BarangKeluar: React.FC = () => {
   const [viewingTx, setViewingTx] = useState<OutboundTransaction | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [uploadingTxId, setUploadingTxId] = useState<string | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
@@ -411,11 +414,20 @@ const BarangKeluar: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Manajemen distribusi dan pengurutan data.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button 
+            type="button"
+            onClick={() => setIsQrModalOpen(true)} 
+            className="flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200/60 dark:border-indigo-800/40 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-ios font-bold shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all active:scale-95 text-xs cursor-pointer"
+            title="Tampilkan / Cetak Barcode QR Pintu Gudang"
+          >
+            <QrCode size={16} className="text-indigo-600 dark:text-indigo-400" />
+            <span>Barcode Pintu Gudang</span>
+          </button>
           <button onClick={handleExportPDF} className="flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 px-5 py-2 rounded-ios font-bold shadow-sm hover:bg-red-100 transition-all active:scale-95 text-xs">
             <FileText size={18} /> Export PDF
           </button>
           {hasPermission('keluar', 'add') && (
-            <button onClick={() => handleOpenModal()} className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95" style={{ backgroundColor: settings.themeColor }}>
+            <button onClick={() => handleOpenModal()} className="flex items-center justify-center gap-2 text-white px-5 py-2 rounded-ios font-bold shadow-sm text-xs transition-all active:scale-95 cursor-pointer" style={{ backgroundColor: settings.themeColor }}>
               <Plus size={18} /> Transaksi Baru
             </button>
           )}
@@ -1021,6 +1033,14 @@ const BarangKeluar: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Barcode / QR Code Pintu Gudang */}
+      <QrPintuGudangModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        appName={settings.appName}
+        warehouseName={settings.warehouseName}
+      />
     </div>
   );
 };

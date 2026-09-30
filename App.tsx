@@ -31,7 +31,8 @@ import {
   LogOut,
   Sparkles,
   LayoutGrid,
-  ChevronDown
+  ChevronDown,
+  DoorOpen
 } from 'lucide-react';
 
 import { initializeApp, getApp, getApps } from 'firebase/app';
@@ -51,6 +52,7 @@ import Profile from './pages/Profile';
 import LaporanBlora from './pages/LaporanBlora';
 import Dokumen from './pages/Dokumen';
 import RekapIndikator from './pages/RekapIndikator';
+import ScanAmbilBarang from './pages/ScanAmbilBarang';
 
 import { Product, InboundEntry, OutboundTransaction, AppSettings, formatIndoDate, ArchiveDocument } from './types';
 import { saveStateToIDB, getStateFromIDB } from './utils/idb';
@@ -612,6 +614,23 @@ const LoginGate: React.FC<LoginGateProps> = ({ loginWithGoogle, appName, appSubt
             {appSubtitle || "SISTEM TANGGAP PEMANTAUAN LOGISTIK KEBENCANAAN"}
           </p>
         </div>
+
+        {typeof window !== 'undefined' && (
+          window.location.hash.includes('ambil-barang') ||
+          window.location.hash.includes('scan-keluar') ||
+          window.location.hash.includes('keluar-cepat') ||
+          window.location.pathname.includes('ambil-barang')
+        ) && (
+          <div className="p-3.5 bg-indigo-500/20 border border-indigo-500/40 rounded-2xl text-left flex items-start gap-3 animate-in fade-in duration-300">
+            <DoorOpen size={20} className="text-indigo-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-indigo-300">Scan Barcode Pintu Gudang Terdeteksi</p>
+              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                Silakan masuk untuk mulai mengisi formulir pengambilan barang keluar dari gudang logistik.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="w-full h-px bg-white/5" />
 
@@ -1325,24 +1344,35 @@ const RestrictedAccess: React.FC<{ user: any; logout: () => void }> = ({ user, l
   return (
     <InventoryContext.Provider value={{ products, setProducts, inbound, setInbound, outbound, setOutbound, documents, setDocuments, settings, setSettings, selectedYear, setSelectedYear, calculateStock, isCloudConnected, isRescuing, toggleTheme, syncError, storage: storageState, user, logout, loginWithGoogle, userPermissions, hasPermission }}>
       <HashRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard" element={hasPermission('dashboard', 'view') ? <Dashboard /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/database" element={hasPermission('database', 'view') ? <DatabaseBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/masuk" element={hasPermission('masuk', 'view') ? <BarangMasuk /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/keluar" element={hasPermission('keluar', 'view') ? <BarangKeluar /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/berita-acara" element={hasPermission('berita_acara', 'view') ? <CetakBeritaAcara /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/stok" element={hasPermission('stok', 'view') ? <StokBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/laporan-blora" element={hasPermission('laporan', 'view') ? <LaporanBlora /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/dokumen" element={hasPermission('dokumen', 'view') ? <Dokumen /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/rekap" element={hasPermission('rekap', 'view') ? <RekapBulanan /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/rekap-indikator" element={hasPermission('indikator', 'view') ? <RekapIndikator /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/profile" element={hasPermission('profile', 'view') ? <Profile /> : <Navigate to={getFirstAllowedRoute()} replace />} />
-            <Route path="/dashboard/restricted" element={<RestrictedAccess user={user} logout={logout} />} />
-            <Route path="*" element={<Navigate to={getFirstAllowedRoute()} replace />} />
-          </Routes>
-        </Layout>
+        <Routes>
+          {/* Link Khusus Barcode Pintu Gudang (Ambil Barang) */}
+          <Route path="/ambil-barang" element={<ScanAmbilBarang />} />
+          <Route path="/scan-keluar" element={<ScanAmbilBarang />} />
+          <Route path="/keluar-cepat" element={<ScanAmbilBarang />} />
+
+          {/* Regular Dashboard Layout Routes */}
+          <Route path="/*" element={
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard" element={hasPermission('dashboard', 'view') ? <Dashboard /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/database" element={hasPermission('database', 'view') ? <DatabaseBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/masuk" element={hasPermission('masuk', 'view') ? <BarangMasuk /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/keluar" element={hasPermission('keluar', 'view') ? <BarangKeluar /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/berita-acara" element={hasPermission('berita_acara', 'view') ? <CetakBeritaAcara /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/stok" element={hasPermission('stok', 'view') ? <StokBarang /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/laporan-blora" element={hasPermission('laporan', 'view') ? <LaporanBlora /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/dokumen" element={hasPermission('dokumen', 'view') ? <Dokumen /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/rekap" element={hasPermission('rekap', 'view') ? <RekapBulanan /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/rekap-indikator" element={hasPermission('indikator', 'view') ? <RekapIndikator /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/profile" element={hasPermission('profile', 'view') ? <Profile /> : <Navigate to={getFirstAllowedRoute()} replace />} />
+                <Route path="/dashboard/ambil-barang" element={<ScanAmbilBarang />} />
+                <Route path="/dashboard/restricted" element={<RestrictedAccess user={user} logout={logout} />} />
+                <Route path="*" element={<Navigate to={getFirstAllowedRoute()} replace />} />
+              </Routes>
+            </Layout>
+          } />
+        </Routes>
       </HashRouter>
     </InventoryContext.Provider>
   );
