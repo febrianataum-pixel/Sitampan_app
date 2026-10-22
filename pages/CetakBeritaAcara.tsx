@@ -442,7 +442,7 @@ const CetakBeritaAcara: React.FC = () => {
       ? `<img src="${settings.logo}" style="height:75px; width:auto; object-fit:contain;" ${settings.logo.startsWith('http') ? 'crossOrigin="anonymous"' : ''} />`
       : `<div style="width:60px; height:60px; background:#f8fafc; border:1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:8px; color:#94a3b8;">LOGO</div>`;
     let grandTotal = 0;
-    const tableRows = tx.items.map((item, idx) => {
+    const tableRows = (tx.items || []).map((item, idx) => {
       const p = products.find(prod => prod.id === item.productId);
       const total = item.jumlah * (p?.harga || 0);
       grandTotal += total;

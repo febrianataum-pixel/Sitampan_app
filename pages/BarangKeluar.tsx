@@ -132,7 +132,7 @@ const BarangKeluar: React.FC = () => {
         subJenisBencana: tx.subJenisBencana || '',
         keteranganBencana: tx.keteranganBencana || ''
       });
-      setItems(tx.items.map(item => ({ ...item, id: crypto.randomUUID() })));
+      setItems((tx.items || []).map(item => ({ ...item, id: crypto.randomUUID() })));
     } else {
       setEditingTx(null);
       setGeneralData({ 
@@ -351,9 +351,9 @@ const BarangKeluar: React.FC = () => {
   });
 
   const grandTotal = sortedOutbound.reduce((acc, tx) => {
-    const txTotal = tx.items.reduce((t, item) => {
+    const txTotal = (tx.items || []).reduce((t, item) => {
       const p = products.find(prod => prod.id === item.productId);
-      return t + (item.jumlah * (p?.harga || 0));
+      return t + ((item.jumlah || 0) * (p?.harga || 0));
     }, 0);
     return acc + txTotal;
   }, 0);

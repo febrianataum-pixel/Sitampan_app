@@ -71,7 +71,7 @@ const RekapBulanan: React.FC = () => {
           return txMonthIndex === monthIdx && txYear === selectedYear;
         })
         .reduce((acc, tx) => {
-          const item = tx.items.find(i => i.productId === p.id);
+          const item = tx.items?.find(i => i.productId === p.id);
           return acc + (item?.jumlah || 0);
         }, 0);
     });

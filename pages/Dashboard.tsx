@@ -113,25 +113,25 @@ const Dashboard: React.FC = () => {
   // 1. Statistik Utama
   const stats = useMemo(() => {
     const jenisLogistik = products.length;
-    const totalMasuk = inbound.reduce((acc, i) => acc + i.jumlah, 0);
+    const totalMasuk = inbound.reduce((acc, i) => acc + (i.jumlah || 0), 0);
     const totalKeluar = outbound.reduce((acc, tx) => 
-      acc + tx.items.reduce((sum, item) => sum + item.jumlah, 0), 0
+      acc + (tx.items || []).reduce((sum, item) => sum + (item.jumlah || 0), 0), 0
     );
     const totalSisaBarang = products.reduce((acc, p) => acc + calculateStock(p.id), 0);
 
     const totalMasukRp = inbound.reduce((acc, i) => {
       const p = products.find(prod => prod.id === i.productId);
-      return acc + (i.jumlah * (p?.harga || 0));
+      return acc + ((i.jumlah || 0) * (p?.harga || 0));
     }, 0);
 
     const totalKeluarRp = outbound.reduce((acc, tx) => 
-      acc + tx.items.reduce((sum, item) => {
+      acc + (tx.items || []).reduce((sum, item) => {
         const p = products.find(prod => prod.id === item.productId);
-        return sum + (item.jumlah * (p?.harga || 0));
+        return sum + ((item.jumlah || 0) * (p?.harga || 0));
       }, 0), 0
     );
 
-    const totalStokRp = products.reduce((acc, p) => acc + (calculateStock(p.id) * p.harga), 0);
+    const totalStokRp = products.reduce((acc, p) => acc + (calculateStock(p.id) * (p.harga || 0)), 0);
 
     return [
       { label: 'Jenis Logistik', value: jenisLogistik, subValue: 'Varian Terdaftar', icon: <Package size={18}/>, color: 'blue' },
@@ -801,7 +801,7 @@ const Dashboard: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                            {tx.items.map((item, idx) => {
+                            {(tx.items || []).map((item, idx) => {
                               const p = products.find(prod => prod.id === item.productId);
                               return (
                                 <tr key={idx}>

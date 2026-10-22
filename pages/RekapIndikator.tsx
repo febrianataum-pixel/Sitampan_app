@@ -153,7 +153,7 @@ const RekapIndikator: React.FC = () => {
       const subBencanaMatch = !filters.subJenisBencana || tx.subJenisBencana === filters.subJenisBencana;
       
       // Filter by category if selected
-      const categoryMatch = !filters.kategori || tx.items.some(item => {
+      const categoryMatch = !filters.kategori || tx.items?.some(item => {
         const p = products.find(prod => prod.id === item.productId);
         return p && isProductInFilterCategory(p.namaBarang, filters.kategori);
       });
@@ -217,9 +217,9 @@ const RekapIndikator: React.FC = () => {
 
     // Add outbound data
     filteredOutbound.forEach(tx => {
-      tx.items.forEach(item => {
+      (tx.items || []).forEach(item => {
         if (recap[item.productId]) {
-          recap[item.productId].jumlahKeluar += item.jumlah;
+          recap[item.productId].jumlahKeluar += (item.jumlah || 0);
         }
       });
     });
@@ -377,10 +377,10 @@ const RekapIndikator: React.FC = () => {
     });
 
     filteredOutbound.forEach(tx => {
-      tx.items.forEach(item => {
+      (tx.items || []).forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (product) {
-          totalKeluar += item.jumlah * product.harga;
+          totalKeluar += (item.jumlah || 0) * (product.harga || 0);
         }
       });
     });

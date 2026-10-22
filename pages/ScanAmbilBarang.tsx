@@ -27,12 +27,16 @@ import {
   ChevronDown,
   X
 } from 'lucide-react';
-import { OutboundTransaction, OutboundItem, formatIndoDate, Product } from '../types';
+import { OutboundTransaction, OutboundItem, formatIndoDate, Product, InboundEntry } from '../types';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { db } from '../App';
 
 export const ScanAmbilBarang: React.FC = () => {
   const navigate = useNavigate();
   const { 
     products, 
+    setProducts,
+    setInbound,
     outbound, 
     setOutbound, 
     calculateStock, 
@@ -42,6 +46,51 @@ export const ScanAmbilBarang: React.FC = () => {
     toggleTheme, 
     selectedYear 
   } = useInventory();
+
+  const [isLoadingData, setIsLoadingData] = useState(products.length === 0);
+
+  // Fallback direct cloud fetch to immediately load products & stock on fresh mobile scans
+  useEffect(() => {
+    let isMounted = true;
+    const loadFreshWarehouseData = async () => {
+      try {
+        if (products.length === 0) setIsLoadingData(true);
+        const [prodSnap, inSnap, outSnap] = await Promise.all([
+          getDocs(collection(db, 'products')),
+          getDocs(collection(db, 'inbound')),
+          getDocs(collection(db, 'outbound'))
+        ]);
+        if (isMounted) {
+          if (!prodSnap.empty) {
+            const prods = prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+            setProducts(prods);
+          }
+          if (!inSnap.empty) {
+            const ins = inSnap.docs.map(d => ({ id: d.id, ...d.data() } as InboundEntry));
+            setInbound(ins);
+          }
+          if (!outSnap.empty) {
+            const outs = outSnap.docs.map(d => ({ id: d.id, ...d.data() } as OutboundTransaction));
+            setOutbound(outs);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching warehouse data directly:', err);
+      } finally {
+        if (isMounted) setIsLoadingData(false);
+      }
+    };
+
+    loadFreshWarehouseData();
+
+    return () => { isMounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      setIsLoadingData(false);
+    }
+  }, [products]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedTx, setSubmittedTx] = useState<OutboundTransaction | null>(null);
@@ -212,7 +261,14 @@ export const ScanAmbilBarang: React.FC = () => {
         images: images
       };
 
-      // Simpan ke state global, IndexedDB, localStorage, dan sync Firestore
+      // Simpan langsung ke cloud database Firestore secara real-time
+      try {
+        await setDoc(doc(db, 'outbound', newTransaction.id), newTransaction);
+      } catch (cloudErr) {
+        console.warn('Direct write to Firestore warning, synced locally:', cloudErr);
+      }
+
+      // Simpan ke state global, IndexedDB, dan localStorage
       setOutbound((prev: OutboundTransaction[]) => [newTransaction, ...prev]);
 
       // Tampilkan layar sukses
@@ -613,6 +669,11 @@ export const ScanAmbilBarang: React.FC = () => {
                                 Stok: {currentStock} {selectedProd.satuan}
                               </span>
                             </div>
+                          ) : isLoadingData && products.length === 0 ? (
+                            <span className="text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-2">
+                              <Loader2 size={14} className="animate-spin text-indigo-500" />
+                              Memuat data stok dari gudang...
+                            </span>
                           ) : (
                             <span className="text-slate-400 font-normal flex items-center gap-1.5">
                               <Search size={14} className="text-slate-400" />
@@ -656,10 +717,12 @@ export const ScanAmbilBarang: React.FC = () => {
                                 <div className="flex justify-between items-center px-1 pt-2 text-[10px] text-slate-400 font-medium">
                                   <span>Urutan Abjad A - Z</span>
                                   <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                    {getAvailableProductsForSelect(item.productId).filter(p => {
-                                      const q = (searchQueries[item.id] || '').toLowerCase();
-                                      return p.namaBarang.toLowerCase().includes(q) || p.kodeBarang.toLowerCase().includes(q);
-                                    }).length} barang bersisa stok
+                                    {isLoadingData && products.length === 0
+                                      ? 'Memuat data stok...'
+                                      : `${getAvailableProductsForSelect(item.productId).filter(p => {
+                                          const q = (searchQueries[item.id] || '').toLowerCase();
+                                          return p.namaBarang.toLowerCase().includes(q) || p.kodeBarang.toLowerCase().includes(q);
+                                        }).length} barang bersisa stok`}
                                   </span>
                                 </div>
                               </div>
@@ -667,6 +730,16 @@ export const ScanAmbilBarang: React.FC = () => {
                               {/* Scrollable list of products (hanya stok > 0) */}
                               <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-white/5 p-1">
                                 {(() => {
+                                  if (isLoadingData && products.length === 0) {
+                                    return (
+                                      <div className="py-8 text-center text-xs text-indigo-600 dark:text-indigo-400 space-y-2">
+                                        <Loader2 size={24} className="animate-spin mx-auto text-indigo-500" />
+                                        <p className="font-bold">Sedang memuat data stok logistik...</p>
+                                        <p className="text-[10px] text-slate-400">Sinkronisasi stok real-time</p>
+                                      </div>
+                                    );
+                                  }
+
                                   const availableList = getAvailableProductsForSelect(item.productId);
                                   const q = (searchQueries[item.id] || '').toLowerCase();
                                   const filtered = availableList.filter(p => 
@@ -681,7 +754,7 @@ export const ScanAmbilBarang: React.FC = () => {
                                         <p>
                                           {searchQueries[item.id] 
                                             ? `Tidak ada barang bersisa stok yang cocok dengan "${searchQueries[item.id]}"` 
-                                            : 'Tidak ada barang dengan stok tersedia (> 0) di gudang'}
+                                            : 'Semua barang saat ini stoknya sedang habis (0)'}
                                         </p>
                                       </div>
                                     );

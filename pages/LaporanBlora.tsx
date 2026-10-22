@@ -69,7 +69,7 @@ const LaporanBlora: React.FC = () => {
 
       // Calculate outbound for this product in current filtered period
       const totalOut = filteredOutbound.reduce((sum, tx) => {
-        const matchItem = tx.items.find(item => item.productId === product.id);
+        const matchItem = tx.items?.find(item => item.productId === product.id);
         return sum + (matchItem ? matchItem.jumlah : 0);
       }, 0);
 
@@ -167,9 +167,9 @@ const LaporanBlora: React.FC = () => {
   const productDistributionPeriod = useMemo(() => {
     if (!selectedProductDetails) return [];
     return filteredOutbound
-      .filter(tx => tx.items.some(item => item.productId === selectedProductDetails.id))
+      .filter(tx => tx.items?.some(item => item.productId === selectedProductDetails.id))
       .map(tx => {
-        const matchItem = tx.items.find(item => item.productId === selectedProductDetails.id);
+        const matchItem = tx.items?.find(item => item.productId === selectedProductDetails.id);
         return {
           id: tx.id,
           penerima: tx.penerima,
@@ -188,9 +188,9 @@ const LaporanBlora: React.FC = () => {
   const productDistributionAllTime = useMemo(() => {
     if (!selectedProductDetails) return [];
     return outbound
-      .filter(tx => tx.items.some(item => item.productId === selectedProductDetails.id))
+      .filter(tx => tx.items?.some(item => item.productId === selectedProductDetails.id))
       .map(tx => {
-        const matchItem = tx.items.find(item => item.productId === selectedProductDetails.id);
+        const matchItem = tx.items?.find(item => item.productId === selectedProductDetails.id);
         return {
           id: tx.id,
           penerima: tx.penerima,

@@ -1222,8 +1222,17 @@ const App: React.FC = () => {
         if (deleted && user) {
           await deleteDoc(doc(db, col, deleted.id));
         }
-        for (const it of data) {
-          await setDoc(doc(db, col, it.id), it);
+        if (!user && col === 'outbound') {
+          // Hanya tulis transaksi baru yang belum tersimpan di Firestore
+          const existingIds = new Set(outboundRef.current.map(o => o.id));
+          const newItems = data.filter(it => !existingIds.has(it.id));
+          for (const it of newItems) {
+            await setDoc(doc(db, col, it.id), it);
+          }
+        } else if (user) {
+          for (const it of data) {
+            await setDoc(doc(db, col, it.id), it);
+          }
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `${col}`);
@@ -1284,8 +1293,8 @@ const App: React.FC = () => {
   };
 
   const calculateStock = (productId: string) => {
-    const totalIn = inbound.filter(i => i.productId === productId).reduce((acc, i) => acc + i.jumlah, 0);
-    const totalOut = outbound.reduce((acc, tx) => acc + (tx.items.find(i => i.productId === productId)?.jumlah || 0), 0);
+    const totalIn = inbound.filter(i => i.productId === productId).reduce((acc, i) => acc + (i.jumlah || 0), 0);
+    const totalOut = outbound.reduce((acc, tx) => acc + (tx.items?.find(i => i.productId === productId)?.jumlah || 0), 0);
     return totalIn - totalOut;
   };
 
